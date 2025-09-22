@@ -47,7 +47,7 @@ const Index = () => {
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
               Welcome to{" "}
               <span className="bg-gradient-primary bg-clip-text text-transparent">
-                EduHub
+                AceTerus
               </span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -136,7 +136,7 @@ const Index = () => {
               Ready to Start Learning?
             </h2>
             <p className="text-xl mb-8 opacity-90">
-              Join thousands of students already using EduHub to enhance their computer science education.
+              Join thousands of students already using AceTerus to enhance their computer science education.
             </p>
             <Link to="/quiz">
               <Button size="lg" variant="secondary" className="text-lg px-8 shadow-lg">
