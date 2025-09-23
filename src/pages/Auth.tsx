@@ -104,17 +104,21 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold">
-            <BookOpen className="w-8 h-8 text-primary" />
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
-              EduHub
-            </span>
-          </Link>
-          <p className="text-muted-foreground mt-2">Welcome back to your learning journey</p>
-        </div>
+   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background p-4">
+  <div className="w-full max-w-md">
+    <div className="text-center mb-8">
+      <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold">
+        <img 
+          src="/logo.png" 
+          alt="AceTerus Logo" 
+          className="w-8 h-8 object-contain"
+        />
+        <span className="bg-gradient-primary bg-clip-text text-transparent">
+          AceTerus
+        </span>
+      </Link>
+      <p className="text-muted-foreground mt-2">Welcome back to your learning journey</p>
+    </div>
 
         <Card className="shadow-elegant">
           <CardHeader className="space-y-1">
