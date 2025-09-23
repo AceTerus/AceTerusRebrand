@@ -159,23 +159,23 @@ const Profile = () => {
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Profile Header */}
         <Card className="mb-6 overflow-hidden shadow-elegant">
-          {/* Cover Image */}
-          <div className="h-32 bg-gradient-hero relative">
+          {/* Cover Image - FIXED: Proper spacing without overlap */}
+          <div className="h-20 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-600 relative">
             <Button
               onClick={() => setIsEditing(!isEditing)}
               variant="secondary"
               size="sm"
-              className="absolute top-4 right-4 shadow-sm"
+              className="absolute top-3 right-3 shadow-sm bg-white/90 backdrop-blur-sm hover:bg-white"
             >
               <Edit className="w-4 h-4 mr-1" />
               {isEditing ? "Cancel" : "Edit Profile"}
             </Button>
           </div>
 
-          <CardContent className="px-6 pb-6">
-            {/* Avatar and Basic Info */}
-            <div className="flex flex-col md:flex-row md:items-end md:space-x-4 -mt-12">
-              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-background shadow-elegant bg-gradient-primary text-primary-foreground flex items-center justify-center text-2xl font-bold">
+          <CardContent className="px-6 pb-6 pt-6">
+            {/* Avatar and Basic Info - FIXED: No negative margin to prevent overlap */}
+            <div className="flex flex-col md:flex-row md:items-start md:space-x-4">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-background shadow-elegant bg-gradient-to-br from-blue-600 to-purple-600 text-white flex items-center justify-center text-xl font-bold">
                 {user.avatar ? (
                   <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
@@ -244,7 +244,7 @@ const Profile = () => {
               </div>
 
               {isEditing && (
-                <Button onClick={handleSaveProfile} className="mt-4 md:mt-0 bg-gradient-primary shadow-glow">
+                <Button onClick={handleSaveProfile} className="mt-4 md:mt-0 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl transition-all duration-200">
                   Save Changes
                 </Button>
               )}
@@ -264,8 +264,8 @@ const Profile = () => {
                 <div className="flex items-center justify-center mb-1">
                   <div className="relative">
                     <Flame className="w-6 h-6 text-orange-500" />
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-primary rounded-full flex items-center justify-center">
-                      <span className="text-xs font-bold text-primary-foreground">{user.streak.current}</span>
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-bold text-white">{user.streak.current}</span>
                     </div>
                   </div>
                 </div>
@@ -287,18 +287,18 @@ const Profile = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-6">
-                <div className="text-center p-4 bg-gradient-primary/10 rounded-lg">
+                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
                   <div className="flex items-center justify-center mb-2">
-                    <Zap className="w-8 h-8 text-primary" />
+                    <Zap className="w-8 h-8 text-blue-600" />
                   </div>
-                  <p className="text-2xl font-bold text-primary">{user.streak.current}</p>
+                  <p className="text-2xl font-bold text-blue-600">{user.streak.current}</p>
                   <p className="text-sm text-muted-foreground">Current Streak</p>
                 </div>
-                <div className="text-center p-4 bg-gradient-hero/10 rounded-lg">
+                <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
                   <div className="flex items-center justify-center mb-2">
-                    <Target className="w-8 h-8 text-secondary" />
+                    <Target className="w-8 h-8 text-purple-600" />
                   </div>
-                  <p className="text-2xl font-bold text-secondary">{user.streak.longest}</p>
+                  <p className="text-2xl font-bold text-purple-600">{user.streak.longest}</p>
                   <p className="text-sm text-muted-foreground">Longest Streak</p>
                 </div>
               </div>
@@ -373,10 +373,10 @@ const Profile = () => {
           {/* Posts Tab */}
           <TabsContent value="posts" className="space-y-4">
             {mockPosts.map((post) => (
-              <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow">
+              <Card key={post.id} className="shadow-elegant hover:shadow-lg transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-primary text-primary-foreground flex items-center justify-center font-bold">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 text-white flex items-center justify-center font-bold">
                       {user.name.charAt(0)}
                     </div>
                     <div className="flex-1">
@@ -417,7 +417,7 @@ const Profile = () => {
           <TabsContent value="uploads">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {mockUploads.map((upload) => (
-                <Card key={upload.id} className="shadow-elegant hover:shadow-glow transition-shadow">
+                <Card key={upload.id} className="shadow-elegant hover:shadow-lg transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
