@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PostUpload } from "@/components/PostUpload";
+import { FileUpload } from "@/components/FileUpload";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import {
   Edit,
   MapPin,
@@ -21,138 +26,212 @@ import {
   Award,
   Target,
   Zap,
+  Trash2,
 } from "lucide-react";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [uploads, setUploads] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user: authUser } = useAuth();
+  const { toast } = useToast();
+  
   const [user, setUser] = useState({
-    name: "Alex Johnson",
-    username: "@alexj",
-    email: "alex.johnson@university.edu",
-    bio: "Computer Science major passionate about AI and machine learning. Love helping classmates with coding projects!",
-    location: "University of Tech",
-    joinDate: "September 2023",
-    major: "Computer Science",
-    year: "Sophomore",
+    name: authUser?.email?.split('@')[0] || "User",
+    username: "@" + (authUser?.email?.split('@')[0] || "user"),
+    email: authUser?.email || "",
+    bio: "Share your thoughts and study materials with the community!",
+    location: "University",
+    joinDate: "January 2024",
+    major: "Student",
+    year: "Current",
     avatar: "",
     stats: {
-      posts: 24,
-      uploads: 12,
-      downloads: 89,
-      followers: 156,
-      following: 92,
+      posts: 0,
+      uploads: 0,
+      downloads: 0,
+      followers: 0,
+      following: 0,
     },
     streak: {
-      current: 15,
-      longest: 28,
+      current: 1,
+      longest: 1,
       lastActive: new Date().toISOString(),
     },
     achievements: [
       {
         id: 1,
-        title: "First Upload",
-        description: "Uploaded your first study material",
-        icon: "Upload",
-        earnedAt: "2024-01-10",
+        title: "Welcome!",
+        description: "Joined the community",
+        icon: "Trophy",
+        earnedAt: "2024-01-01",
         category: "milestone",
-      },
-      {
-        id: 2,
-        title: "Helpful Helper",
-        description: "Received 10+ likes on your posts",
-        icon: "Heart",
-        earnedAt: "2024-01-15",
-        category: "engagement",
-      },
-      {
-        id: 3,
-        title: "Study Streak",
-        description: "Maintained a 7-day activity streak",
-        icon: "Flame",
-        earnedAt: "2024-01-20",
-        category: "consistency",
-      },
-      {
-        id: 4,
-        title: "Knowledge Sharer",
-        description: "Uploaded 10+ study materials",
-        icon: "Award",
-        earnedAt: "2024-01-25",
-        category: "contribution",
       },
     ],
   });
 
   const [editForm, setEditForm] = useState({ ...user });
 
-  const mockPosts = [
-    {
-      id: 1,
-      content:
-        "Just finished my machine learning project! The neural network achieved 94% accuracy on the test set. 🎉",
-      timestamp: "2 hours ago",
-      likes: 15,
-      comments: 4,
-      tags: ["MachineLearning", "AI", "Project"],
-    },
-    {
-      id: 2,
-      content:
-        "Study group for Data Structures tomorrow at 3 PM in the library. We'll be covering binary trees and graph algorithms.",
-      timestamp: "1 day ago",
-      likes: 8,
-      comments: 12,
-      tags: ["StudyGroup", "DataStructures", "Algorithms"],
-    },
-  ];
+  // Load user posts and uploads
+  const loadPosts = async () => {
+    if (!authUser) return;
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setPosts(data || []);
+    } catch (error: any) {
+      console.error('Error loading posts:', error);
+    }
+  };
 
-  const mockUploads = [
-    {
-      id: 1,
-      title: "Python Data Structures Cheat Sheet",
-      type: "Cheat Sheet",
-      downloads: 45,
-      rating: 4.8,
-      uploadDate: "2024-01-15",
-    },
-    {
-      id: 2,
-      title: "Linear Algebra Notes - Chapter 5",
-      type: "Notes",
-      downloads: 32,
-      rating: 4.6,
-      uploadDate: "2024-01-10",
-    },
-  ];
+  const loadUploads = async () => {
+    if (!authUser) return;
+    try {
+      const { data, error } = await supabase
+        .from('uploads')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setUploads(data || []);
+    } catch (error: any) {
+      console.error('Error loading uploads:', error);
+    }
+  };
 
-  const mockActivities = [
-    {
-      id: 1,
-      action: 'Uploaded "Python Data Structures Cheat Sheet"',
-      timestamp: "2 days ago",
-      icon: Upload,
-      color: "text-primary",
-    },
-    {
-      id: 2,
-      action: "Posted about machine learning project",
-      timestamp: "3 days ago",
-      icon: MessageCircle,
-      color: "text-secondary",
-    },
-    {
-      id: 3,
-      action: 'Downloaded "Calculus II - Integration Techniques"',
-      timestamp: "5 days ago",
-      icon: Download,
-      color: "text-primary",
-    },
-  ];
+  const loadData = async () => {
+    setLoading(true);
+    await Promise.all([loadPosts(), loadUploads()]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (authUser) {
+      loadData();
+      // Update user stats
+      setUser(prev => ({
+        ...prev,
+        name: authUser.email?.split('@')[0] || "User",
+        username: "@" + (authUser.email?.split('@')[0] || "user"),
+        email: authUser.email || "",
+        stats: {
+          ...prev.stats,
+          posts: posts.length,
+          uploads: uploads.length,
+        }
+      }));
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    // Update stats when posts/uploads change
+    setUser(prev => ({
+      ...prev,
+      stats: {
+        ...prev.stats,
+        posts: posts.length,
+        uploads: uploads.length,
+      }
+    }));
+  }, [posts.length, uploads.length]);
 
   const handleSaveProfile = () => {
     setUser({ ...editForm });
     setIsEditing(false);
   };
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
+      
+      if (error) throw error;
+      
+      setPosts(posts.filter(post => post.id !== postId));
+      toast({
+        title: "Post deleted",
+        description: "Your post has been removed",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete post",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteUpload = async (uploadId: string, fileUrl: string) => {
+    try {
+      // Delete from storage
+      const fileName = fileUrl.split('/').pop();
+      if (fileName) {
+        const { error: storageError } = await supabase.storage
+          .from('user-uploads')
+          .remove([`${authUser?.id}/${fileName}`]);
+        
+        if (storageError) console.error('Storage deletion error:', storageError);
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('uploads')
+        .delete()
+        .eq('id', uploadId);
+      
+      if (error) throw error;
+      
+      setUploads(uploads.filter(upload => upload.id !== uploadId));
+      toast({
+        title: "File deleted",
+        description: "Your file has been removed",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return "1 day ago";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  if (!authUser) {
+    return (
+      <div className="min-h-screen pt-20 pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
+        <div className="container mx-auto px-4 max-w-4xl text-center">
+          <h1 className="text-2xl font-bold mb-4">Please sign in to view your profile</h1>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-20 pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
@@ -182,6 +261,7 @@ const Profile = () => {
                   user.name.charAt(0)
                 )}
               </div>
+
 
               <div className="flex-1 mt-4 md:mt-0">
                 {isEditing ? (
@@ -244,7 +324,7 @@ const Profile = () => {
               </div>
 
               {isEditing && (
-                <Button onClick={handleSaveProfile} className="mt-4 md:mt-0 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl transition-all duration-200">
+                <Button onClick={handleSaveProfile} className="mt-4 md:mt-0 bg-gradient-primary shadow-glow">
                   Save Changes
                 </Button>
               )}
@@ -264,8 +344,8 @@ const Profile = () => {
                 <div className="flex items-center justify-center mb-1">
                   <div className="relative">
                     <Flame className="w-6 h-6 text-orange-500" />
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">{user.streak.current}</span>
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-primary rounded-full flex items-center justify-center">
+                      <span className="text-xs font-bold text-primary-foreground">{user.streak.current}</span>
                     </div>
                   </div>
                 </div>
@@ -287,18 +367,18 @@ const Profile = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-6">
-                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="text-center p-4 bg-gradient-primary/10 rounded-lg">
                   <div className="flex items-center justify-center mb-2">
-                    <Zap className="w-8 h-8 text-blue-600" />
+                    <Zap className="w-8 h-8 text-primary" />
                   </div>
-                  <p className="text-2xl font-bold text-blue-600">{user.streak.current}</p>
+                  <p className="text-2xl font-bold text-primary">{user.streak.current}</p>
                   <p className="text-sm text-muted-foreground">Current Streak</p>
                 </div>
-                <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="text-center p-4 bg-gradient-hero/10 rounded-lg">
                   <div className="flex items-center justify-center mb-2">
-                    <Target className="w-8 h-8 text-purple-600" />
+                    <Target className="w-8 h-8 text-secondary" />
                   </div>
-                  <p className="text-2xl font-bold text-purple-600">{user.streak.longest}</p>
+                  <p className="text-2xl font-bold text-secondary">{user.streak.longest}</p>
                   <p className="text-sm text-muted-foreground">Longest Streak</p>
                 </div>
               </div>
@@ -372,77 +452,128 @@ const Profile = () => {
 
           {/* Posts Tab */}
           <TabsContent value="posts" className="space-y-4">
-            {mockPosts.map((post) => (
-              <Card key={post.id} className="shadow-elegant hover:shadow-lg transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 text-white flex items-center justify-center font-bold">
-                      {user.name.charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="font-semibold text-sm">{user.name}</h3>
-                        <span className="text-muted-foreground text-xs">{post.timestamp}</span>
+            <PostUpload onPostCreated={loadPosts} />
+            
+            {loading ? (
+              <div className="text-center py-8">Loading posts...</div>
+            ) : posts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No posts yet. Share your first post above!
+              </div>
+            ) : (
+              posts.map((post) => (
+                <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-primary text-primary-foreground flex items-center justify-center font-bold">
+                        {user.name.charAt(0)}
                       </div>
-                      <p className="text-sm mb-3">{post.content}</p>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {post.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            #{tag}
-                          </Badge>
-                        ))}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center space-x-4 text-muted-foreground">
-                        <div className="flex items-center space-x-1">
-                          <Heart className="w-4 h-4" />
-                          <span className="text-sm">{post.likes}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-semibold text-sm">{user.name}</h3>
+                            <span className="text-muted-foreground text-xs">{formatDate(post.created_at)}</span>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeletePost(post.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <MessageCircle className="w-4 h-4" />
-                          <span className="text-sm">{post.comments}</span>
+                        <p className="text-sm mb-3">{post.content}</p>
+
+                        {/* Image */}
+                        {post.image_url && (
+                          <img 
+                            src={post.image_url} 
+                            alt="Post image" 
+                            className="rounded-lg max-h-40 object-cover mb-3"
+                          />
+                        )}
+
+                        {/* Tags */}
+                        {post.tags && post.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {post.tags.map((tag: string) => (
+                              <Badge key={tag} variant="outline" className="text-xs">
+                                #{tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex items-center space-x-4 text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <Heart className="w-4 h-4" />
+                            <span className="text-sm">{post.likes_count || 0}</span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <MessageCircle className="w-4 h-4" />
+                            <span className="text-sm">{post.comments_count || 0}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </TabsContent>
 
           {/* Uploads Tab */}
           <TabsContent value="uploads">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {mockUploads.map((upload) => (
-                <Card key={upload.id} className="shadow-elegant hover:shadow-lg transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-sm mb-1">{upload.title}</h3>
-                        <Badge variant="outline" className="text-xs">
-                          {upload.type}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                        <span>{upload.rating}</span>
-                      </div>
-                    </div>
+            <FileUpload onUploadCreated={loadUploads} />
+            
+            {loading ? (
+              <div className="text-center py-8">Loading uploads...</div>
+            ) : uploads.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No uploads yet. Upload your first file above!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {uploads.map((upload) => (
+                    <Card key={upload.id} className="shadow-elegant hover:shadow-glow transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-sm mb-1">{upload.title}</h3>
+                            {upload.description && (
+                              <p className="text-xs text-muted-foreground mb-2">{upload.description}</p>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              {upload.file_type.split('/')[1]?.toUpperCase() || 'FILE'}
+                            </Badge>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeleteUpload(upload.id, upload.file_url)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
 
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <div className="flex items-center space-x-1">
-                        <Download className="w-3 h-3" />
-                        <span>{upload.downloads} downloads</span>
-                      </div>
-                      <span>{upload.uploadDate}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center space-x-1">
+                            <Download className="w-3 h-3" />
+                            <span>{upload.download_count || 0} downloads</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span>{formatFileSize(upload.file_size || 0)}</span>
+                            <span>{formatDate(upload.created_at)}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* Activity Tab */}
@@ -452,20 +583,9 @@ const Profile = () => {
                 <h3 className="font-semibold text-lg">Recent Activity</h3>
               </CardHeader>
               <CardContent className="space-y-4">
-                {mockActivities.map((activity) => {
-                  const Icon = activity.icon;
-                  return (
-                    <div key={activity.id} className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg">
-                      <div className={`w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center ${activity.color}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm">{activity.action}</p>
-                        <p className="text-xs text-muted-foreground">{activity.timestamp}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="text-center py-8 text-muted-foreground">
+                  Activity tracking coming soon!
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
