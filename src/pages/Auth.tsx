@@ -110,7 +110,7 @@ const Auth = () => {
           <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold">
             <BookOpen className="w-8 h-8 text-primary" />
             <span className="bg-gradient-primary bg-clip-text text-transparent">
-              EduHub
+              AceTerus
             </span>
           </Link>
           <p className="text-muted-foreground mt-2">Welcome back to your learning journey</p>
@@ -250,5 +250,6 @@ const Auth = () => {
     </div>
   );
 };
+
 
 export default Auth;
