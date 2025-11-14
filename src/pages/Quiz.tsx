@@ -13,8 +13,13 @@ import {
   ChevronRight,
   BookOpen,
   GraduationCap,
-  Target
+  Target,
+  Flame
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useStreak } from "@/hooks/useStreak";
+import { useToast } from "@/hooks/use-toast";
+import Navbar from "@/components/Navbar";
 
 interface ExamPaper {
   id: string;
@@ -33,15 +38,44 @@ const Quiz = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+  const { user } = useAuth();
+  const { streak, updateStreak } = useStreak();
+  const { toast } = useToast();
 
-  // Mock statistics
+  const handleStartExam = async (examId: string) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to track your streak",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Simulate exam completion - in a real app, this would happen after the exam
+    const result = await updateStreak(examId);
+    
+    if (result?.success) {
+      toast({
+        title: "Streak updated! 🔥",
+        description: `Your current streak is ${result.newStreak} day${result.newStreak !== 1 ? 's' : ''}!`,
+      });
+    } else if (result?.message === 'Streak already updated today') {
+      toast({
+        title: "Keep it up!",
+        description: "You've already completed a quiz today. Your streak can only increase once per day.",
+      });
+    }
+  };
+
+  // Statistics
   const stats = [
     {
-      icon: FileText,
-      value: "127",
-      label: "papers completed",
-      color: "text-blue-500",
-      bgColor: "bg-blue-50"
+      icon: Flame,
+      value: streak.toString(),
+      label: "day streak",
+      color: "text-orange-500",
+      bgColor: "bg-orange-50"
     },
     {
       icon: Calendar,
@@ -182,14 +216,15 @@ const Quiz = () => {
   };
 
   return (
-    <div className="min-h-screen pt-20 pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
-      <div className="container mx-auto px-4 max-w-6xl">
+    <div className="min-h-screen pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
+      {!user && <Navbar />}
+      <div className={`container mx-auto px-4 max-w-6xl ${!user ? 'pt-20' : ''}`}>
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
             <Target className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              AceTerus
+              AceHub
             </h1>
           </div>
           <p className="text-muted-foreground">
@@ -298,6 +333,7 @@ const Quiz = () => {
                   <Button 
                     className="w-full mt-4 bg-gradient-primary shadow-glow"
                     size="sm"
+                    onClick={() => handleStartExam(paper.id)}
                   >
                     Start Exam
                   </Button>

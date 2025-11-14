@@ -158,6 +158,8 @@ export type Database = {
           followers_count: number | null
           following_count: number | null
           id: string
+          last_quiz_date: string | null
+          streak: number | null
           updated_at: string
           user_id: string
           username: string | null
@@ -169,6 +171,8 @@ export type Database = {
           followers_count?: number | null
           following_count?: number | null
           id?: string
+          last_quiz_date?: string | null
+          streak?: number | null
           updated_at?: string
           user_id: string
           username?: string | null
@@ -180,14 +184,105 @@ export type Database = {
           followers_count?: number | null
           following_count?: number | null
           id?: string
+          last_quiz_date?: string | null
+          streak?: number | null
           updated_at?: string
           user_id?: string
           username?: string | null
         }
         Relationships: []
       }
+      quiz_completions: {
+        Row: {
+          completed_at: string
+          created_at: string
+          exam_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          created_at?: string
+          exam_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          created_at?: string
+          exam_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      upload_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          updated_at: string
+          upload_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          upload_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          upload_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_comments_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      upload_likes: {
+        Row: {
+          created_at: string
+          id: string
+          upload_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          upload_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          upload_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_likes_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uploads: {
         Row: {
+          comments_count: number | null
           created_at: string
           description: string | null
           download_count: number | null
@@ -195,12 +290,14 @@ export type Database = {
           file_type: string
           file_url: string
           id: string
+          likes_count: number | null
           rating: number | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          comments_count?: number | null
           created_at?: string
           description?: string | null
           download_count?: number | null
@@ -208,12 +305,14 @@ export type Database = {
           file_type: string
           file_url: string
           id?: string
+          likes_count?: number | null
           rating?: number | null
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          comments_count?: number | null
           created_at?: string
           description?: string | null
           download_count?: number | null
@@ -221,6 +320,7 @@ export type Database = {
           file_type?: string
           file_url?: string
           id?: string
+          likes_count?: number | null
           rating?: number | null
           title?: string
           updated_at?: string

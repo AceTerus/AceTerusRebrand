@@ -1,23 +1,30 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Calendar, Search } from "lucide-react";
+import { Calendar, Search, TrendingUp, Users } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { FollowButton } from "@/components/FollowButton";
 import { LikeButton } from "@/components/LikeButton";
 import { CommentSection } from "@/components/CommentSection";
+import { PostUpload } from "@/components/PostUpload";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Post {
   id: string;
+  user_id: string;
   content: string;
   image_url: string | null;
   likes_count: number;
   comments_count: number;
   created_at: string;
+  tags?: string[];
   profiles: {
     username: string;
     avatar_url: string;
@@ -26,6 +33,7 @@ interface Post {
 
 interface Upload {
   id: string;
+  user_id: string;
   title: string;
   description: string | null;
   file_url: string;
@@ -57,10 +65,12 @@ export const Feed = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [suggestedUsers, setSuggestedUsers] = useState<SearchProfile[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchFeed();
+      fetchSuggestedUsers();
     }
   }, [user]);
 
@@ -69,7 +79,6 @@ export const Feed = () => {
 
     setIsLoading(true);
     try {
-      // Get list of users that current user follows
       const { data: followedUsers } = await supabase
         .from("follows")
         .select("followed_id")
@@ -77,7 +86,6 @@ export const Feed = () => {
 
       const followedIds = followedUsers?.map((f) => f.followed_id) || [];
 
-      // Fetch posts from followed users and join with profiles
       const { data: postsData, error: postsError } = await supabase
         .from("posts")
         .select("*")
@@ -87,7 +95,6 @@ export const Feed = () => {
 
       if (postsError) throw postsError;
 
-      // Fetch profile data for posts
       const postsWithProfiles = await Promise.all(
         (postsData || []).map(async (post) => {
           const { data: profileData } = await supabase
@@ -103,7 +110,6 @@ export const Feed = () => {
         })
       );
 
-      // Fetch uploads from followed users
       const { data: uploadsData, error: uploadsError } = await supabase
         .from("uploads")
         .select("*")
@@ -113,7 +119,6 @@ export const Feed = () => {
 
       if (uploadsError) throw uploadsError;
 
-      // Fetch profile data for uploads
       const uploadsWithProfiles = await Promise.all(
         (uploadsData || []).map(async (upload) => {
           const { data: profileData } = await supabase
@@ -140,6 +145,32 @@ export const Feed = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchSuggestedUsers = async () => {
+    if (!user) return;
+
+    try {
+      const { data: followedUsers } = await supabase
+        .from("follows")
+        .select("followed_id")
+        .eq("follower_id", user.id);
+
+      const followedIds = followedUsers?.map((f) => f.followed_id) || [];
+      followedIds.push(user.id);
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .not("user_id", "in", `(${followedIds.join(",")})`)
+        .order("followers_count", { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      setSuggestedUsers(data || []);
+    } catch (error) {
+      console.error("Error fetching suggested users:", error);
     }
   };
 
@@ -181,9 +212,112 @@ export const Feed = () => {
     });
   };
 
+  const renderPost = (post: Post) => (
+    <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-start space-x-4 mb-4">
+          <Avatar>
+            <AvatarImage src={post.profiles?.avatar_url} />
+            <AvatarFallback>
+              {post.profiles?.username?.[0]?.toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <Link to={`/profile/${post.user_id}`} className="font-semibold hover:underline">
+              {post.profiles?.username || "Anonymous"}
+            </Link>
+            <p className="text-sm text-muted-foreground">
+              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+            </p>
+          </div>
+        </div>
+
+        <p className="mb-4 whitespace-pre-wrap">{post.content}</p>
+
+        {post.image_url && (
+          <img
+            src={post.image_url}
+            alt="Post content"
+            className="w-full rounded-lg mb-4 max-h-96 object-cover"
+          />
+        )}
+
+        {post.tags && post.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {post.tags.map((tag, i) => (
+              <Badge key={i} variant="secondary" className="text-xs">
+                #{tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <div className="pt-2 border-t">
+          <div className="flex items-center gap-6">
+            <LikeButton
+              postId={post.id}
+              likesCount={post.likes_count}
+              onLikeChange={(newCount) => {
+                setPosts(posts.map(p => 
+                  p.id === post.id ? { ...p, likes_count: newCount } : p
+                ));
+              }}
+            />
+            <CommentSection
+              postId={post.id}
+              commentsCount={post.comments_count}
+              onCommentChange={(newCount) => {
+                setPosts(posts.map(p => 
+                  p.id === post.id ? { ...p, comments_count: newCount } : p
+                ));
+              }}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderUpload = (upload: Upload) => (
+    <Card key={upload.id} className="shadow-elegant hover:shadow-glow transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-start space-x-4 mb-4">
+          <Avatar>
+            <AvatarImage src={upload.profiles?.avatar_url} />
+            <AvatarFallback>
+              {upload.profiles?.username?.[0]?.toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <Link to={`/profile/${upload.user_id}`} className="font-semibold hover:underline">
+              {upload.profiles?.username || "Anonymous"}
+            </Link>
+            <p className="text-sm text-muted-foreground">
+              {formatDistanceToNow(new Date(upload.created_at), { addSuffix: true })}
+            </p>
+          </div>
+        </div>
+
+        <h3 className="font-semibold mb-2 text-lg">{upload.title}</h3>
+        {upload.description && (
+          <p className="text-sm text-muted-foreground mb-4">
+            {upload.description}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between pt-3 border-t">
+          <Badge variant="outline">{upload.file_type}</Badge>
+          <span className="text-sm text-muted-foreground">
+            {upload.download_count} downloads
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (!user) {
     return (
-      <div className="min-h-screen pt-24 px-4">
+      <div className="min-h-screen px-4 flex items-center justify-center">
         <div className="container mx-auto max-w-2xl text-center">
           <p className="text-muted-foreground">Please sign in to view your feed</p>
         </div>
@@ -192,196 +326,162 @@ export const Feed = () => {
   }
 
   return (
-    <div className="min-h-screen pt-24 px-4 pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
-      <div className="container mx-auto max-w-2xl">
-        <h1 className="text-3xl font-bold mb-6">
-          <span className="bg-gradient-primary bg-clip-text text-transparent">
-            Your Feed
-          </span>
-        </h1>
+    <div className="min-h-screen px-4 py-8 bg-gradient-to-br from-background via-muted/20 to-background">
+        <div className="container mx-auto max-w-5xl">
+          <div className="grid lg:grid-cols-12 gap-6">
+            {/* Main Feed */}
+            <main className="lg:col-span-8">
+            <h1 className="text-3xl font-bold mb-6">
+              <span className="bg-gradient-primary bg-clip-text text-transparent">
+                Your Feed
+              </span>
+            </h1>
 
-        {/* Search Bar */}
-        <div className="mb-8">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-            <Input
-              type="text"
-              placeholder="Search for users..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="pl-10"
-            />
-          </div>
+            {/* Search Bar */}
+            <div className="mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                <Input
+                  type="text"
+                  placeholder="Search for users..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  className="pl-10"
+                />
+              </div>
 
-          {/* Search Results */}
-          {searchQuery && (
-            <Card className="mt-2">
-              <CardContent className="p-4">
-                {isSearching ? (
-                  <p className="text-sm text-muted-foreground">Searching...</p>
-                ) : searchResults.length > 0 ? (
-                  <div className="space-y-3">
-                    {searchResults.map((profile) => (
-                      <div
-                        key={profile.id}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <Avatar>
-                            <AvatarImage src={profile.avatar_url} />
-                            <AvatarFallback>
-                              {profile.username?.[0]?.toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-semibold">{profile.username}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {profile.followers_count} followers
-                            </p>
+              {searchQuery && (
+                <Card className="mt-2">
+                  <CardContent className="p-4">
+                    {isSearching ? (
+                      <p className="text-sm text-muted-foreground">Searching...</p>
+                    ) : searchResults.length > 0 ? (
+                      <div className="space-y-3">
+                        {searchResults.map((profile) => (
+                          <div
+                            key={profile.id}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <Avatar>
+                                <AvatarImage src={profile.avatar_url} />
+                                <AvatarFallback>
+                                  {profile.username?.[0]?.toUpperCase() || "U"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-semibold">{profile.username}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {profile.followers_count} followers
+                                </p>
+                              </div>
+                            </div>
+                            <FollowButton targetUserId={profile.user_id} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No users found</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Post Creation */}
+            <PostUpload onPostCreated={fetchFeed} />
+
+            {/* Content Tabs */}
+            <Tabs defaultValue="all" className="mb-4">
+              <TabsList className="w-full justify-start">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="posts">Posts</TabsTrigger>
+                <TabsTrigger value="uploads">Resources</TabsTrigger>
+              </TabsList>
+
+              {isLoading ? (
+                <div className="space-y-4 mt-4">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i}>
+                      <CardContent className="p-6">
+                        <div className="flex items-start space-x-4">
+                          <Skeleton className="w-12 h-12 rounded-full" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-1/4" />
+                            <Skeleton className="h-20 w-full" />
                           </div>
                         </div>
-                        <FollowButton targetUserId={profile.user_id} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No users found</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : posts.length === 0 && uploads.length === 0 ? (
+                <Card className="mt-4">
+                  <CardContent className="p-12 text-center">
+                    <p className="text-muted-foreground">
+                      No posts or uploads yet. Follow some users to see their content here!
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <TabsContent value="all" className="mt-4 space-y-4">
+                    {posts.map(renderPost)}
+                    {uploads.map(renderUpload)}
+                  </TabsContent>
 
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <Skeleton className="w-12 h-12 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-1/4" />
-                      <Skeleton className="h-20 w-full" />
+                  <TabsContent value="posts" className="mt-4 space-y-4">
+                    {posts.length > 0 ? (
+                      posts.map(renderPost)
+                    ) : (
+                      <Card>
+                        <CardContent className="p-12 text-center">
+                          <p className="text-muted-foreground">No posts yet</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="uploads" className="mt-4 space-y-4">
+                    {uploads.length > 0 ? (
+                      uploads.map(renderUpload)
+                    ) : (
+                      <Card>
+                        <CardContent className="p-12 text-center">
+                          <p className="text-muted-foreground">No uploads yet</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+                </>
+              )}
+            </Tabs>
+          </main>
+
+          {/* Right Sidebar - Trending/Activity */}
+          <aside className="hidden lg:block lg:col-span-4">
+            <div className="sticky top-24 space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TrendingUp className="w-4 h-4" />
+                    Popular Tags
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {["ComputerScience", "Programming", "AI", "WebDev", "DataStructures"].map((tag) => (
+                    <div key={tag} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">#{tag}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {Math.floor(Math.random() * 50 + 10)}
+                      </Badge>
                     </div>
-                  </div>
+                  ))}
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        ) : posts.length === 0 && uploads.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <p className="text-muted-foreground">
-                No posts or uploads yet. Follow some users to see their content here!
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            {/* Posts Section */}
-            {posts.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Recent Posts</h2>
-                {posts.map((post) => (
-                  <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start space-x-4 mb-4">
-                        <Avatar>
-                          <AvatarImage src={post.profiles?.avatar_url} />
-                          <AvatarFallback>
-                            {post.profiles?.username?.[0]?.toUpperCase() || "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <p className="font-semibold">{post.profiles?.username || "Anonymous"}</p>
-                          <p className="text-sm text-muted-foreground flex items-center">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {formatDate(post.created_at)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="mb-4">{post.content}</p>
-
-                      {post.image_url && (
-                        <img
-                          src={post.image_url}
-                          alt="Post"
-                          className="w-full rounded-lg mb-4"
-                        />
-                      )}
-
-                      <div className="flex items-center space-x-4">
-                        <LikeButton
-                          postId={post.id}
-                          likesCount={post.likes_count}
-                          onLikeChange={(newCount) => {
-                            setPosts(posts.map(p => 
-                              p.id === post.id ? { ...p, likes_count: newCount } : p
-                            ));
-                          }}
-                        />
-                        <CommentSection
-                          postId={post.id}
-                          commentsCount={post.comments_count}
-                          onCommentChange={(newCount) => {
-                            setPosts(posts.map(p => 
-                              p.id === post.id ? { ...p, comments_count: newCount } : p
-                            ));
-                          }}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            {/* Uploads Section */}
-            {uploads.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Recent Uploads</h2>
-                {uploads.map((upload) => (
-                  <Card key={upload.id} className="shadow-elegant hover:shadow-glow transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-start space-x-4 mb-4">
-                        <Avatar>
-                          <AvatarImage src={upload.profiles?.avatar_url} />
-                          <AvatarFallback>
-                            {upload.profiles?.username?.[0]?.toUpperCase() || "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <p className="font-semibold">{upload.profiles?.username || "Anonymous"}</p>
-                          <p className="text-sm text-muted-foreground flex items-center">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {formatDate(upload.created_at)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <h3 className="font-semibold mb-2">{upload.title}</h3>
-                      {upload.description && (
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {upload.description}
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs bg-muted px-2 py-1 rounded">
-                          {upload.file_type}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {upload.download_count} downloads
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );

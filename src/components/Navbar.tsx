@@ -36,14 +36,12 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 group">
-            <img 
-          src="/logo.png" 
-          alt="AceTerus Logo" 
-          className="w-8 h-8 object-contain group-hover:scale-110 transition-transform duration-300"
-              />
-        <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-          AceTerus
-        </span>
+            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center group-hover:shadow-glow transition-all duration-300">
+              <BookOpen className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              EduHub
+            </span>
           </Link>
 
           {/* Desktop Navigation */}

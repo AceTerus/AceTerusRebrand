@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useStreak } from '@/hooks/useStreak';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { PostUpload } from '@/components/PostUpload';
-import { FileUpload } from '@/components/FileUpload';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, FileText, Heart, MessageCircle, Download, Star, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search } from 'lucide-react';
+import { Calendar, Heart, MessageCircle, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search } from 'lucide-react';
 
 interface Post {
   id: string;
@@ -24,17 +28,6 @@ interface Post {
   tags: string[];
 }
 
-interface Upload {
-  id: string;
-  title: string;
-  description?: string;
-  file_url: string;
-  file_type: string;
-  file_size?: number;
-  download_count: number;
-  rating: number;
-  created_at: string;
-}
 
 interface Profile {
   id: string;
@@ -55,17 +48,12 @@ interface Achievement {
   category: string;
 }
 
-interface StreakData {
-  current: number;
-  longest: number;
-  lastActive: string;
-}
-
 export const Profile = () => {
+  const { userId } = useParams<{ userId?: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { streak } = useStreak();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [uploads, setUploads] = useState<Upload[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [followers, setFollowers] = useState<string[]>([]);
   const [following, setFollowing] = useState<string[]>([]);
@@ -73,13 +61,11 @@ export const Profile = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  
-  // Streak and achievements data (this could be moved to database later)
-  const [streakData] = useState<StreakData>({
-    current: 7,
-    longest: 15,
-    lastActive: new Date().toISOString(),
-  });
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editUsername, setEditUsername] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const [achievements] = useState<Achievement[]>([
     {
@@ -108,24 +94,26 @@ export const Profile = () => {
     },
   ]);
 
+  const profileUserId = userId || user?.id;
+  const isOwnProfile = !userId || userId === user?.id;
+
   useEffect(() => {
-    if (user) {
+    if (profileUserId) {
       fetchProfile();
       fetchPosts();
-      fetchUploads();
       fetchFollowers();
       fetchFollowing();
     }
-  }, [user]);
+  }, [profileUserId]);
 
   const fetchProfile = async () => {
-    if (!user) return;
+    if (!profileUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', profileUserId)
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -152,20 +140,99 @@ export const Profile = () => {
         setProfile(newProfile);
       } else {
         setProfile(data);
+        setEditUsername(data.username || '');
+        setEditBio(data.bio || '');
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
   };
 
+  const handleUpdateProfile = async () => {
+    if (!user || !profile) return;
+
+    setIsUpdating(true);
+    try {
+      let avatarUrl = profile.avatar_url;
+
+      // Upload avatar if a new file is selected
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('profile-images')
+          .upload(filePath, avatarFile, {
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('Error uploading avatar:', uploadError);
+          toast({
+            title: 'Error',
+            description: 'Failed to upload profile picture',
+            variant: 'destructive',
+          });
+          setIsUpdating(false);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('profile-images')
+          .getPublicUrl(filePath);
+
+        avatarUrl = urlData.publicUrl;
+      }
+
+      // Update profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          username: editUsername,
+          bio: editBio,
+          avatar_url: avatarUrl,
+        })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Error updating profile:', updateError);
+        toast({
+          title: 'Error',
+          description: 'Failed to update profile',
+          variant: 'destructive',
+        });
+        setIsUpdating(false);
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Profile updated successfully',
+      });
+
+      setIsEditDialogOpen(false);
+      setAvatarFile(null);
+      fetchProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update profile',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const fetchFollowers = async () => {
-    if (!user) return;
+    if (!profileUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('follows')
         .select('follower_id')
-        .eq('followed_id', user.id);
+        .eq('followed_id', profileUserId);
 
       if (error) {
         console.error('Error fetching followers:', error);
@@ -179,13 +246,13 @@ export const Profile = () => {
   };
 
   const fetchFollowing = async () => {
-    if (!user) return;
+    if (!profileUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('follows')
         .select('followed_id')
-        .eq('follower_id', user.id);
+        .eq('follower_id', profileUserId);
 
       if (error) {
         console.error('Error fetching following:', error);
@@ -199,13 +266,13 @@ export const Profile = () => {
   };
 
   const fetchPosts = async () => {
-    if (!user) return;
+    if (!profileUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('posts')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', profileUserId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -221,26 +288,6 @@ export const Profile = () => {
     }
   };
 
-  const fetchUploads = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('uploads')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching uploads:', error);
-        return;
-      }
-
-      setUploads(data || []);
-    } catch (error) {
-      console.error('Error fetching uploads:', error);
-    }
-  };
 
   const searchUsers = async (query: string) => {
     if (!query.trim()) {
@@ -308,37 +355,6 @@ export const Profile = () => {
     }
   };
 
-  const deleteUpload = async (uploadId: string) => {
-    try {
-      const { error } = await supabase
-        .from('uploads')
-        .delete()
-        .eq('id', uploadId);
-
-      if (error) {
-        console.error('Error deleting upload:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to delete upload',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setUploads(uploads.filter(upload => upload.id !== uploadId));
-      toast({
-        title: 'Success',
-        description: 'Upload deleted successfully',
-      });
-    } catch (error) {
-      console.error('Error deleting upload:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete upload',
-        variant: 'destructive',
-      });
-    }
-  };
 
   if (!user) {
     return (
@@ -352,136 +368,150 @@ export const Profile = () => {
     );
   }
 
-     return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 pt-20">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Profile Header */}
+        {/* Profile Picture and Bio Section */}
         <Card className="mb-8">
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-              <Avatar className="h-24 w-24">
+            <div className="flex flex-col items-center gap-6">
+              <Avatar className="h-32 w-32 border-4 border-primary/20">
                 <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
-                <AvatarFallback className="text-2xl">
+                <AvatarFallback className="text-4xl">
                   {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 text-center md:text-left">
+              <div className="text-center w-full max-w-md">
                 <h1 className="text-3xl font-bold mb-2">
                   {profile?.username || user?.email?.split('@')[0] || 'Anonymous User'}
                 </h1>
-                <p className="text-muted-foreground mb-4">
-                  {profile?.bio || 'Creative professional sharing amazing content'}
+                <p className="text-muted-foreground mb-6">
+                  {profile?.bio || 'No bio yet. Click edit to add one.'}
                 </p>
-                <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                  <div className="text-center">
-                    <div className="font-bold text-lg">{posts.length}</div>
-                    <div className="text-sm text-muted-foreground">Posts</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-lg">{uploads.length}</div>
-                    <div className="text-sm text-muted-foreground">Uploads</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-lg">{profile?.followers_count || 0}</div>
-                    <div className="text-sm text-muted-foreground">Followers</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-lg">{profile?.following_count || 0}</div>
-                    <div className="text-sm text-muted-foreground">Following</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="relative">
-                        <Flame className="w-6 h-6 text-orange-500" />
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                          <span className="text-xs font-bold text-primary-foreground">{streakData.current}</span>
+                {isOwnProfile && (
+                  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full max-w-xs">
+                        Edit Profile
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit Profile</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="username">Username</Label>
+                          <Input
+                            id="username"
+                            value={editUsername}
+                            onChange={(e) => setEditUsername(e.target.value)}
+                            placeholder="Enter username"
+                          />
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="bio">Bio</Label>
+                          <Textarea
+                            id="bio"
+                            value={editBio}
+                            onChange={(e) => setEditBio(e.target.value)}
+                            placeholder="Tell us about yourself"
+                            rows={4}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="avatar">Profile Picture</Label>
+                          <div className="flex items-center gap-4">
+                            <Input
+                              id="avatar"
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                            />
+                            {avatarFile && (
+                              <span className="text-sm text-muted-foreground">
+                                {avatarFile.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={handleUpdateProfile} 
+                          disabled={isUpdating}
+                          className="w-full"
+                        >
+                          {isUpdating ? 'Updating...' : 'Save Changes'}
+                        </Button>
                       </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground">Streak</div>
-                  </div>
-                </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+                {!isOwnProfile && profileUserId && (
+                  <FollowButton targetUserId={profileUserId} />
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Streak and Achievements Section */}
-        <div className="grid gap-6 md:grid-cols-2 mb-8">
-          {/* Streak Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Flame className="h-5 w-5 text-orange-500" />
-                Streak Statistics
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/50 rounded-lg">
-                  <div className="flex items-center justify-center mb-2">
-                    <Zap className="w-8 h-8 text-orange-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-orange-600">{streakData.current}</p>
-                  <p className="text-sm text-muted-foreground">Current Streak</p>
-                </div>
-                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/50 rounded-lg">
-                  <div className="flex items-center justify-center mb-2">
-                    <Target className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600">{streakData.longest}</p>
-                  <p className="text-sm text-muted-foreground">Longest Streak</p>
-                </div>
+        {/* Profile Stats */}
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-6 justify-center">
+              <div className="text-center">
+                <div className="font-bold text-lg">{posts.length}</div>
+                <div className="text-sm text-muted-foreground">Posts</div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Achievements */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-yellow-500" />
-                Achievements ({achievements.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 max-h-48 overflow-y-auto">
-                {achievements.map((achievement) => {
-                  const getIcon = (iconName: string) => {
-                    const icons = { Upload: FileText, Heart, Flame, Award, Trophy, Target };
-                    return icons[iconName as keyof typeof icons] || Trophy;
-                  };
-                  const Icon = getIcon(achievement.icon);
-                  
-                  const getCategoryColor = (category: string) => {
-                    const colors = {
-                      milestone: "text-blue-500 bg-blue-500/10",
-                      engagement: "text-pink-500 bg-pink-500/10",
-                      consistency: "text-orange-500 bg-orange-500/10",
-                      contribution: "text-green-500 bg-green-500/10",
-                    };
-                    return colors[category as keyof typeof colors] || "text-gray-500 bg-gray-500/10";
-                  };
-
-                  return (
-                    <div
-                      key={achievement.id}
-                      className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg"
-                    >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getCategoryColor(achievement.category)}`}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{achievement.title}</p>
-                        <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                      </div>
+              <div className="text-center">
+                <div className="font-bold text-lg">{profile?.followers_count || 0}</div>
+                <div className="text-sm text-muted-foreground">Followers</div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold text-lg">{profile?.following_count || 0}</div>
+                <div className="text-sm text-muted-foreground">Following</div>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center mb-1">
+                  <div className="relative">
+                    <Flame className="w-6 h-6 text-orange-500" />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+                      <span className="text-xs font-bold text-primary-foreground">{streak}</span>
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">Streak</div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Streak Statistics Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5 text-orange-500" />
+              Streak Statistics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/50 rounded-lg">
+                <div className="flex items-center justify-center mb-3">
+                  <Zap className="w-12 h-12 text-orange-600" />
+                </div>
+                <p className="text-4xl font-bold text-orange-600 mb-2">{streak}</p>
+                <p className="text-sm text-muted-foreground">Current Streak</p>
+              </div>
+              <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/50 rounded-lg">
+                <div className="flex items-center justify-center mb-3">
+                  <Target className="w-12 h-12 text-blue-600" />
+                </div>
+                <p className="text-4xl font-bold text-blue-600 mb-2">{streak}</p>
+                <p className="text-sm text-muted-foreground">Best Streak</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* User Search Section */}
         <Card className="mb-8">
@@ -542,9 +572,8 @@ export const Profile = () => {
 
         {/* Content Sections */}
         <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="posts">Posts</TabsTrigger>
-            <TabsTrigger value="uploads">Uploads</TabsTrigger>
             <TabsTrigger value="followers">Followers</TabsTrigger>
             <TabsTrigger value="following">Following</TabsTrigger>
           </TabsList>
@@ -625,74 +654,6 @@ export const Profile = () => {
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="uploads" className="space-y-6">
-            <FileUpload onUploadCreated={fetchUploads} />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  File Uploads
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {uploads.length === 0 ? (
-                  <p className="text-muted-foreground">No uploads yet. Upload your first file above!</p>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {uploads.map((upload) => (
-                      <Card key={upload.id} className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-semibold text-sm">{upload.title}</h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteUpload(upload.id)}
-                            className="text-destructive hover:text-destructive h-6 w-6 p-0"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        
-                        {upload.description && (
-                          <p className="text-xs text-muted-foreground mb-2">
-                            {upload.description}
-                          </p>
-                        )}
-                        
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                          <span>{upload.file_type}</span>
-                          {upload.file_size && (
-                            <span>{(upload.file_size / 1024 / 1024).toFixed(1)} MB</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-xs">
-                            <div className="flex items-center gap-1">
-                              <Download className="h-3 w-3" />
-                              {upload.download_count}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Star className="h-3 w-3" />
-                              {upload.rating.toFixed(1)}
-                            </div>
-                          </div>
-                          
-                          <Button asChild size="sm" variant="outline" className="h-6 text-xs">
-                            <a href={upload.file_url} download>
-                              Download
-                            </a>
-                          </Button>
-                        </div>
-                      </Card>
                     ))}
                   </div>
                 )}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,6 +18,7 @@ interface Profile {
 }
 
 export const Discover = () => {
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -75,7 +77,11 @@ export const Discover = () => {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredProfiles.map((profile) => (
-              <Card key={profile.id} className="hover:shadow-md transition-shadow">
+              <Card 
+                key={profile.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/profile/${profile.user_id}`)}
+              >
                 <CardHeader className="pb-4">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-12 w-12">

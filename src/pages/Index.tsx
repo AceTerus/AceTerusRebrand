@@ -1,10 +1,24 @@
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { BookOpen, User, Brain, ArrowRight, Sparkles, Zap } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import Navbar from "@/components/Navbar";
 
 const Index = () => {
+  const { user, isLoading } = useAuth();
+
+  // Redirect authenticated users to feed
+  if (isLoading) {
+    return null; // or a loading spinner
+  }
+
+  if (user) {
+    return <Navigate to="/feed" replace />;
+  }
+
   return (
-    <div className="min-h-screen pt-16 overflow-hidden">
+    <div className="min-h-screen overflow-hidden">
+      <Navbar />
       {/* Hero Section - Asymmetric Layout */}
       <section className="relative min-h-[90vh] flex items-center">
         <div className="container mx-auto px-4">
@@ -25,7 +39,7 @@ const Index = () => {
               </h1>
               
               <p className="text-xl md:text-2xl text-muted-foreground max-w-lg leading-relaxed">
-                Master skills through interactive quizzes, connect with peers, and track your journey to success.
+                Master computer science through interactive quizzes, connect with peers, and track your journey to success.
               </p>
               
               <div className="flex flex-wrap gap-4">
@@ -80,10 +94,10 @@ const Index = () => {
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-20">
               <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                Why AceTerus?
+                Why EduHub?
               </h2>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Everything you need to succeed in education
+                Everything you need to succeed in computer science
               </p>
             </div>
 
@@ -97,7 +111,7 @@ const Index = () => {
                     <Brain className="w-12 h-12 text-primary mb-6" />
                     <h3 className="text-3xl md:text-4xl font-bold mb-4">Interactive Quizzes</h3>
                     <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-                      Test your knowledge with engaging quizzes designed to challenge and improve your skills
+                      Test your knowledge with engaging computer science quizzes designed to challenge and improve your skills
                     </p>
                     <div className="flex items-center gap-2 text-primary font-medium">
                       Take a quiz
@@ -146,10 +160,10 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
-              Ready to level up your knowledge?
+              Ready to level up your CS skills?
             </h2>
             <p className="text-2xl text-muted-foreground">
-              Join 1,200+ students already learning on AceTerus
+              Join 1,200+ students already learning on EduHub
             </p>
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <Link to="/quiz">

@@ -130,7 +130,7 @@ export const CommentSection = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div>
       <Button
         variant="ghost"
         size="sm"
@@ -142,7 +142,7 @@ export const CommentSection = ({
       </Button>
 
       {showComments && (
-        <div className="space-y-4 pt-2 border-t">
+        <div className="space-y-4 pt-4 mt-4 border-t">
           {/* Comment Input */}
           <form onSubmit={handleSubmitComment} className="flex space-x-2">
             <Input
