@@ -94,7 +94,7 @@ const Index = () => {
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-20">
               <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                Why EduHub?
+                Why AceTerus?
               </h2>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 Everything you need to succeed in computer science
@@ -163,7 +163,7 @@ const Index = () => {
               Ready to level up your CS skills?
             </h2>
             <p className="text-2xl text-muted-foreground">
-              Join 1,200+ students already learning on EduHub
+              Join 1,200+ students already learning on AceTerus
             </p>
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <Link to="/quiz">
