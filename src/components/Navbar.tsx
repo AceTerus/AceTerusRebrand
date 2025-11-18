@@ -40,7 +40,7 @@ const Navbar = () => {
             <img
               src={Logo}
               alt="AceTerus Logo"
-              className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+              className="w-16 h-16 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
             />
             <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
               AceTerus
