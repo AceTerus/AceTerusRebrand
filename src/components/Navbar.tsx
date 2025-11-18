@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { BookOpen, User, Menu, X, LogOut, LogIn, Home } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import Logo from "../assets/logo.png";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,9 +37,11 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 group">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center group-hover:shadow-glow transition-all duration-300">
-              <BookOpen className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img
+              src={Logo}
+              alt="AceTerus Logo"
+              className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+            />
             <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
               AceTerus
             </span>

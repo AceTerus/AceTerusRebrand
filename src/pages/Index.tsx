@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { BookOpen, User, Brain, ArrowRight, Sparkles, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import Navbar from "@/components/Navbar";
+import Logo from "../assets/logo.png";
 
 const Index = () => {
   const { user, isLoading } = useAuth();
@@ -168,7 +169,11 @@ const Index = () => {
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <Link to="/quiz">
                 <Button size="lg" className="text-lg px-10 h-14 group">
-                  <BookOpen className="w-5 h-5 mr-2" />
+                  <img
+                    src={Logo}
+                    alt="AceTerus Logo"
+                    className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+                  />
                   Start Your First Quiz
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>

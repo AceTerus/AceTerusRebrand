@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Mail, Lock, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import Logo from "@/assets/logo.png"; 
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +109,11 @@ const Auth = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold">
-            <BookOpen className="w-8 h-8 text-primary" />
+            <img
+              src={Logo}
+              alt="AceTerus Logo"
+              className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+            />
             <span className="bg-gradient-primary bg-clip-text text-transparent">
               AceTerus
             </span>

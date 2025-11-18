@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import Logo from "../assets/logo.png";
 
 const navItems = [
   { href: "/feed", label: "Feed", icon: Compass },
@@ -34,9 +35,11 @@ export const AppSidebar = () => {
     <aside className="hidden lg:flex lg:flex-col fixed left-0 top-0 h-screen w-64 border-r border-border bg-background p-6 z-50">
       {/* Logo */}
       <Link to="/feed" className="flex items-center space-x-2 mb-8 group">
-        <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center group-hover:shadow-glow transition-all duration-300">
-          <BookOpen className="w-5 h-5 text-primary-foreground" />
-        </div>
+        <img
+          src={Logo}
+          alt="AceTerus Logo"
+          className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+        />
         <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
           AceTerus
         </span>
