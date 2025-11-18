@@ -20,6 +20,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
+import Logo from "@/assets/logo.png"; 
+
 
 interface ExamPaper {
   id: string;
@@ -222,9 +224,13 @@ const Quiz = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <Target className="w-8 h-8 text-primary" />
+            <img
+              src={Logo}
+              alt="AceTerus Logo"
+              className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+            />
             <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              AceHub
+              AceTerus
             </h1>
           </div>
           <p className="text-muted-foreground">
