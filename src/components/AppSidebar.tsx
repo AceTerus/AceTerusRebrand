@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import Logo from "../assets/logo.png";
 
 const navItems = [
-  { href: "/Start with us", label: "Get Started", icon: Compass },
   { href: "/feed", label: "Feed", icon: Compass },
   { href: "/discover", label: "Discover", icon: Search },
   { href: "/quiz", label: "Quiz", icon: BookOpen },
