@@ -21,12 +21,15 @@ const Index = () => {
     <div className="min-h-screen overflow-hidden">
         <section className="relative min-h-[90vh] flex items-center overflow-hidden">
 
-            {/* GIF Background */}
-            <img
-              src="src/assets/images/aceterus.gif"  // <-- path to your GIF
-              alt="Hero Background"
-              className="absolute top-0 left-0 w-full h-full object-cover z-[-1]"
-            />
+          {/* Background Video */}
+          <video
+            className="absolute top-0 left-0 w-full h-full object-cover z-[-1]"
+            src="videos\promotional.mp4"   // <-- adjust path to your video
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
 
           <div className="container mx-auto px-4">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
