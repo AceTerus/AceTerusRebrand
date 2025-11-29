@@ -26,6 +26,7 @@ interface Post {
   comments_count: number;
   created_at: string;
   tags: string[];
+  images?: { id: string; file_url: string }[];
 }
 
 
@@ -66,6 +67,9 @@ export const Profile = () => {
   const [editBio, setEditBio] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   
   const [achievements] = useState<Achievement[]>([
     {
@@ -269,7 +273,7 @@ export const Profile = () => {
     if (!profileUserId) return;
 
     try {
-      const { data, error } = await supabase
+      const { data: postsData, error } = await supabase
         .from('posts')
         .select('*')
         .eq('user_id', profileUserId)
@@ -280,7 +284,37 @@ export const Profile = () => {
         return;
       }
 
-      setPosts(data || []);
+      const basePosts = postsData || [];
+
+      // Fetch all images for these posts in one query
+      const postIds = basePosts.map((p) => p.id);
+      let imagesByPost = new Map<string, { id: string; file_url: string }[]>();
+
+      if (postIds.length > 0) {
+        const { data: imagesData, error: imagesError } = await supabase
+          .from('post_images')
+          .select('id, post_id, file_url, position')
+          .in('post_id', postIds)
+          .order('position', { ascending: true });
+
+        if (imagesError) {
+          console.error('Error fetching post images:', imagesError);
+        } else {
+          imagesByPost = new Map();
+          (imagesData || []).forEach((img: any) => {
+            const arr = imagesByPost.get(img.post_id) || [];
+            arr.push({ id: img.id, file_url: img.file_url });
+            imagesByPost.set(img.post_id, arr);
+          });
+        }
+      }
+
+      const postsWithImages: Post[] = basePosts.map((post: any) => ({
+        ...post,
+        images: imagesByPost.get(post.id) || [],
+      }));
+
+      setPosts(postsWithImages);
     } catch (error) {
       console.error('Error fetching posts:', error);
     } finally {
@@ -353,6 +387,47 @@ export const Profile = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  const openLightbox = (postId: string, index: number) => {
+    setLightboxPostId(postId);
+    setLightboxIndex(index);
+  };
+
+  const closeLightbox = () => {
+    setLightboxPostId(null);
+  };
+
+  const showPrev = () => {
+    const post = posts.find((p) => p.id === lightboxPostId);
+    if (!post || !post.images || post.images.length === 0) return;
+    setLightboxIndex((prev) =>
+      prev === 0 ? post.images!.length - 1 : prev - 1
+    );
+  };
+
+  const showNext = () => {
+    const post = posts.find((p) => p.id === lightboxPostId);
+    if (!post || !post.images || post.images.length === 0) return;
+    setLightboxIndex((prev) =>
+      prev === post.images!.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const diffX = e.changedTouches[0].clientX - touchStartX;
+    const threshold = 50; // px
+    if (diffX > threshold) {
+      showPrev();
+    } else if (diffX < -threshold) {
+      showNext();
+    }
+    setTouchStartX(null);
   };
 
 
@@ -624,8 +699,29 @@ export const Profile = () => {
                         </div>
                         
                         <p className="text-sm mb-3">{post.content}</p>
+
+                        {/* Multi-image grid gallery */}
+                        {post.images && post.images.length > 0 && (
+                          <div className="mb-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {post.images.map((img, index) => (
+                              <button
+                                key={img.id + index}
+                                type="button"
+                                className="relative overflow-hidden rounded-lg aspect-square bg-muted group"
+                                onClick={() => openLightbox(post.id, index)}
+                              >
+                                <img
+                                  src={img.file_url}
+                                  alt="Post image"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         
-                        {post.image_url && (
+                        {/* Legacy single image support if no gallery images */}
+                        {!post.images?.length && post.image_url && (
                           <img
                             src={post.image_url}
                             alt="Post image"
@@ -670,6 +766,53 @@ export const Profile = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Fullscreen lightbox for this profile's post images */}
+      {lightboxPostId && (() => {
+        const post = posts.find((p) => p.id === lightboxPostId);
+        if (!post || !post.images || post.images.length === 0) return null;
+        const currentImage = post.images[lightboxIndex];
+        if (!currentImage) return null;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+            <button
+              type="button"
+              className="absolute top-4 right-4 text-white text-xl md:text-2xl"
+              onClick={closeLightbox}
+            >
+              ✕
+            </button>
+
+            <button
+              type="button"
+              className="absolute left-4 md:left-8 text-white text-3xl md:text-4xl"
+              onClick={showPrev}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="absolute right-4 md:right-8 text-white text-3xl md:text-4xl"
+              onClick={showNext}
+            >
+              ›
+            </button>
+
+            <div
+              className="max-w-5xl w-full px-4"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
+              <img
+                src={currentImage.file_url}
+                alt="Post image"
+                className="w-full max-h-[80vh] object-contain mx-auto"
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

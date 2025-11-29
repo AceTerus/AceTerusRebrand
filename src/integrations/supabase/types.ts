@@ -150,6 +150,38 @@ export type Database = {
         }
         Relationships: []
       }
+      post_images: {
+        Row: {
+          id: string
+          post_id: string
+          file_url: string
+          position: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          file_url: string
+          position?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          file_url?: string
+          position?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_images_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

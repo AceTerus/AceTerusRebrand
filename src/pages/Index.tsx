@@ -22,9 +22,10 @@ const Index = () => {
         <section className="relative min-h-[90vh] flex items-center overflow-hidden">
 
           {/* Background Video */}
+          {/* Background promo video from public/videos */}
           <video
             className="absolute top-0 left-0 w-full h-full object-cover z-[-1]"
-            src="videos\promotional.mp4"   // <-- adjust path to your video
+            src="/videos/promotional.mp4"
             autoPlay
             muted
             loop
@@ -81,45 +82,6 @@ const Index = () => {
                       Sign Up - It's Free!
                     </Button>
                   </Link>
-                </div>
-              </div>
-
-              {/* Right Column - Visual Elements */}
-              <div className="relative hidden lg:block z-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent rounded-3xl blur-3xl" />
-                <div className="relative space-y-4">
-                  {/* 1 — Top Card */}
-                  <div className="flex justify-end animate-fade-in" style={{ animationDelay: "0.1s" }}>
-                    <div className="bg-card border rounded-2xl p-6 shadow-elegant inline-block">
-                      <div className="text-4xl font-bold text-primary mb-1">1,200+</div>
-                      <div className="text-sm text-muted-foreground">Active Students</div>
-                    </div>
-                  </div>
-
-                  {/* ⭐ CENTER LOGO CARD */}
-                  <div className="flex justify-center animate-fade-in" style={{ animationDelay: "0.18s" }}>
-                    <img 
-                      src="/Round Logo.png" 
-                      alt="Logo Placeholder"
-                      className="w-60 h-60 object-contain opacity-100"
-                    />
-                  </div>
-
-                  {/* 2 — Middle Stat Card */}
-                  <div className="flex justify-start animate-fade-in" style={{ animationDelay: "0.2s" }}>
-                    <div className="bg-card border rounded-2xl p-6 shadow-elegant inline-block">
-                      <div className="text-4xl font-bold text-primary mb-1">500+</div>
-                      <div className="text-sm text-muted-foreground">Quiz Questions</div>
-                    </div>
-                  </div>
-
-                  {/* 3 — Bottom Card */}
-                  <div className="flex justify-end animate-fade-in" style={{ animationDelay: "0.3s" }}>
-                    <div className="bg-card border rounded-2xl p-6 shadow-elegant inline-block">
-                      <div className="text-4xl font-bold text-primary mb-1">85%</div>
-                      <div className="text-sm text-muted-foreground">Success Rate</div>
-                    </div>
-                  </div>
                 </div>
               </div>
 

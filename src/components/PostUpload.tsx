@@ -18,28 +18,39 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
   const [content, setContent] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState("");
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({
-          title: "File too large",
-          description: "Please select an image under 5MB",
-          variant: "destructive",
-        });
-        return;
-      }
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target?.result as string);
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const oversized = files.find((file) => file.size > 5 * 1024 * 1024);
+    if (oversized) {
+      toast({
+        title: "File too large",
+        description: "Each image must be under 5MB",
+        variant: "destructive",
+      });
+      return;
     }
+
+    setSelectedImages(files);
+
+    // Generate previews for all selected images
+    const readers: Promise<string>[] = files.map(
+      (file) =>
+        new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => resolve((event.target?.result as string) || "");
+          reader.readAsDataURL(file);
+        })
+    );
+
+    Promise.all(readers).then((results) => setImagePreviews(results));
   };
 
   const handleAddTag = () => {
@@ -75,37 +86,54 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
     setIsUploading(true);
 
     try {
-      let imageUrl = null;
+      const imageUrls: string[] = [];
 
-      // Upload image if selected
-      if (selectedImage) {
-        const fileExt = selectedImage.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        
+      // Upload all selected images (if any)
+      for (const file of selectedImages) {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${user.id}/${Date.now()}_${file.name}`;
+
         const { error: uploadError } = await supabase.storage
-          .from('profile-images')
-          .upload(fileName, selectedImage);
+          .from("profile-images")
+          .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('profile-images')
-          .getPublicUrl(fileName);
-        
-        imageUrl = publicUrl;
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("profile-images").getPublicUrl(fileName);
+
+        imageUrls.push(publicUrl);
       }
 
-      // Create post
-      const { error } = await supabase
-        .from('posts')
+      // Create post (store first image as legacy image_url for compatibility)
+      const { data: newPost, error } = await supabase
+        .from("posts")
         .insert({
           user_id: user.id,
           content: content.trim(),
-          image_url: imageUrl,
+          image_url: imageUrls[0] || null,
           tags: tags,
-        });
+        })
+        .select("id")
+        .single();
 
       if (error) throw error;
+
+      // Store all images in post_images for multi-image gallery
+      if (newPost && imageUrls.length > 0) {
+        const payload = imageUrls.map((url, index) => ({
+          post_id: newPost.id,
+          file_url: url,
+          position: index,
+        }));
+
+        const { error: imagesError } = await supabase
+          .from("post_images")
+          .insert(payload);
+
+        if (imagesError) throw imagesError;
+      }
 
       toast({
         title: "Post created!",
@@ -115,8 +143,8 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
       // Reset form
       setContent("");
       setTags([]);
-      setSelectedImage(null);
-      setImagePreview(null);
+      setSelectedImages([]);
+      setImagePreviews([]);
       setIsOpen(false);
       onPostCreated();
 
@@ -165,33 +193,39 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
             <label htmlFor="image-upload" className="cursor-pointer">
               <div className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
                 <Camera className="w-4 h-4" />
-                Add Photo
+                Add Photos
               </div>
               <input
                 id="image-upload"
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageSelect}
                 className="hidden"
               />
             </label>
           </div>
 
-          {/* Image Preview */}
-          {imagePreview && (
+          {/* Image Previews */}
+          {imagePreviews.length > 0 && (
             <div className="relative">
-              <img 
-                src={imagePreview} 
-                alt="Preview" 
-                className="max-h-40 rounded-lg object-cover"
-              />
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                {imagePreviews.map((src, idx) => (
+                  <img
+                    key={idx}
+                    src={src}
+                    alt={`Preview ${idx + 1}`}
+                    className="h-24 w-full object-cover rounded-lg"
+                  />
+                ))}
+              </div>
               <Button
                 size="icon"
                 variant="secondary"
                 className="absolute top-2 right-2 h-6 w-6"
                 onClick={() => {
-                  setSelectedImage(null);
-                  setImagePreview(null);
+                  setSelectedImages([]);
+                  setImagePreviews([]);
                 }}
               >
                 <X className="w-3 h-3" />

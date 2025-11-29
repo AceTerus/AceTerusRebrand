@@ -29,6 +29,7 @@ interface Post {
     username: string;
     avatar_url: string;
   };
+  images?: { id: string; file_url: string }[];
 }
 
 interface Upload {
@@ -66,6 +67,9 @@ export const Feed = () => {
   const [searchResults, setSearchResults] = useState<SearchProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [suggestedUsers, setSuggestedUsers] = useState<SearchProfile[]>([]);
+  const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -95,8 +99,10 @@ export const Feed = () => {
 
       if (postsError) throw postsError;
 
+      const postsArray = postsData || [];
+
       const postsWithProfiles = await Promise.all(
-        (postsData || []).map(async (post) => {
+        postsArray.map(async (post) => {
           const { data: profileData } = await supabase
             .from("profiles")
             .select("username, avatar_url")
@@ -109,6 +115,35 @@ export const Feed = () => {
           };
         })
       );
+
+      // Fetch all images for these posts in one query
+      const postIds = postsArray.map((p) => p.id);
+      let imagesByPost = new Map<string, { id: string; file_url: string }[]>();
+
+      if (postIds.length > 0) {
+        const { data: imagesData, error: imagesError } = await supabase
+          .from("post_images")
+          .select("id, post_id, file_url, position")
+          .in("post_id", postIds)
+          .order("position", { ascending: true });
+
+        if (imagesError) throw imagesError;
+
+        imagesByPost = new Map();
+        (imagesData || []).forEach((img: any) => {
+          const arr = imagesByPost.get(img.post_id) || [];
+          arr.push({ id: img.id, file_url: img.file_url });
+          imagesByPost.set(img.post_id, arr);
+        });
+      }
+
+      const postsWithImages: Post[] = postsWithProfiles.map((post: any) => {
+        const images = imagesByPost.get(post.id) || [];
+        return {
+          ...post,
+          images,
+        };
+      });
 
       const { data: uploadsData, error: uploadsError } = await supabase
         .from("uploads")
@@ -134,7 +169,7 @@ export const Feed = () => {
         })
       );
 
-      setPosts(postsWithProfiles);
+      setPosts(postsWithImages);
       setUploads(uploadsWithProfiles);
     } catch (error) {
       console.error("Error fetching feed:", error);
@@ -212,6 +247,47 @@ export const Feed = () => {
     });
   };
 
+  const openLightbox = (postId: string, index: number) => {
+    setLightboxPostId(postId);
+    setLightboxIndex(index);
+  };
+
+  const closeLightbox = () => {
+    setLightboxPostId(null);
+  };
+
+  const showPrev = () => {
+    const post = posts.find((p) => p.id === lightboxPostId);
+    if (!post || !post.images || post.images.length === 0) return;
+    setLightboxIndex((prev) =>
+      prev === 0 ? post.images!.length - 1 : prev - 1
+    );
+  };
+
+  const showNext = () => {
+    const post = posts.find((p) => p.id === lightboxPostId);
+    if (!post || !post.images || post.images.length === 0) return;
+    setLightboxIndex((prev) =>
+      prev === post.images!.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const diffX = e.changedTouches[0].clientX - touchStartX;
+    const threshold = 50; // px
+    if (diffX > threshold) {
+      showPrev();
+    } else if (diffX < -threshold) {
+      showNext();
+    }
+    setTouchStartX(null);
+  };
+
   const renderPost = (post: Post) => (
     <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow">
       <CardContent className="p-6">
@@ -234,12 +310,23 @@ export const Feed = () => {
 
         <p className="mb-4 whitespace-pre-wrap">{post.content}</p>
 
-        {post.image_url && (
-          <img
-            src={post.image_url}
-            alt="Post content"
-            className="w-full rounded-lg mb-4 max-h-96 object-cover"
-          />
+        {post.images && post.images.length > 0 && (
+          <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {post.images.map((img, index) => (
+              <button
+                key={img.id + index}
+                type="button"
+                className="relative overflow-hidden rounded-lg aspect-square bg-muted group"
+                onClick={() => openLightbox(post.id, index)}
+              >
+                <img
+                  src={img.file_url}
+                  alt="Post content"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                />
+              </button>
+            ))}
+          </div>
         )}
 
         {post.tags && post.tags.length > 0 && (
@@ -324,6 +411,13 @@ export const Feed = () => {
       </div>
     );
   }
+
+  const currentLightboxPost =
+    lightboxPostId && posts.find((p) => p.id === lightboxPostId);
+  const currentLightboxImage =
+    currentLightboxPost &&
+    currentLightboxPost.images &&
+    currentLightboxPost.images[lightboxIndex];
 
   return (
     <div className="min-h-screen px-4 py-8 bg-gradient-to-br from-background via-muted/20 to-background">
@@ -483,6 +577,46 @@ export const Feed = () => {
           </aside>
         </div>
       </div>
+
+      {/* Fullscreen lightbox for post images */}
+      {currentLightboxPost && currentLightboxImage && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+          <button
+            type="button"
+            className="absolute top-4 right-4 text-white text-xl md:text-2xl"
+            onClick={closeLightbox}
+          >
+            ✕
+          </button>
+
+          <button
+            type="button"
+            className="absolute left-4 md:left-8 text-white text-3xl md:text-4xl"
+            onClick={showPrev}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="absolute right-4 md:right-8 text-white text-3xl md:text-4xl"
+            onClick={showNext}
+          >
+            ›
+          </button>
+
+          <div
+            className="max-w-5xl w-full px-4"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <img
+              src={currentLightboxImage.file_url}
+              alt="Post content"
+              className="w-full max-h-[80vh] object-contain mx-auto"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
