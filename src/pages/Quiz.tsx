@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +21,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
 import { useToast } from "@/hooks/use-toast";
+import { QuizBulkImport } from "@/components/QuizBulkImport";
 import Navbar from "@/components/Navbar";
 import Logo from "@/assets/logo.png"; 
 
@@ -26,8 +29,8 @@ interface ExamPaper {
   id: string;
   title: string;
   subject: string;
-  location: string;
-  year: number;
+  location: string | null;
+  year: number | null;
   questionCount: number;
   duration: number;
   difficulty: 'Easy' | 'Medium' | 'Hard';
@@ -35,38 +38,85 @@ interface ExamPaper {
 }
 
 const Quiz = () => {
+  const navigate = useNavigate();
   const [selectedSubject, setSelectedSubject] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [examPapers, setExamPapers] = useState<ExamPaper[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const itemsPerPage = 6;
   const { user } = useAuth();
-  const { streak, updateStreak } = useStreak();
+  const { streak } = useStreak();
   const { toast } = useToast();
 
-  const handleStartExam = async (examId: string) => {
+  useEffect(() => {
+    fetchQuizzes();
+  }, []);
+
+  const fetchQuizzes = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch all quizzes
+      const { data: quizzes, error: quizzesError } = await supabase
+        .from('quizzes' as any)
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (quizzesError) throw quizzesError;
+
+      // Fetch question counts and completion counts for each quiz
+      const quizzesWithStats = await Promise.all(
+        (quizzes || []).map(async (quiz: any) => {
+          // Get question count
+          const { count: questionCount } = await supabase
+            .from('questions' as any)
+            .select('*', { count: 'exact', head: true })
+            .eq('quiz_id', quiz.id);
+
+          // Get completion count
+          const { count: completionCount } = await supabase
+            .from('quiz_results' as any)
+            .select('*', { count: 'exact', head: true })
+            .eq('quiz_id', quiz.id);
+
+          return {
+            id: quiz.id,
+            title: quiz.title,
+            subject: quiz.subject,
+            location: quiz.location,
+            year: quiz.year,
+            questionCount: questionCount || 0,
+            duration: quiz.duration,
+            difficulty: quiz.difficulty as 'Easy' | 'Medium' | 'Hard',
+            completions: completionCount || 0,
+          };
+        })
+      );
+
+      setExamPapers(quizzesWithStats);
+    } catch (error: any) {
+      console.error("Error fetching quizzes:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load quizzes",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStartExam = (examId: string) => {
     if (!user) {
       toast({
         title: "Authentication required",
-        description: "Please log in to track your streak",
+        description: "Please log in to take quizzes",
         variant: "destructive"
       });
       return;
     }
-
-    // Simulate exam completion - in a real app, this would happen after the exam
-    const result = await updateStreak(examId);
-    
-    if (result?.success) {
-      toast({
-        title: "Streak updated! 🔥",
-        description: `Your current streak is ${result.newStreak} day${result.newStreak !== 1 ? 's' : ''}!`,
-      });
-    } else if (result?.message === 'Streak already updated today') {
-      toast({
-        title: "Keep it up!",
-        description: "You've already completed a quiz today. Your streak can only increase once per day.",
-      });
-    }
+    navigate(`/quiz/${examId}`);
   };
 
   // Statistics
@@ -101,98 +151,8 @@ const Quiz = () => {
     }
   ];
 
-  const subjects = ["All", "Computer Science", "Mathematics", "Physics", "Chemistry", "Biology"];
-
-  const examPapers: ExamPaper[] = [
-    {
-      id: "1009",
-      title: "Computer Science | Data Structures | 2024",
-      subject: "Computer Science",
-      location: "Federal Territory",
-      year: 2024,
-      questionCount: 25,
-      duration: 90,
-      difficulty: "Medium",
-      completions: 1234
-    },
-    {
-      id: "1008", 
-      title: "Mathematics | Calculus Set 2 | 2024",
-      subject: "Mathematics",
-      location: "Selangor",
-      year: 2024,
-      questionCount: 30,
-      duration: 120,
-      difficulty: "Hard",
-      completions: 987
-    },
-    {
-      id: "1007",
-      title: "Physics | Mechanics Set 1 | 2024", 
-      subject: "Physics",
-      location: "Penang",
-      year: 2024,
-      questionCount: 20,
-      duration: 75,
-      difficulty: "Medium",
-      completions: 654
-    },
-    {
-      id: "1006",
-      title: "Chemistry | Organic Chemistry | 2024",
-      subject: "Chemistry", 
-      location: "Johor",
-      year: 2024,
-      questionCount: 35,
-      duration: 100,
-      difficulty: "Hard",
-      completions: 543
-    },
-    {
-      id: "1005",
-      title: "Biology | Cell Biology Set 2 | 2024",
-      subject: "Biology",
-      location: "Kuala Lumpur",
-      year: 2024,
-      questionCount: 28,
-      duration: 85,
-      difficulty: "Easy",
-      completions: 765
-    },
-    {
-      id: "1004",
-      title: "Computer Science | Algorithms | 2024",
-      subject: "Computer Science",
-      location: "Sabah",
-      year: 2024,
-      questionCount: 22,
-      duration: 80,
-      difficulty: "Medium",
-      completions: 432
-    },
-    {
-      id: "1003",
-      title: "Mathematics | Statistics | 2024",
-      subject: "Mathematics", 
-      location: "Sarawak",
-      year: 2024,
-      questionCount: 26,
-      duration: 95,
-      difficulty: "Easy",
-      completions: 678
-    },
-    {
-      id: "1002",
-      title: "Physics | Thermodynamics | 2024",
-      subject: "Physics",
-      location: "Melaka",
-      year: 2024,
-      questionCount: 24,
-      duration: 90,
-      difficulty: "Hard",
-      completions: 321
-    }
-  ];
+  // Get unique subjects from quizzes
+  const subjects = ["All", ...Array.from(new Set(examPapers.map(p => p.subject))).sort()];
 
   // Filter exam papers
   const filteredPapers = examPapers.filter(paper => {
@@ -273,29 +233,44 @@ const Quiz = () => {
           ))}
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-8">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search for exam papers"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="pl-10"
-          />
-          <Button 
-            size="sm" 
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-primary"
-          >
-            Search
-          </Button>
+        {/* Bulk Import and Search */}
+        <div className="mb-8 space-y-4">
+          {user && (
+            <div className="flex justify-end">
+              <QuizBulkImport onImportSuccess={fetchQuizzes} />
+            </div>
+          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search for exam papers"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-10"
+            />
+          </div>
         </div>
 
         {/* Exam Papers Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {paginatedPapers.map((paper) => (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading quizzes...</p>
+          </div>
+        ) : paginatedPapers.length === 0 ? (
+          <Card className="mb-8">
+            <CardContent className="p-12 text-center">
+              <p className="text-muted-foreground mb-4">No quizzes found.</p>
+              {user && (
+                <QuizBulkImport onImportSuccess={fetchQuizzes} />
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {paginatedPapers.map((paper) => (
             <Card key={paper.id} className="shadow-elegant hover:shadow-glow transition-all cursor-pointer group">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between mb-2">
@@ -323,26 +298,30 @@ const Quiz = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <div className="flex items-center space-x-1">
                       <Users className="w-3 h-3" />
                       <span>{paper.completions.toLocaleString()} completed</span>
                     </div>
-                    <span className="text-xs">{paper.location}</span>
+                    {paper.location && (
+                      <span className="text-xs">{paper.location}</span>
+                    )}
                   </div>
 
                   <Button 
                     className="w-full mt-4 bg-gradient-primary shadow-glow"
                     size="sm"
                     onClick={() => handleStartExam(paper.id)}
+                    disabled={paper.questionCount === 0}
                   >
-                    Start Exam
+                    {paper.questionCount === 0 ? "No Questions" : "Start Exam"}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (

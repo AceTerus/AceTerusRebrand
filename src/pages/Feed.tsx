@@ -15,6 +15,7 @@ import { CommentSection } from "@/components/CommentSection";
 import { PostUpload } from "@/components/PostUpload";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PostImageCarousel } from "@/components/PostImageCarousel";
 
 interface Post {
   id: string;
@@ -310,24 +311,24 @@ export const Feed = () => {
 
         <p className="mb-4 whitespace-pre-wrap">{post.content}</p>
 
-        {post.images && post.images.length > 0 && (
-          <div className="mb-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {post.images.map((img, index) => (
-              <button
-                key={img.id + index}
-                type="button"
-                className="relative overflow-hidden rounded-lg aspect-square bg-muted group"
-                onClick={() => openLightbox(post.id, index)}
-              >
-                <img
-                  src={img.file_url}
-                  alt="Post content"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                />
-              </button>
-            ))}
-          </div>
-        )}
+        {(() => {
+          const hasGalleryImages = !!(post.images && post.images.length);
+          const gallery =
+            (post.images?.map((img) => img.file_url) ?? []).concat(
+              !hasGalleryImages && post.image_url ? [post.image_url] : []
+            );
+          if (gallery.length === 0) return null;
+          return (
+            <div className="mb-4">
+              <PostImageCarousel
+                images={gallery}
+                onImageClick={
+                  hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined
+                }
+              />
+            </div>
+          );
+        })()}
 
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">

@@ -71,3 +71,16 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Enabling the Chatwoot live chat badge
+
+The app can load the Chatwoot widget lazily via [`react-live-chat-loader`](https://github.com/calibreapp/react-live-chat-loader.git).  
+Create a `.env` (or `.env.local`) file in the project root with the following values:
+
+```
+VITE_CHATWOOT_BASE_URL=https://app.chatwoot.com    # or your self-hosted URL
+VITE_CHATWOOT_WEBSITE_TOKEN=xxxxxxxxxxxxxxxxxxxx   # website token from Chatwoot
+```
+
+Restart `npm run dev` so Vite can read the new environment variables.  
+If either value is missing, the Chatwoot loader is skipped automatically.

@@ -1,24 +1,18 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, User, Search, LogOut, Compass, FileText } from "lucide-react";
+import { BookOpen, User, Search, LogOut, Compass, FileText, MessageCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "../assets/logo.png";
-
-const navItems = [
-  { href: "/feed", label: "Feed", icon: Compass },
-  { href: "/discover", label: "Discover", icon: Search },
-  { href: "/quiz", label: "Quiz", icon: BookOpen },
-  { href: "/materials", label: "Materials", icon: FileText },
-  { href: "/profile", label: "Profile", icon: User },
-];
+import { useChatNotifications } from "@/context/ChatNotificationsContext";
 
 export const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const { totalSenders } = useChatNotifications();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -47,7 +41,19 @@ export const AppSidebar = () => {
 
       {/* Navigation */}
       <nav className="flex flex-col space-y-2 flex-1">
-        {navItems.map((item) => {
+        {[
+          { href: "/feed", label: "Feed", icon: Compass },
+          { href: "/discover", label: "Discover", icon: Search },
+          {
+            href: "/chat",
+            label: "Chat",
+            icon: MessageCircle,
+            badge: totalSenders > 0 ? Math.min(totalSenders, 99) : undefined,
+          },
+          { href: "/quiz", label: "Quiz", icon: BookOpen },
+          { href: "/materials", label: "Materials", icon: FileText },
+          { href: "/profile", label: "Profile", icon: User },
+        ].map((item) => {
           const Icon = item.icon;
           return (
             <Link
@@ -61,8 +67,15 @@ export const AppSidebar = () => {
                 }
               `}
             >
-              <Icon className={`w-6 h-6 ${isActive(item.href) ? "stroke-[2.5]" : ""}`} />
-              <span className="text-base">{item.label}</span>
+              <div className="flex items-center gap-4 w-full">
+                <Icon className={`w-6 h-6 ${isActive(item.href) ? "stroke-[2.5]" : ""}`} />
+                <span className="text-base flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-destructive px-2 text-xs font-semibold text-destructive-foreground">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
             </Link>
           );
         })}

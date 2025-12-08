@@ -4,12 +4,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Trash2 } from 'lucide-react';
 
 interface Comment {
   id: string;
   content: string;
   created_at: string;
+  user_id: string;
   profiles: {
     username: string | null;
     avatar_url: string | null;
@@ -29,6 +30,7 @@ export const UploadCommentSection = ({ uploadId, commentsCount, onCommentChange 
   const [newComment, setNewComment] = useState('');
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isVisible) {
@@ -128,6 +130,46 @@ export const UploadCommentSection = ({ uploadId, commentsCount, onCommentChange 
     }
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'You need to be signed in to delete a comment',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDeletingId(commentId);
+
+    try {
+      const { error } = await supabase
+        .from('upload_comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setComments(prev => prev.filter(comment => comment.id !== commentId));
+      onCommentChange(Math.max(0, commentsCount - 1));
+
+      toast({
+        title: 'Comment deleted',
+        description: 'Your comment has been removed.',
+      });
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete comment',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -178,12 +220,25 @@ export const UploadCommentSection = ({ uploadId, commentsCount, onCommentChange 
               comments.map((comment) => (
                 <div key={comment.id} className="bg-background p-2 rounded text-xs">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold">
-                      {comment.profiles?.username || 'Anonymous'}
-                    </span>
-                    <span className="text-muted-foreground text-xs">
-                      {formatDate(comment.created_at)}
-                    </span>
+                    <div>
+                      <span className="font-semibold">
+                        {comment.profiles?.username || 'Anonymous'}
+                      </span>
+                      <span className="text-muted-foreground text-xs ml-2">
+                        {formatDate(comment.created_at)}
+                      </span>
+                    </div>
+                    {user && comment.user_id === user.id && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteComment(comment.id)}
+                        disabled={deletingId === comment.id}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                   <p className="text-foreground">{comment.content}</p>
                 </div>

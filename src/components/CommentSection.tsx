@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MessageCircle, Send } from "lucide-react";
+import { MessageCircle, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,6 +11,7 @@ interface Comment {
   id: string;
   content: string;
   created_at: string;
+  user_id: string;
   profiles: {
     username: string;
     avatar_url: string;
@@ -34,6 +35,7 @@ export const CommentSection = ({
   const [newComment, setNewComment] = useState("");
   const [showComments, setShowComments] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (showComments) {
@@ -129,6 +131,46 @@ export const CommentSection = ({
     return `${days}d ago`;
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to manage comments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDeletingId(commentId);
+
+    try {
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
+      onCommentChange(Math.max(0, commentsCount - 1));
+
+      toast({
+        title: "Comment deleted",
+        description: "Your comment has been removed",
+      });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete comment",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div>
       <Button
@@ -171,10 +213,25 @@ export const CommentSection = ({
                   </Avatar>
                   <div className="flex-1">
                     <div className="bg-muted rounded-lg p-3">
-                      <p className="font-semibold text-sm">
-                        {comment.profiles?.username || "Anonymous"}
-                      </p>
-                      <p className="text-sm">{comment.content}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-sm">
+                            {comment.profiles?.username || "Anonymous"}
+                          </p>
+                          <p className="text-sm">{comment.content}</p>
+                        </div>
+                        {user && comment.user_id === user.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            disabled={deletingId === comment.id}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       {formatDate(comment.created_at)}

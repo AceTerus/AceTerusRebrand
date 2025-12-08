@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileUpload } from '@/components/FileUpload';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Download, Star, Trash2, User } from 'lucide-react';
+import { FileText, Download, Trash2, User } from 'lucide-react';
 import { UploadLikeButton } from '@/components/UploadLikeButton';
 import { UploadCommentSection } from '@/components/UploadCommentSection';
 
@@ -139,6 +139,81 @@ export const Materials = () => {
     ));
   };
 
+  const extractStoragePath = (fileUrl: string) => {
+    try {
+      const url = new URL(fileUrl);
+      const prefix = '/storage/v1/object/public/user-uploads/';
+      const idx = url.pathname.indexOf(prefix);
+      if (idx === -1) return null;
+      return decodeURIComponent(url.pathname.substring(idx + prefix.length));
+    } catch {
+      return null;
+    }
+  };
+
+  const handleDownload = async (upload: Upload) => {
+    try {
+      const storagePath = extractStoragePath(upload.file_url);
+      let blob: Blob | null = null;
+
+      if (storagePath) {
+        const { data, error } = await supabase.storage
+          .from('user-uploads')
+          .download(storagePath);
+
+        if (error || !data) {
+          throw error || new Error('Unable to download file');
+        }
+        blob = data;
+      } else {
+        // Fallback to direct fetch for legacy URLs
+        const response = await fetch(upload.file_url);
+        if (!response.ok) throw new Error('Download failed');
+        blob = await response.blob();
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Extract filename from the storage path or use the title
+      const originalFileName = storagePath?.split('/').pop() || upload.file_url.split('/').pop() || upload.title;
+      const fileName = originalFileName?.includes('_')
+        ? originalFileName.substring(originalFileName.indexOf('_') + 1)
+        : originalFileName;
+
+      const extension = upload.file_type?.split('/')[1] || 'file';
+      link.download = fileName || `${upload.title}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      await supabase
+        .from('uploads')
+        .update({ download_count: (upload.download_count || 0) + 1 })
+        .eq('id', upload.id);
+
+      setUploads(uploads.map(u =>
+        u.id === upload.id
+          ? { ...u, download_count: (u.download_count || 0) + 1 }
+          : u
+      ));
+
+      toast({
+        title: 'Download started',
+        description: `Downloading ${upload.title}`,
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: 'Download failed',
+        description: 'Unable to download the file. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
@@ -250,10 +325,14 @@ export const Materials = () => {
                             />
                           </div>
                           
-                          <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-                            <a href={upload.file_url} download>
-                              Download
-                            </a>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-7 text-xs gap-1"
+                            onClick={() => handleDownload(upload)}
+                          >
+                            <Download className="h-3 w-3" />
+                            Download {upload.download_count > 0 && `(${upload.download_count})`}
                           </Button>
                         </div>
                       </div>

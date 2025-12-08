@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { PostUpload } from '@/components/PostUpload';
+import { PostImageCarousel } from '@/components/PostImageCarousel';
+import { CommentSection } from '@/components/CommentSection';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
@@ -700,34 +702,26 @@ export const Profile = () => {
                         
                         <p className="text-sm mb-3">{post.content}</p>
 
-                        {/* Multi-image grid gallery */}
-                        {post.images && post.images.length > 0 && (
-                          <div className="mb-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {post.images.map((img, index) => (
-                              <button
-                                key={img.id + index}
-                                type="button"
-                                className="relative overflow-hidden rounded-lg aspect-square bg-muted group"
-                                onClick={() => openLightbox(post.id, index)}
-                              >
-                                <img
-                                  src={img.file_url}
-                                  alt="Post image"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Legacy single image support if no gallery images */}
-                        {!post.images?.length && post.image_url && (
-                          <img
-                            src={post.image_url}
-                            alt="Post image"
-                            className="w-full max-w-md h-48 object-cover rounded-lg mb-3"
-                          />
-                        )}
+                        {(() => {
+                          const hasGalleryImages = !!(post.images && post.images.length);
+                          const gallery =
+                            (post.images?.map((img) => img.file_url) ?? []).concat(
+                              !hasGalleryImages && post.image_url ? [post.image_url] : []
+                            );
+                          if (gallery.length === 0) return null;
+                          return (
+                            <div className="mb-4">
+                              <PostImageCarousel
+                                images={gallery}
+                                onImageClick={
+                                  hasGalleryImages
+                                    ? (idx) => openLightbox(post.id, idx)
+                                    : undefined
+                                }
+                              />
+                            </div>
+                          );
+                        })()}
                         
                         {post.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mb-3">
@@ -748,6 +742,20 @@ export const Profile = () => {
                             <MessageCircle className="h-4 w-4" />
                             {post.comments_count}
                           </div>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t">
+                          <CommentSection
+                            postId={post.id}
+                            commentsCount={post.comments_count}
+                            onCommentChange={(newCount) =>
+                              setPosts((prevPosts) =>
+                                prevPosts.map((p) =>
+                                  p.id === post.id ? { ...p, comments_count: newCount } : p
+                                )
+                              )
+                            }
+                          />
                         </div>
                       </div>
                     ))}

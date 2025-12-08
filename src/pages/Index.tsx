@@ -1,9 +1,31 @@
 import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BookOpen, User, Brain, ArrowRight, Sparkles, Zap } from "lucide-react";
+import { User, Brain, ArrowRight, Sparkles, Zap, Quote } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import Navbar from "@/components/Navbar";
 import Logo from "../assets/logo.png";
+
+const heroStats = [
+  { label: "Active learners", value: "12K+" },
+  { label: "Resources shared", value: "4.3K" },
+  { label: "Avg. session score", value: "4.9/5" },
+];
+
+const trustedBy = ["PoliTech", "Northstar STEM", "ACE Collegiate", "Quantum Labs"];
+
+const testimonials = [
+  {
+    quote:
+      "AceTerus helps me stay consistent with CS prep. The quizzes feel like mini wins every day.",
+    author: "Nadia Rahman",
+    role: "2nd year CS, Purdue",
+  },
+  {
+    quote: "Materials + community feedback have replaced three separate tools I used before.",
+    author: "Aiden Cross",
+    role: "AP CS Student",
+  },
+];
 
 const Index = () => {
   const { user, isLoading } = useAuth();
@@ -18,266 +40,238 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden">
-        <section className="relative min-h-[90vh] flex items-center overflow-hidden">
-
-          {/* Background Video */}
-          {/* Background promo video from public/videos */}
+    <div className="min-h-screen overflow-hidden bg-background text-foreground">
+      <Navbar />
+      <main>
+        <section className="relative min-h-[95vh] flex items-center overflow-hidden">
           <video
-            className="absolute top-0 left-0 w-full h-full object-cover z-[-1]"
+            className="absolute inset-0 w-full h-full object-cover opacity-80"
             src="/videos/promotional.mp4"
             autoPlay
             muted
             loop
             playsInline
           />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/60 to-background/30 backdrop-brightness-75" />
+          <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20" />
 
-          <div className="container mx-auto px-4">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-
-              {/* Left Column - Main Content */}
-              <div className="space-y-8 relative z-10 text-white">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/20 bg-primary/30">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Where learning meets achievement</span>
+          <div className="container relative mx-auto px-6 py-24">
+            <div className="grid items-center gap-12">
+              <div className="space-y-8 text-black">
+                <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 shadow-sm">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium tracking-wide text-black">Where learning meets achievement</span>
                 </div>
 
-                <h1
-                  className="text-6xl md:text-7xl lg:text-8xl font-bold leading-none text-white"
-                  style={{ WebkitTextStroke: "1px black" }}
-                >
-                  Ace
-                  <br />
-                  with
-                  <br />
-                  <span className="text-primary">
-                    AceTerus.
-                  </span>
+                <h1 className="text-5xl font-bold leading-tight tracking-tight text-black md:text-7xl lg:text-8xl">
+                  Ace your
+                  <span className="block text-primary">journey</span>
+                  with AceTerus
                 </h1>
 
-                <div className="bg-black/40 p-6 md:p-8 rounded-2xl shadow-lg max-w-lg">
-                  <p
-                    className="text-xl md:text-3xl leading-relaxed text-white"
-                  >
-                    Your all-in-one platform for mastering education through interactive quizzes, community engagement, and resource sharing.
-                  </p>
-                </div>
+                <p className="max-w-2xl text-lg text-black/80 md:text-2xl">
+                  Immersive quizzes, collaborative materials, and live insights—crafted to keep you learning, sharing, and celebrating every win.
+                </p>
 
                 <div className="flex flex-wrap gap-4">
                   <Button
                     size="lg"
-                    className="text-lg px-8 h-14 group"
+                    className="group h-14 px-8 text-lg shadow-glow"
                     onClick={() => {
-                      document.getElementById("GetStarted").scrollIntoView({
-                        behavior: "smooth"
-                      });
+                      document.getElementById("GetStarted")?.scrollIntoView({ behavior: "smooth" });
                     }}
                   >
                     Start Learning
-                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </Button>
 
                   <Link to="/auth">
-                    <Button size="lg" className="text-lg px-8 h-14 bg-purple-600 text-white hover:bg-purple-700 transition-colors">
-                      Sign Up - It's Free!
+                    <Button size="lg" variant="outline" className="h-14 px-8 text-lg">
+                      Sign Up — it’s free!
                     </Button>
                   </Link>
                 </div>
-              </div>
 
+                <div className="grid gap-6 pt-10 sm:grid-cols-3">
+                  {heroStats.map((stat) => (
+                    <div key={stat.label} className="rounded-2xl border border-black/10 bg-white/80 p-4 text-center shadow-md">
+                      <p className="text-3xl font-bold text-black">{stat.value}</p>
+                      <p className="text-sm uppercase tracking-wide text-black/70">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-      <section id="GetStarted" className="relative py-40 overflow-hidden">
-
-        {/* Animated Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/30 via-purple-600/30 to-pink-500/30 animate-gradient bg-[length:300%_300%]"></div>
-
-        {/* Floating Decorations */}
-        <div className="absolute top-10 left-20 w-40 h-40 bg-white/10 rounded-full blur-2xl animate-float-slow"></div>
-        <div className="absolute bottom-10 right-20 w-52 h-52 bg-white/10 rounded-full blur-3xl animate-float"></div>
-
-        <div className="container relative mx-auto px-6">
-          
-          {/* Section Title */}
-          <div className="text-center max-w-4xl mx-auto space-y-6 mb-24">
-            <h2 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-black drop-shadow-xl">
-              Start Your Journey With AceTerus
-            </h2>
-
-            <p className="text-xl md:text-2xl text-black/80 leading-relaxed">
-              A powerful all-in-one platform to help you master Computer Science through quizzes, 
-              study materials, AI analytics, and a thriving learning community.
-            </p>
+        <section className="border-y border-muted/40 bg-muted/20 py-8">
+          <div className="container mx-auto px-6">
+            <p className="mb-6 text-center text-sm uppercase tracking-[0.5em] text-muted-foreground">Trusted by learners at</p>
+            <div className="grid gap-4 text-center text-base font-semibold text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+              {trustedBy.map((logo) => (
+                <div key={logo} className="rounded-2xl border border-muted/30 bg-card/40 px-6 py-4">
+                  {logo}
+                </div>
+              ))}
+            </div>
           </div>
+        </section>
 
-          {/* Step Grid */}
-          <div className="grid md:grid-cols-2 gap-12 max-w-6xl mx-auto">
-
-            {/* Step 1 */}
-            <div className="bg-green/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl 
-                            animate-fade-up border border-white/20 hover:scale-[1.03] transition-all duration-300">
-              <h3 className="text-4xl font-bold text-black">1. Sign Up — Free</h3>
-              <p className="text-black/80 mt-4">
-                Create your AceTerus account instantly using Google or email. No friction,
-                no commitment — start learning right away.
+        <section id="GetStarted" className="relative overflow-hidden py-32">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-muted/30" />
+          <div className="absolute inset-x-0 top-10 mx-auto h-48 w-48 rounded-full bg-primary/20 blur-3xl" />
+          <div className="container relative mx-auto px-6">
+            <div className="mx-auto mb-16 max-w-4xl text-center space-y-6">
+              <h2 className="text-4xl font-bold md:text-6xl">Start your journey with AceTerus</h2>
+              <p className="text-xl text-muted-foreground">
+                A powerful all-in-one platform to help you master computer science through quizzes, study materials, AI analytics, and a thriving community.
               </p>
             </div>
 
-            {/* Step 2 */}
-            <div className="bg-white/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl 
-                            animate-fade-up delay-100 border border-white/20 hover:scale-[1.03] transition-all duration-300">
-              <h3 className="text-4xl font-bold text-black">2. Personalize Your Profile</h3>
-              <p className="text-black/80 mt-4">
-                Choose topics, difficulty level, and goals — and our AI automatically
-                adjusts quizzes and content for your level.
-              </p>
-            </div>
+            <div className="grid gap-10 md:grid-cols-2 max-w-6xl mx-auto">
+              <div className="rounded-3xl border border-white/20 bg-white/70 p-8 shadow-2xl backdrop-blur-lg dark:bg-black/30">
+                <h3 className="text-3xl font-semibold">1. Sign up — free</h3>
+                <p className="mt-4 text-muted-foreground">
+                  Create your account instantly using Google or email. No friction, no commitment—just immediate access to your dashboard.
+                </p>
+              </div>
 
-            {/* Step 3 */}
-            <div className="md:col-span-2 bg-white/10 backdrop-blur-xl p-12 rounded-3xl shadow-xl 
-                            animate-fade-up delay-200 border border-white/20">
-              
-              <h3 className="text-4xl font-bold text-center text-black mb-10">
-                3. Explore Features
-              </h3>
-
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-
-                <div className="bg-white/10 p-6 rounded-2xl border border-white/20 shadow-lg text-center">
-                  <h4 className="text-2xl font-bold text-black mb-2">Quizzes</h4>
-                  <p className="text-black/70">500+ curated CS questions</p>
-                </div>
-
-                <div className="bg-white/10 p-6 rounded-2xl border border-white/20 shadow-lg text-center">
-                  <h4 className="text-2xl font-bold text-black mb-2">Materials</h4>
-                  <p className="text-black/70">Notes & diagrams for fast learning</p>
-                </div>
-
-                <div className="bg-white/10 p-6 rounded-2xl border border-white/20 shadow-lg text-center">
-                  <h4 className="text-2xl font-bold text-black mb-2">AI Analytics</h4>
-                  <p className="text-black/70">Track strengths & weaknesses</p>
-                </div>
-
-                <div className="bg-white/10 p-6 rounded-2xl border border-white/20 shadow-lg text-center">
-                  <h4 className="text-2xl font-bold text-black mb-2">Tutor Classes</h4>
-                  <p className="text-black/70">Live & recorded CS sessions</p>
-                </div>
-
+              <div className="rounded-3xl border border-white/20 bg-white/70 p-8 shadow-2xl backdrop-blur-lg dark:bg-black/30">
+                <h3 className="text-3xl font-semibold">2. Personalize everything</h3>
+                <p className="mt-4 text-muted-foreground">
+                  Choose topics, pace, and study goals so AceTerus can adapt quizzes, reminders, and recommended materials to you.
+                </p>
               </div>
             </div>
 
-            {/* Step 4 */}
-            <div className="md:col-span-2 bg-white/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl 
-                            animate-fade-up delay-300 border border-white/20 hover:scale-[1.02] transition-all duration-300">
-              <h3 className="text-4xl font-bold text-black text-center">
-                4. Join the Community Feed
-              </h3>
-              <p className="text-black/80 mt-4 text-center max-w-3xl mx-auto">
-                Share your progress, ask questions, get feedback, and learn together with 
-                other students. AceTerus isn’t just a platform — it’s a community.
-              </p>
+            <div className="mt-10 rounded-[2.5rem] border border-white/20 bg-white/80 p-10 shadow-2xl backdrop-blur-lg dark:bg-black/30">
+              <h3 className="mb-10 text-center text-3xl font-semibold">3. Explore the toolkit</h3>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { title: "Quizzes", tagline: "500+ curated CS questions" },
+                  { title: "Materials", tagline: "Notes & diagrams for fast learning" },
+                  { title: "AI Analytics", tagline: "Track strengths & weaknesses" },
+                  { title: "Tutor Classes", tagline: "Live & recorded CS sessions" },
+                ].map((feature) => (
+                  <div key={feature.title} className="rounded-2xl border border-muted/30 bg-card/80 p-6 text-center shadow-lg">
+                    <h4 className="text-2xl font-semibold">{feature.title}</h4>
+                    <p className="mt-2 text-sm text-muted-foreground">{feature.tagline}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
+            <div className="mt-10 rounded-3xl border border-muted/40 bg-card/90 p-10 text-center shadow-xl">
+              <h3 className="text-3xl font-semibold">4. Join the community feed</h3>
+              <p className="mt-4 text-muted-foreground">
+                Share your progress, ask questions, get feedback, and learn together with other students. AceTerus isn’t just a platform—it’s a community.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      
-      {/* Features Section - Creative Grid */}
-      <section className="py-32 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-20">
-              <h2 className="text-5xl md:text-6xl font-bold mb-6">
-                Why AceTerus?
-              </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Everything you need to succeed in computer science
+        <section className="bg-muted/30 py-28">
+          <div className="container mx-auto px-6">
+            <div className="mx-auto mb-16 max-w-3xl text-center">
+              <p className="text-sm uppercase tracking-[0.4em] text-primary">What's inside</p>
+              <h2 className="mt-4 text-4xl font-bold md:text-5xl">Everything you need to succeed in education</h2>
+              <p className="mt-4 text-lg text-muted-foreground">
+                Each module is designed to keep you accountable, inspired, and in sync with your learning milestones.
               </p>
             </div>
 
-            {/* Asymmetric Feature Grid */}
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Feature 1 - Large */}
+            <div className="grid gap-8 md:grid-cols-2">
               <Link to="/quiz" className="group md:col-span-2">
-                <div className="relative bg-card border rounded-3xl p-10 md:p-12 hover:shadow-glow transition-all duration-300 overflow-hidden">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors" />
+                <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-10 shadow-2xl transition-all duration-300 hover:shadow-glow">
+                  <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl group-hover:bg-primary/20" />
                   <div className="relative">
-                    <Brain className="w-12 h-12 text-primary mb-6" />
-                    <h3 className="text-3xl md:text-4xl font-bold mb-4">Interactive Quizzes</h3>
-                    <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-                      Test your knowledge with engaging computer science quizzes designed to challenge and improve your skills
+                    <Brain className="mb-6 h-12 w-12 text-primary" />
+                    <h3 className="text-4xl font-semibold">Interactive quizzes</h3>
+                    <p className="mt-3 text-lg text-muted-foreground">
+                      Test your knowledge with engaging computer science quizzes designed to challenge and improve your skills.
                     </p>
-                    <div className="flex items-center gap-2 text-primary font-medium">
+                    <div className="mt-6 flex items-center gap-2 text-primary">
                       Take a quiz
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                      <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-2" />
                     </div>
                   </div>
                 </div>
               </Link>
 
-              {/* Feature 2 */}
               <Link to="/profile" className="group">
-                <div className="bg-card border rounded-3xl p-8 h-full hover:shadow-glow transition-all duration-300">
-                  <User className="w-10 h-10 text-primary mb-6" />
-                  <h3 className="text-2xl font-bold mb-3">Your Profile</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Build your academic identity with posts, uploads, and achievements
+                <div className="h-full rounded-3xl border border-border bg-card p-8 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-glow">
+                  <User className="mb-6 h-10 w-10 text-primary" />
+                  <h3 className="text-2xl font-semibold">Your profile</h3>
+                  <p className="mt-4 text-muted-foreground">
+                    Build your academic identity with posts, uploads, and achievements that grow alongside you.
                   </p>
-                  <div className="flex items-center gap-2 text-primary font-medium text-sm">
+                  <div className="mt-6 flex items-center gap-2 text-primary text-sm font-semibold">
                     View profiles
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </div>
                 </div>
               </Link>
 
-              {/* Feature 3 */}
               <Link to="/discover" className="group">
-                <div className="bg-card border rounded-3xl p-8 h-full hover:shadow-glow transition-all duration-300">
-                  <Zap className="w-10 h-10 text-primary mb-6" />
-                  <h3 className="text-2xl font-bold mb-3">Connect & Grow</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Join a community of learners, share knowledge, and grow together
+                <div className="h-full rounded-3xl border border-border bg-card p-8 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-glow">
+                  <Zap className="mb-6 h-10 w-10 text-primary" />
+                  <h3 className="text-2xl font-semibold">Connect & grow</h3>
+                  <p className="mt-4 text-muted-foreground">
+                    Join a community of learners, share knowledge, and grow together with curated rooms and discussions.
                   </p>
-                  <div className="flex items-center gap-2 text-primary font-medium text-sm">
+                  <div className="mt-6 flex items-center gap-2 text-primary text-sm font-semibold">
                     Discover more
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </div>
                 </div>
               </Link>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA Section - Bold and Simple */}
-      <section className="py-32">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight">
-              Ready to level up your CS skills?
-            </h2>
-            <p className="text-2xl text-muted-foreground">
-              Join 1,200+ students already learning on AceTerus
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center pt-4">
-              <Link to="/quiz">
-                <Button size="lg" className="text-lg px-10 h-14 group">
-                  <img
-                    src={Logo}
-                    alt="AceTerus Logo"
-                    className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
-                  />
-                  Start Your First Quiz
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
+        <section className="py-28">
+          <div className="container mx-auto px-6">
+            <div className="grid gap-10 lg:grid-cols-2">
+              {testimonials.map((item) => (
+                <div key={item.author} className="rounded-[2rem] border border-border bg-card/90 p-10 shadow-xl backdrop-blur">
+                  <Quote className="h-10 w-10 text-primary" />
+                  <p className="mt-6 text-2xl font-light leading-relaxed">{item.quote}</p>
+                  <div className="mt-8 text-sm uppercase tracking-[0.3em] text-primary">{item.role}</div>
+                  <p className="text-lg font-semibold">{item.author}</p>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <section className="py-32">
+          <div className="container mx-auto px-6">
+            <div className="mx-auto max-w-4xl rounded-[3rem] border border-primary/30 bg-gradient-to-br from-primary via-primary/80 to-secondary p-12 text-center text-primary-foreground shadow-2xl">
+              <h2 className="text-4xl font-bold md:text-5xl">Ready to level up your CS skills?</h2>
+              <p className="mt-4 text-xl text-primary-foreground/90">Join 1,200+ students already learning on AceTerus.</p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+                <Link to="/quiz">
+                  <Button size="lg" className="h-14 px-10 text-lg">
+                    <img
+                      src={Logo}
+                      alt="AceTerus Logo"
+                      className="mr-3 h-8 w-8 rounded-lg object-contain"
+                    />
+                    Start your first quiz
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link to="/auth">
+                  <Button size="lg" variant="secondary" className="h-14 px-8 text-lg text-primary">
+                    Create free account
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 };

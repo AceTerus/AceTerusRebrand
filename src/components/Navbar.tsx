@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BookOpen, User, Menu, X, LogOut, LogIn, Home } from "lucide-react";
+import { BookOpen, User, Menu, X, LogOut, LogIn, Home, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "../assets/logo.png";
@@ -15,6 +15,7 @@ const Navbar = () => {
 
   const navItems = [
     { href: "/feed", label: "Home", icon: Home },
+    { href: "/chat", label: "Chat", icon: MessageCircle },
     { href: "/quiz", label: "Quiz", icon: BookOpen },
     { href: "/profile", label: "Profile", icon: User },
   ];
