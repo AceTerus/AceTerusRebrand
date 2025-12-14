@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +9,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Clock, CheckCircle2, XCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { useStreak } from "@/hooks/useStreak";
+import { apiClient } from "@/lib/api-client";
+import type { SessionWithDeck, Question as OMCQuestion, Answer } from "@/types/openmultiplechoice";
 
 interface Question {
   id: string;
@@ -75,44 +76,52 @@ export const QuizTaking = () => {
     try {
       setIsLoading(true);
 
-      // Fetch quiz
-      const { data: quizData, error: quizError } = await supabase
-        .from('quizzes' as any)
-        .select('*')
-        .eq('id', quizId)
-        .single();
+      // Fetch session with deck and questions from openmultiplechoice API
+      const sessionData = await apiClient.fetchSession(quizId) as SessionWithDeck;
+      
+      if (!sessionData.session || !sessionData.deck) {
+        throw new Error('Session or deck not found');
+      }
 
-      if (quizError) throw quizError;
+      const deck = sessionData.deck;
+      const session = sessionData.session;
+
+      // Map deck to quiz format
+      const quizData: Quiz = {
+        id: session.id.toString(),
+        title: deck.name,
+        subject: deck.module?.subject?.name || deck.module?.name || 'Unknown',
+        duration: deck.questions ? Math.max(30, Math.ceil(deck.questions.length * 2)) : 60,
+        difficulty: deck.questions && deck.questions.length > 50 ? 'Hard' : 
+                   deck.questions && deck.questions.length < 20 ? 'Easy' : 'Medium',
+      };
+
       setQuiz(quizData);
       setTimeRemaining(quizData.duration * 60);
       setStartTime(new Date());
 
-      // Fetch questions
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('questions' as any)
-        .select('*')
-        .eq('quiz_id', quizId)
-        .order('position', { ascending: true });
+      // Map openmultiplechoice questions to component format
+      const mappedQuestions: Question[] = (deck.questions || []).map((q: OMCQuestion, index: number) => {
+        const answers = q.answers || [];
+        const correctAnswerId = q.correct_answer_id?.toString() || '';
 
-      if (questionsError) throw questionsError;
+        return {
+          id: q.id.toString(),
+          question_text: q.text,
+          question_type: 'multiple_choice' as const,
+          correct_answer: correctAnswerId,
+          points: 1,
+          position: index + 1,
+          explanation: q.comment || null,
+          options: answers.map((answer: Answer) => ({
+            id: answer.id.toString(),
+            option_text: answer.text,
+            option_index: parseInt(answer.id.toString()),
+          })),
+        };
+      });
 
-      // Fetch options for each question
-      const questionsWithOptions = await Promise.all(
-        (questionsData || []).map(async (q: any) => {
-          if (q.question_type === 'multiple_choice') {
-            const { data: optionsData } = await supabase
-              .from('question_options' as any)
-              .select('*')
-              .eq('question_id', q.id)
-              .order('option_index', { ascending: true });
-
-            return { ...q, options: optionsData || [] };
-          }
-          return q;
-        })
-      );
-
-      setQuestions(questionsWithOptions);
+      setQuestions(mappedQuestions);
     } catch (error: any) {
       console.error("Error fetching quiz:", error);
       toast({
@@ -131,83 +140,52 @@ export const QuizTaking = () => {
   };
 
   const handleSubmit = async () => {
-    if (!user || !quiz || questions.length === 0) return;
+    if (!user || !quiz || !quizId || questions.length === 0) return;
 
     setIsSubmitted(true);
 
     try {
       let totalScore = 0;
       let totalPoints = 0;
-      const answerRecords: Array<{ question_id: string; user_answer: string; is_correct: boolean; points_earned: number }> = [];
+      let correctCount = 0;
 
-      // Calculate score
+      // Submit answers and calculate score
       for (const question of questions) {
         totalPoints += question.points;
-        const userAnswer = answers[question.id] || "";
-        let isCorrect = false;
-        let pointsEarned = 0;
-
-        if (question.question_type === 'multiple_choice') {
-          isCorrect = userAnswer === question.correct_answer;
-        } else if (question.question_type === 'true_false') {
-          isCorrect = userAnswer.toLowerCase() === question.correct_answer.toLowerCase();
-        } else {
-          // Short answer - case-insensitive comparison
-          isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
+        const userAnswerId = answers[question.id];
+        
+        if (!userAnswerId) {
+          continue; // Skip unanswered questions
         }
 
+        // Create answer choice via API
+        try {
+          await apiClient.createAnswerChoice(
+            parseInt(quizId),
+            parseInt(question.id),
+            parseInt(userAnswerId)
+          );
+        } catch (error) {
+          console.error(`Error submitting answer for question ${question.id}:`, error);
+        }
+
+        // Check if answer is correct
+        const isCorrect = userAnswerId === question.correct_answer;
         if (isCorrect) {
-          pointsEarned = question.points;
           totalScore += question.points;
+          correctCount++;
         }
-
-        answerRecords.push({
-          question_id: question.id,
-          user_answer: userAnswer,
-          is_correct: isCorrect,
-          points_earned: pointsEarned,
-        });
       }
 
       const percentage = totalPoints > 0 ? (totalScore / totalPoints) * 100 : 0;
-      const timeTaken = startTime ? Math.floor((new Date().getTime() - startTime.getTime()) / 1000) : 0;
 
-      // Create quiz result
-      const { data: result, error: resultError } = await supabase
-        .from('quiz_results' as any)
-        .insert({
-          quiz_id: quiz.id,
-          user_id: user.id,
-          score: totalScore,
-          total_points: totalPoints,
-          percentage: percentage,
-          time_taken: timeTaken,
-          completed_at: new Date().toISOString(),
-          answers: answers,
-        })
-        .select()
-        .single();
-
-      if (resultError) throw resultError;
-
-      // Create answer records
-      const answersToInsert = answerRecords.map(a => ({
-        result_id: result.id,
-        question_id: a.question_id,
-        user_answer: a.user_answer,
-        is_correct: a.is_correct,
-        points_earned: a.points_earned,
-      }));
-
-      const { error: answersError } = await supabase
-        .from('quiz_answers' as any)
-        .insert(answersToInsert);
-
-      if (answersError) throw answersError;
-
-      // Update streak
-      if (percentage >= 50) {
-        await updateStreak(quiz.id);
+      // Update streak if score is good enough
+      if (percentage >= 50 && quizId) {
+        try {
+          await updateStreak(quizId);
+        } catch (error) {
+          console.error('Error updating streak:', error);
+        }
       }
 
       setScore({ score: totalScore, total: totalPoints, percentage });
@@ -442,7 +420,7 @@ export const QuizTaking = () => {
                 >
                   {currentQuestion.options.map((option) => (
                     <div key={option.id} className="flex items-center space-x-2 p-3 rounded-lg hover:bg-muted cursor-pointer">
-                      <RadioGroupItem value={option.option_index.toString()} id={option.id} />
+                      <RadioGroupItem value={option.id} id={option.id} />
                       <Label htmlFor={option.id} className="flex-1 cursor-pointer">
                         {option.option_text}
                       </Label>

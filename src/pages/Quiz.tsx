@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,21 +20,11 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
 import { useToast } from "@/hooks/use-toast";
-import { QuizBulkImport } from "@/components/QuizBulkImport";
 import Navbar from "@/components/Navbar";
-import Logo from "@/assets/logo.png"; 
-
-interface ExamPaper {
-  id: string;
-  title: string;
-  subject: string;
-  location: string | null;
-  year: number | null;
-  questionCount: number;
-  duration: number;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  completions: number;
-}
+import Logo from "@/assets/logo.png";
+import { apiClient } from "@/lib/api-client";
+import { mapDecksToExamPapers, type ExamPaper } from "@/lib/deck-to-quiz-mapper";
+import type { Deck, PaginatedResponse } from "@/types/openmultiplechoice";
 
 const Quiz = () => {
   const navigate = useNavigate();
@@ -57,57 +46,61 @@ const Quiz = () => {
     try {
       setIsLoading(true);
       
-      // Fetch all quizzes
-      const { data: quizzes, error: quizzesError } = await supabase
-        .from('quizzes' as any)
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch decks from openmultiplechoice API
+      // Use public endpoint first (no authentication required)
+      let response;
+      try {
+        // Try public endpoint first (works without authentication)
+        response = await apiClient.get('/decks/public');
+      } catch (error) {
+        // Fallback: try authenticated endpoint if user is logged in
+        if (user) {
+          try {
+            response = await apiClient.fetchDecks({ kind: 'public-rw-listed' });
+          } catch (authError) {
+            // Last fallback: try user decks
+            try {
+              response = await apiClient.fetchDecks({ kind: 'user' });
+            } catch (finalError) {
+              throw error; // Throw original error
+            }
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      // Handle paginated response or array response
+      let decks: Deck[];
+      if (Array.isArray(response)) {
+        decks = response;
+      } else if ((response as PaginatedResponse<Deck>).data) {
+        decks = (response as PaginatedResponse<Deck>).data;
+      } else {
+        decks = [];
+      }
 
-      if (quizzesError) throw quizzesError;
+      // Filter out archived and ephemeral decks
+      decks = decks.filter(deck => !deck.is_archived && !deck.is_ephemeral);
 
-      // Fetch question counts and completion counts for each quiz
-      const quizzesWithStats = await Promise.all(
-        (quizzes || []).map(async (quiz: any) => {
-          // Get question count
-          const { count: questionCount } = await supabase
-            .from('questions' as any)
-            .select('*', { count: 'exact', head: true })
-            .eq('quiz_id', quiz.id);
-
-          // Get completion count
-          const { count: completionCount } = await supabase
-            .from('quiz_results' as any)
-            .select('*', { count: 'exact', head: true })
-            .eq('quiz_id', quiz.id);
-
-          return {
-            id: quiz.id,
-            title: quiz.title,
-            subject: quiz.subject,
-            location: quiz.location,
-            year: quiz.year,
-            questionCount: questionCount || 0,
-            duration: quiz.duration,
-            difficulty: quiz.difficulty as 'Easy' | 'Medium' | 'Hard',
-            completions: completionCount || 0,
-          };
-        })
-      );
-
-      setExamPapers(quizzesWithStats);
+      // Map decks to exam papers format
+      const examPapersData = mapDecksToExamPapers(decks);
+      setExamPapers(examPapersData);
     } catch (error: any) {
       console.error("Error fetching quizzes:", error);
       toast({
         title: "Error",
-        description: "Failed to load quizzes",
+        description: error.message || "Failed to load quizzes. Please check your connection and ensure the API server is running.",
         variant: "destructive",
       });
+      setExamPapers([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleStartExam = (examId: string) => {
+  const handleStartExam = async (deckId: string) => {
+    // Validate user authentication
     if (!user) {
       toast({
         title: "Authentication required",
@@ -116,7 +109,73 @@ const Quiz = () => {
       });
       return;
     }
-    navigate(`/quiz/${examId}`);
+
+    // Validate deckId
+    const parsedDeckId = parseInt(deckId);
+    if (isNaN(parsedDeckId) || parsedDeckId <= 0) {
+      console.error("Invalid deck ID:", deckId);
+      toast({
+        title: "Invalid quiz",
+        description: "The selected quiz is invalid. Please try selecting another quiz.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Find the exam paper to validate it exists and has questions
+    const examPaper = examPapers.find(paper => paper.id === deckId);
+    if (examPaper && examPaper.questionCount === 0) {
+      toast({
+        title: "No questions available",
+        description: "This quiz has no questions. Please select another quiz.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log("Creating session for deck:", {
+        deckId: parsedDeckId,
+        examPaperTitle: examPaper?.title,
+        questionCount: examPaper?.questionCount,
+      });
+
+      // Create a session from the deck
+      const session = await apiClient.createSession(parsedDeckId) as { id: number };
+      
+      if (!session || !session.id) {
+        throw new Error("Invalid session response from server");
+      }
+
+      console.log("Session created successfully:", session.id);
+      
+      // Navigate to quiz taking page with session ID
+      navigate(`/quiz/${session.id}`);
+    } catch (error: any) {
+      // Enhanced error logging
+      console.error("Error creating session:", {
+        deckId: parsedDeckId,
+        error: error.message || error,
+        errorType: error.constructor?.name,
+        stack: error.stack,
+      });
+
+      // Extract error message - ApiError has a message property
+      let errorMessage = "Failed to start quiz";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      // Show user-friendly error message
+      toast({
+        title: "Error starting quiz",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
   // Statistics
@@ -157,8 +216,10 @@ const Quiz = () => {
   // Filter exam papers
   const filteredPapers = examPapers.filter(paper => {
     const matchesSubject = selectedSubject === "All" || paper.subject === selectedSubject;
-    const matchesSearch = paper.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         paper.location.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = searchQuery === "" || 
+      paper.title.toLowerCase().includes(searchLower) ||
+      (paper.location && paper.location.toLowerCase().includes(searchLower));
     return matchesSubject && matchesSearch;
   });
 
@@ -233,13 +294,8 @@ const Quiz = () => {
           ))}
         </div>
 
-        {/* Bulk Import and Search */}
-        <div className="mb-8 space-y-4">
-          {user && (
-            <div className="flex justify-end">
-              <QuizBulkImport onImportSuccess={fetchQuizzes} />
-            </div>
-          )}
+        {/* Search */}
+        <div className="mb-8">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -263,15 +319,17 @@ const Quiz = () => {
           <Card className="mb-8">
             <CardContent className="p-12 text-center">
               <p className="text-muted-foreground mb-4">No quizzes found.</p>
-              {user && (
-                <QuizBulkImport onImportSuccess={fetchQuizzes} />
-              )}
+              <p className="text-sm text-muted-foreground">
+                {searchQuery || selectedSubject !== "All" 
+                  ? "Try adjusting your search or filters." 
+                  : "No decks are available at the moment."}
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {paginatedPapers.map((paper) => (
-            <Card key={paper.id} className="shadow-elegant hover:shadow-glow transition-all cursor-pointer group">
+            <Card key={paper.id} className="shadow-elegant hover:shadow-glow transition-all group">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between mb-2">
                   <Badge variant="outline" className="text-xs font-medium">
@@ -309,12 +367,15 @@ const Quiz = () => {
                   </div>
 
                   <Button 
-                    className="w-full mt-4 bg-gradient-primary shadow-glow"
+                    className="w-full mt-4 bg-gradient-primary shadow-glow hover:opacity-90 transition-opacity"
                     size="sm"
-                    onClick={() => handleStartExam(paper.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartExam(paper.id);
+                    }}
                     disabled={paper.questionCount === 0}
                   >
-                    {paper.questionCount === 0 ? "No Questions" : "Start Exam"}
+                    {paper.questionCount === 0 ? "No Questions" : "Start Quiz"}
                   </Button>
                 </div>
               </CardContent>
