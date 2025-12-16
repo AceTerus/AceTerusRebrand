@@ -1,512 +1,400 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Clock, CheckCircle2, XCircle, ArrowLeft, ArrowRight } from "lucide-react";
-import { useStreak } from "@/hooks/useStreak";
-import { apiClient } from "@/lib/api-client";
-import type { SessionWithDeck, Question as OMCQuestion, Answer } from "@/types/openmultiplechoice";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock, Layers, Sparkles, XCircle } from "lucide-react";
+import Navbar from "@/components/Navbar";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  buildOpenMcImageUrl,
+  fetchOpenMcDeckWithQuestions,
+  isOpenMcConfigured,
+  OpenMcClientError,
+} from "@/lib/openmc-client";
+import type { OpenMcDeck, OpenMcQuestion } from "@/types/openmc";
+import { cn } from "@/lib/utils";
 
-interface Question {
-  id: string;
-  question_text: string;
-  question_type: 'multiple_choice' | 'true_false' | 'short_answer';
-  correct_answer: string;
-  points: number;
-  position: number;
-  explanation: string | null;
-  options?: Array<{ id: string; option_text: string; option_index: number }>;
-}
-
-interface Quiz {
-  id: string;
-  title: string;
-  subject: string;
-  duration: number;
-  difficulty: string;
-}
-
-export const QuizTaking = () => {
-  const { quizId } = useParams<{ quizId: string }>();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const { updateStreak } = useStreak();
-
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0); // in seconds
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [score, setScore] = useState<{ score: number; total: number; percentage: number } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [startTime, setStartTime] = useState<Date | null>(null);
-
-  useEffect(() => {
-    if (quizId) {
-      fetchQuiz();
-    }
-  }, [quizId]);
-
-  useEffect(() => {
-    if (quiz && timeRemaining > 0 && !isSubmitted) {
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            handleSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [quiz, timeRemaining, isSubmitted]);
-
-  const fetchQuiz = async () => {
-    if (!quizId) return;
-
-    try {
-      setIsLoading(true);
-
-      // Fetch session with deck and questions from openmultiplechoice API
-      const sessionData = await apiClient.fetchSession(quizId) as SessionWithDeck;
-      
-      if (!sessionData.session || !sessionData.deck) {
-        throw new Error('Session or deck not found');
-      }
-
-      const deck = sessionData.deck;
-      const session = sessionData.session;
-
-      // Map deck to quiz format
-      const quizData: Quiz = {
-        id: session.id.toString(),
-        title: deck.name,
-        subject: deck.module?.subject?.name || deck.module?.name || 'Unknown',
-        duration: deck.questions ? Math.max(30, Math.ceil(deck.questions.length * 2)) : 60,
-        difficulty: deck.questions && deck.questions.length > 50 ? 'Hard' : 
-                   deck.questions && deck.questions.length < 20 ? 'Easy' : 'Medium',
-      };
-
-      setQuiz(quizData);
-      setTimeRemaining(quizData.duration * 60);
-      setStartTime(new Date());
-
-      // Map openmultiplechoice questions to component format
-      const mappedQuestions: Question[] = (deck.questions || []).map((q: OMCQuestion, index: number) => {
-        const answers = q.answers || [];
-        const correctAnswerId = q.correct_answer_id?.toString() || '';
-
-        return {
-          id: q.id.toString(),
-          question_text: q.text,
-          question_type: 'multiple_choice' as const,
-          correct_answer: correctAnswerId,
-          points: 1,
-          position: index + 1,
-          explanation: q.comment || null,
-          options: answers.map((answer: Answer) => ({
-            id: answer.id.toString(),
-            option_text: answer.text,
-            option_index: parseInt(answer.id.toString()),
-          })),
-        };
-      });
-
-      setQuestions(mappedQuestions);
-    } catch (error: any) {
-      console.error("Error fetching quiz:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load quiz",
-        variant: "destructive",
-      });
-      navigate('/quiz');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAnswerChange = (questionId: string, answer: string) => {
-    setAnswers({ ...answers, [questionId]: answer });
-  };
-
-  const handleSubmit = async () => {
-    if (!user || !quiz || !quizId || questions.length === 0) return;
-
-    setIsSubmitted(true);
-
-    try {
-      let totalScore = 0;
-      let totalPoints = 0;
-      let correctCount = 0;
-
-      // Submit answers and calculate score
-      for (const question of questions) {
-        totalPoints += question.points;
-        const userAnswerId = answers[question.id];
-        
-        if (!userAnswerId) {
-          continue; // Skip unanswered questions
-        }
-
-        // Create answer choice via API
-        try {
-          await apiClient.createAnswerChoice(
-            parseInt(quizId),
-            parseInt(question.id),
-            parseInt(userAnswerId)
-          );
-        } catch (error) {
-          console.error(`Error submitting answer for question ${question.id}:`, error);
-        }
-
-        // Check if answer is correct
-        const isCorrect = userAnswerId === question.correct_answer;
-        if (isCorrect) {
-          totalScore += question.points;
-          correctCount++;
-        }
-      }
-
-      const percentage = totalPoints > 0 ? (totalScore / totalPoints) * 100 : 0;
-
-      // Update streak if score is good enough
-      if (percentage >= 50 && quizId) {
-        try {
-          await updateStreak(quizId);
-        } catch (error) {
-          console.error('Error updating streak:', error);
-        }
-      }
-
-      setScore({ score: totalScore, total: totalPoints, percentage });
-
-      toast({
-        title: "Quiz submitted!",
-        description: `You scored ${totalScore}/${totalPoints} (${percentage.toFixed(1)}%)`,
-      });
-    } catch (error: any) {
-      console.error("Error submitting quiz:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit quiz",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const currentQuestion = questions[currentQuestionIndex];
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading quiz...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!quiz || questions.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Quiz not found</p>
-          <Button onClick={() => navigate('/quiz')} className="mt-4">
-            Back to Quizzes
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isSubmitted && score) {
-    return (
-      <div className="min-h-screen p-4 bg-gradient-to-br from-background via-muted/20 to-background">
-        <div className="container mx-auto max-w-4xl">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-2xl">Quiz Results</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center">
-                <div className="text-6xl font-bold mb-2">
-                  {score.percentage.toFixed(1)}%
-                </div>
-                <p className="text-muted-foreground">
-                  {score.score} out of {score.total} points
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">Correct</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {questions.filter((q, idx) => {
-                      const userAnswer = answers[q.id] || "";
-                      if (q.question_type === 'multiple_choice') {
-                        return userAnswer === q.correct_answer;
-                      } else if (q.question_type === 'true_false') {
-                        return userAnswer.toLowerCase() === q.correct_answer.toLowerCase();
-                      } else {
-                        return userAnswer.toLowerCase().trim() === q.correct_answer.toLowerCase().trim();
-                      }
-                    }).length}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">Incorrect</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {questions.length - questions.filter((q) => {
-                      const userAnswer = answers[q.id] || "";
-                      if (q.question_type === 'multiple_choice') {
-                        return userAnswer === q.correct_answer;
-                      } else if (q.question_type === 'true_false') {
-                        return userAnswer.toLowerCase() === q.correct_answer.toLowerCase();
-                      } else {
-                        return userAnswer.toLowerCase().trim() === q.correct_answer.toLowerCase().trim();
-                      }
-                    }).length}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Review Answers</h3>
-                {questions.map((question, idx) => {
-                  const userAnswer = answers[question.id] || "";
-                  let isCorrect = false;
-                  
-                  if (question.question_type === 'multiple_choice') {
-                    isCorrect = userAnswer === question.correct_answer;
-                  } else if (question.question_type === 'true_false') {
-                    isCorrect = userAnswer.toLowerCase() === question.correct_answer.toLowerCase();
-                  } else {
-                    isCorrect = userAnswer.toLowerCase().trim() === question.correct_answer.toLowerCase().trim();
-                  }
-
-                  return (
-                    <Card key={question.id} className={isCorrect ? "border-green-500" : "border-red-500"}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-2 mb-2">
-                          {isCorrect ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                          )}
-                          <div className="flex-1">
-                            <p className="font-medium mb-2">
-                              {idx + 1}. {question.question_text}
-                            </p>
-                            <div className="space-y-1 text-sm">
-                              <p>
-                                <span className="font-medium">Your answer:</span>{" "}
-                                <span className={isCorrect ? "text-green-600" : "text-red-600"}>
-                                  {userAnswer || "No answer"}
-                                </span>
-                              </p>
-                              {!isCorrect && (
-                                <p>
-                                  <span className="font-medium">Correct answer:</span>{" "}
-                                  <span className="text-green-600">
-                                    {question.question_type === 'multiple_choice' && question.options
-                                      ? question.options[parseInt(question.correct_answer)]?.option_text
-                                      : question.correct_answer}
-                                  </span>
-                                </p>
-                              )}
-                              {question.explanation && (
-                                <p className="text-muted-foreground mt-2">
-                                  <span className="font-medium">Explanation:</span> {question.explanation}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={() => navigate('/quiz')} className="flex-1">
-                  Back to Quizzes
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setAnswers({});
-                    setCurrentQuestionIndex(0);
-                    setIsSubmitted(false);
-                    setScore(null);
-                    setTimeRemaining(quiz.duration * 60);
-                    setStartTime(new Date());
-                  }}
-                >
-                  Retake Quiz
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
+const HtmlContent = ({ content, className }: { content?: string | null; className?: string }) => {
+  if (!content) {
+    return <p className={cn("text-sm text-muted-foreground italic", className)}>No content provided.</p>;
   }
 
   return (
-    <div className="min-h-screen p-4 bg-gradient-to-br from-background via-muted/20 to-background">
-      <div className="container mx-auto max-w-4xl">
-        {/* Header with Timer */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">{quiz.title}</h1>
-                <p className="text-sm text-muted-foreground">{quiz.subject}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="outline">{quiz.difficulty}</Badge>
-                <div className="flex items-center gap-2 text-lg font-semibold">
-                  <Clock className="w-5 h-5" />
-                  {formatTime(timeRemaining)}
-                </div>
-              </div>
+    <div
+      className={cn(
+        "leading-relaxed text-base text-foreground space-y-4 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_em]:italic",
+        className
+      )}
+      dangerouslySetInnerHTML={{ __html: content }}
+    />
+  );
+};
+
+export const QuizTaking = () => {
+  const { quizId } = useParams<{ quizId: string }>();
+  const deckId = Number(quizId);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const openMcReady = isOpenMcConfigured();
+
+  const [deck, setDeck] = useState<OpenMcDeck | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [sessionComplete, setSessionComplete] = useState(false);
+
+  useEffect(() => {
+    if (!openMcReady) {
+      setLoading(false);
+      setError("OpenMultipleChoice API is not configured. Set VITE_OPENMC_API_URL to begin.");
+      return;
+    }
+
+    if (!Number.isFinite(deckId)) {
+      setLoading(false);
+      setError("Invalid quiz identifier.");
+      return;
+    }
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    fetchOpenMcDeckWithQuestions(deckId, controller.signal)
+      .then((data) => {
+        setDeck(data);
+        setCurrentIndex(0);
+        setSelectedAnswerId(null);
+        setShowFeedback(false);
+        setCorrectCount(0);
+        setSessionComplete(false);
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        const message = err instanceof OpenMcClientError ? err.message : "Failed to load the quiz.";
+        setError(message);
+      })
+      .finally(() => setLoading(false));
+
+    return () => controller.abort();
+  }, [deckId, openMcReady]);
+
+  const questions: OpenMcQuestion[] = useMemo(() => {
+    if (!deck?.questions) return [];
+    return deck.questions
+      .filter((question) => !question.is_invalid)
+      .sort((a, b) => a.id - b.id);
+  }, [deck]);
+
+  const currentQuestion = questions[currentIndex];
+  const progressPercent = questions.length ? ((currentIndex + (showFeedback || sessionComplete ? 1 : 0)) / questions.length) * 100 : 0;
+  const accuracy = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
+  const isLastQuestion = currentIndex >= questions.length - 1;
+  const selectedIsCorrect = currentQuestion
+    ? selectedAnswerId === currentQuestion.correct_answer_id
+    : false;
+
+  const handleAnswerSelect = (answerId: number) => {
+    if (!currentQuestion || showFeedback) return;
+
+    setSelectedAnswerId(answerId);
+    if (answerId === currentQuestion.correct_answer_id) {
+      setCorrectCount((prev) => prev + 1);
+    }
+    setShowFeedback(true);
+  };
+
+  const handleNextStep = () => {
+    if (!showFeedback) return;
+
+    if (isLastQuestion) {
+      setSessionComplete(true);
+      setShowFeedback(false);
+      return;
+    }
+
+    setCurrentIndex((prev) => prev + 1);
+    setSelectedAnswerId(null);
+    setShowFeedback(false);
+  };
+
+  const handleRestart = () => {
+    setCurrentIndex(0);
+    setSelectedAnswerId(null);
+    setShowFeedback(false);
+    setCorrectCount(0);
+    setSessionComplete(false);
+  };
+
+  const handleBackToHub = () => navigate("/quiz");
+
+  const renderImages = (question: OpenMcQuestion) => {
+    if (!question.images?.length) {
+      return null;
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {question.images.map((image) => {
+          const url = buildOpenMcImageUrl(image.path);
+          if (!url) return null;
+
+          return (
+            <div key={image.id} className="rounded-xl overflow-hidden border bg-muted/30">
+              <img
+                src={url}
+                alt={image.comment ?? `Question image ${image.id}`}
+                className="w-full h-auto object-cover"
+                loading="lazy"
+              />
+              {image.comment && (
+                <p className="px-3 py-2 text-xs text-muted-foreground border-t border-border/60">
+                  {image.comment}
+                </p>
+              )}
             </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderQuestionCard = () => {
+    if (!currentQuestion) {
+      return (
+        <Card className="shadow-elegant">
+          <CardContent className="py-10 text-center text-muted-foreground">
+            This deck does not include any valid questions yet.
           </CardContent>
         </Card>
+      );
+    }
 
-        {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="flex justify-between text-sm mb-2">
-            <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
-            <span>{Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}%</span>
+    return (
+      <Card className="shadow-elegant">
+        <CardHeader className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-wide text-muted-foreground">Question {currentIndex + 1} of {questions.length}</p>
+              <CardTitle className="text-2xl">Practice mode</CardTitle>
+            </div>
+            {currentQuestion.type && (
+              <Badge variant="outline" className="text-xs">
+                {currentQuestion.type.toUpperCase()}
+              </Badge>
+            )}
           </div>
-          <div className="w-full bg-muted rounded-full h-2">
-            <div
-              className="bg-primary h-2 rounded-full transition-all"
-              style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-            />
+          <Progress value={progressPercent} className="h-2" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <HtmlContent content={currentQuestion.text} className="text-lg" />
+          {renderImages(currentQuestion)}
+
+          {currentQuestion.case && (
+            <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4 space-y-2">
+              <p className="text-sm font-semibold text-primary">Case context</p>
+              <HtmlContent content={currentQuestion.case.description ?? currentQuestion.case.title} className="text-sm" />
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {currentQuestion.answers?.length ? (
+              currentQuestion.answers.map((answer) => (
+                <Button
+                  key={answer.id}
+                  variant="outline"
+                  disabled={showFeedback}
+                  onClick={() => handleAnswerSelect(answer.id)}
+                  className={cn(
+                    "w-full justify-start text-left whitespace-normal",
+                    showFeedback &&
+                      answer.id === currentQuestion.correct_answer_id &&
+                      "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-200",
+                    showFeedback &&
+                      selectedAnswerId === answer.id &&
+                      answer.id !== currentQuestion.correct_answer_id &&
+                      "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-200"
+                  )}
+                >
+                  <HtmlContent content={answer.text} className="text-base" />
+                </Button>
+              ))
+            ) : (
+              <Alert>
+                <AlertTitle>No answers found</AlertTitle>
+                <AlertDescription>This question has no answer options yet.</AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {showFeedback && (
+            <Alert variant={selectedIsCorrect ? "default" : "destructive"}>
+              <div className="flex items-start gap-3">
+                {selectedIsCorrect ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-500 mt-1" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-red-500 mt-1" />
+                )}
+                <div>
+                  <AlertTitle>{selectedIsCorrect ? "Correct!" : "Not quite"}</AlertTitle>
+                  <AlertDescription>
+                    {selectedIsCorrect
+                      ? "Great work — keep the streak going."
+                      : "Review the explanation below and try again next round."}
+                  </AlertDescription>
+                </div>
+              </div>
+            </Alert>
+          )}
+
+          {currentQuestion.comment && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+              <p className="text-sm font-semibold text-primary">Explanation</p>
+              <HtmlContent content={currentQuestion.comment} className="text-sm" />
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              className="bg-gradient-primary shadow-glow"
+              disabled={!showFeedback}
+              onClick={handleNextStep}
+            >
+              {isLastQuestion ? (
+                <>
+                  Finish quiz <Sparkles className="ml-2 h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  Next question <ChevronRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={handleRestart}>
+              Restart deck
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderSummaryCard = () => (
+    <Card className="shadow-elegant">
+      <CardHeader>
+        <CardTitle className="text-2xl">Great job!</CardTitle>
+        <p className="text-muted-foreground">
+          You completed {deck?.name}. Review the results below or jump back into the deck.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-xl border p-4 text-center">
+            <p className="text-sm text-muted-foreground">Accuracy</p>
+            <p className="text-3xl font-bold text-primary">{accuracy}%</p>
+          </div>
+          <div className="rounded-xl border p-4 text-center">
+            <p className="text-sm text-muted-foreground">Correct answers</p>
+            <p className="text-3xl font-bold text-primary">
+              {correctCount} / {questions.length}
+            </p>
           </div>
         </div>
+        <div className="flex flex-wrap gap-3">
+          <Button className="bg-gradient-primary shadow-glow" onClick={handleRestart}>
+            Retake deck
+          </Button>
+          <Button variant="outline" onClick={handleBackToHub}>
+            Back to quiz hub
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
-        {/* Question Card */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-4">
-                {currentQuestion.question_text}
-              </h2>
+  return (
+    <div className="min-h-screen pb-12 bg-gradient-to-br from-background via-muted/20 to-background">
+      {!user && <Navbar />}
+      <div className={`container mx-auto px-4 max-w-5xl ${!user ? "pt-20" : "pt-10"}`}>
+        <div className="mb-6">
+          <Button variant="ghost" onClick={handleBackToHub} className="gap-2">
+            <ChevronLeft className="h-4 w-4" />
+            Back to quiz hub
+          </Button>
+        </div>
 
-              {currentQuestion.question_type === 'multiple_choice' && currentQuestion.options && (
-                <RadioGroup
-                  value={answers[currentQuestion.id] || ""}
-                  onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-                >
-                  {currentQuestion.options.map((option) => (
-                    <div key={option.id} className="flex items-center space-x-2 p-3 rounded-lg hover:bg-muted cursor-pointer">
-                      <RadioGroupItem value={option.id} id={option.id} />
-                      <Label htmlFor={option.id} className="flex-1 cursor-pointer">
-                        {option.option_text}
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              )}
+        {error && (
+          <Alert variant="destructive" className="mb-8">
+            <AlertTitle>Unable to load quiz</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-              {currentQuestion.question_type === 'true_false' && (
-                <RadioGroup
-                  value={answers[currentQuestion.id] || ""}
-                  onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
-                >
-                  <div className="flex items-center space-x-2 p-3 rounded-lg hover:bg-muted cursor-pointer">
-                    <RadioGroupItem value="true" id="true" />
-                    <Label htmlFor="true" className="cursor-pointer">True</Label>
+        {loading ? (
+          <Card className="shadow-elegant">
+            <CardHeader>
+              <Skeleton className="h-6 w-1/3" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-40 w-full" />
+            </CardContent>
+          </Card>
+        ) : (
+          deck && (
+            <div className="space-y-8">
+              <Card className="shadow-elegant">
+                <CardHeader className="space-y-3">
+                  <CardTitle className="text-3xl">{deck.name}</CardTitle>
+                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                    {deck.module?.subject?.name && <Badge variant="secondary">{deck.module.subject.name}</Badge>}
+                    {deck.module?.name && <Badge variant="outline">{deck.module.name}</Badge>}
+                    <Badge variant="outline" className="flex items-center gap-1">
+                      <Layers className="h-3.5 w-3.5" />
+                      {questions.length} questions
+                    </Badge>
+                    {deck.exam_at && (
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        {new Date(deck.exam_at).toLocaleDateString()}
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-2 p-3 rounded-lg hover:bg-muted cursor-pointer">
-                    <RadioGroupItem value="false" id="false" />
-                    <Label htmlFor="false" className="cursor-pointer">False</Label>
+                  {deck.description && (
+                    <p className="text-muted-foreground">{deck.description}</p>
+                  )}
+                </CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border p-4">
+                    <p className="text-sm text-muted-foreground">Progress</p>
+                    <p className="text-2xl font-bold text-primary">
+                      {sessionComplete ? questions.length : currentIndex + 1}/{questions.length || 1}
+                    </p>
                   </div>
-                </RadioGroup>
-              )}
+                  <div className="rounded-xl border p-4">
+                    <p className="text-sm text-muted-foreground">Correct answers</p>
+                    <p className="text-2xl font-bold text-primary">{correctCount}</p>
+                  </div>
+                  <div className="rounded-xl border p-4">
+                    <p className="text-sm text-muted-foreground">Accuracy</p>
+                    <p className="text-2xl font-bold text-primary">{accuracy}%</p>
+                  </div>
+                </CardContent>
+              </Card>
 
-              {currentQuestion.question_type === 'short_answer' && (
-                <div>
-                  <input
-                    type="text"
-                    value={answers[currentQuestion.id] || ""}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    className="w-full p-3 border rounded-lg"
-                    placeholder="Type your answer..."
-                  />
-                </div>
-              )}
+              {sessionComplete ? renderSummaryCard() : renderQuestionCard()}
             </div>
-
-            {/* Navigation */}
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
-                disabled={currentQuestionIndex === 0}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Previous
-              </Button>
-              <div className="flex gap-2">
-                {currentQuestionIndex < questions.length - 1 ? (
-                  <Button
-                    onClick={() => setCurrentQuestionIndex(currentQuestionIndex + 1)}
-                  >
-                    Next
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                ) : (
-                  <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
-                    Submit Quiz
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Question Navigation Grid */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Question Navigation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-10 gap-2">
-              {questions.map((q, idx) => (
-                <Button
-                  key={q.id}
-                  variant={answers[q.id] ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentQuestionIndex(idx)}
-                  className={currentQuestionIndex === idx ? "ring-2 ring-primary" : ""}
-                >
-                  {idx + 1}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+          )
+        )}
       </div>
     </div>
   );

@@ -1,239 +1,122 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Search, 
-  Clock, 
-  FileText, 
-  Users, 
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  BookOpen,
-  GraduationCap,
-  Target,
-  Flame
-} from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useStreak } from "@/hooks/useStreak";
-import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar, Clock, Flame, GraduationCap, Layers, Target, BookOpen } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Logo from "@/assets/logo.png";
-import { apiClient } from "@/lib/api-client";
-import { mapDecksToExamPapers, type ExamPaper } from "@/lib/deck-to-quiz-mapper";
-import type { Deck, PaginatedResponse } from "@/types/openmultiplechoice";
+import { useAuth } from "@/hooks/useAuth";
+import { useStreak } from "@/hooks/useStreak";
+import { fetchOpenMcDecks, isOpenMcConfigured, OpenMcClientError } from "@/lib/openmc-client";
+import type { OpenMcDeck } from "@/types/openmc";
+
+const placeholderHighlights = [
+  {
+    title: "Personalised Practice",
+    description: "Build quizzes from your saved study materials and focus on weak topics.",
+    icon: Target,
+  },
+  {
+    title: "Live Performance Insights",
+    description: "Track accuracy, speed, and readiness across upcoming exam seasons.",
+    icon: Clock,
+  },
+  {
+    title: "Community Challenges",
+    description: "Compete with friends and unlock streak rewards for consistent study.",
+    icon: Flame,
+  },
+];
 
 const Quiz = () => {
-  const navigate = useNavigate();
-  const [selectedSubject, setSelectedSubject] = useState<string>("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [examPapers, setExamPapers] = useState<ExamPaper[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const itemsPerPage = 6;
   const { user } = useAuth();
   const { streak } = useStreak();
-  const { toast } = useToast();
+  const navigate = useNavigate();
+  const openMcReady = isOpenMcConfigured();
+  const [decks, setDecks] = useState<OpenMcDeck[]>([]);
+  const [loadingDecks, setLoadingDecks] = useState(openMcReady);
+  const [deckError, setDeckError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchQuizzes();
-  }, []);
-
-  const fetchQuizzes = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Fetch decks from openmultiplechoice API
-      // Use public endpoint first (no authentication required)
-      let response;
-      try {
-        // Try public endpoint first (works without authentication)
-        response = await apiClient.get('/decks/public');
-      } catch (error) {
-        // Fallback: try authenticated endpoint if user is logged in
-        if (user) {
-          try {
-            response = await apiClient.fetchDecks({ kind: 'public-rw-listed' });
-          } catch (authError) {
-            // Last fallback: try user decks
-            try {
-              response = await apiClient.fetchDecks({ kind: 'user' });
-            } catch (finalError) {
-              throw error; // Throw original error
-            }
-          }
-        } else {
-          throw error;
-        }
-      }
-      
-      // Handle paginated response or array response
-      let decks: Deck[];
-      if (Array.isArray(response)) {
-        decks = response;
-      } else if ((response as PaginatedResponse<Deck>).data) {
-        decks = (response as PaginatedResponse<Deck>).data;
-      } else {
-        decks = [];
-      }
-
-      // Filter out archived and ephemeral decks
-      decks = decks.filter(deck => !deck.is_archived && !deck.is_ephemeral);
-
-      // Map decks to exam papers format
-      const examPapersData = mapDecksToExamPapers(decks);
-      setExamPapers(examPapersData);
-    } catch (error: any) {
-      console.error("Error fetching quizzes:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load quizzes. Please check your connection and ensure the API server is running.",
-        variant: "destructive",
-      });
-      setExamPapers([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleStartExam = async (deckId: string) => {
-    // Validate user authentication
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to take quizzes",
-        variant: "destructive"
-      });
+    if (!openMcReady) {
+      setLoadingDecks(false);
       return;
     }
 
-    // Validate deckId
-    const parsedDeckId = parseInt(deckId);
-    if (isNaN(parsedDeckId) || parsedDeckId <= 0) {
-      console.error("Invalid deck ID:", deckId);
-      toast({
-        title: "Invalid quiz",
-        description: "The selected quiz is invalid. Please try selecting another quiz.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const controller = new AbortController();
+    setLoadingDecks(true);
+    setDeckError(null);
 
-    // Find the exam paper to validate it exists and has questions
-    const examPaper = examPapers.find(paper => paper.id === deckId);
-    if (examPaper && examPaper.questionCount === 0) {
-      toast({
-        title: "No questions available",
-        description: "This quiz has no questions. Please select another quiz.",
-        variant: "destructive",
-      });
-      return;
-    }
+    fetchOpenMcDecks(undefined, controller.signal)
+      .then((payload) => setDecks(payload ?? []))
+      .catch((error) => {
+        if (error.name === "AbortError") return;
+        const message = error instanceof OpenMcClientError ? error.message : "Failed to load quizzes.";
+        setDeckError(message);
+      })
+      .finally(() => setLoadingDecks(false));
 
-    try {
-      console.log("Creating session for deck:", {
-        deckId: parsedDeckId,
-        examPaperTitle: examPaper?.title,
-        questionCount: examPaper?.questionCount,
-      });
+    return () => controller.abort();
+  }, [openMcReady]);
 
-      // Create a session from the deck
-      const session = await apiClient.createSession(parsedDeckId) as { id: number };
-      
-      if (!session || !session.id) {
-        throw new Error("Invalid session response from server");
-      }
+  const deckCount = decks.length;
+  const totalQuestions = useMemo(
+    () => decks.reduce((acc, deck) => acc + (deck.questions?.length ?? 0), 0),
+    [decks]
+  );
+  const moduleCount = useMemo(() => {
+    const modules = new Set(
+      decks
+        .map((deck) => deck.module?.name ?? deck.module?.subject?.name ?? null)
+        .filter(Boolean) as string[]
+    );
+    return modules.size;
+  }, [decks]);
 
-      console.log("Session created successfully:", session.id);
-      
-      // Navigate to quiz taking page with session ID
-      navigate(`/quiz/${session.id}`);
-    } catch (error: any) {
-      // Enhanced error logging
-      console.error("Error creating session:", {
-        deckId: parsedDeckId,
-        error: error.message || error,
-        errorType: error.constructor?.name,
-        stack: error.stack,
-      });
-
-      // Extract error message - ApiError has a message property
-      let errorMessage = "Failed to start quiz";
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (error?.message) {
-        errorMessage = error.message;
-      }
-
-      // Show user-friendly error message
-      toast({
-        title: "Error starting quiz",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Statistics
   const stats = [
     {
       icon: Flame,
       value: streak.toString(),
       label: "day streak",
-      color: "text-orange-500",
-      bgColor: "bg-orange-50"
+      color: "text-orange-500 dark:text-orange-300",
+      bgColor: "bg-orange-50 dark:bg-orange-400/15",
     },
     {
-      icon: Calendar,
-      value: "-257",
-      label: "days to SPM Bertutur",
-      color: "text-orange-500",
-      bgColor: "bg-orange-50"
+      icon: BookOpen,
+      value: loadingDecks ? "..." : deckCount.toString(),
+      label: "quizzes online",
+      color: "text-red-500 dark:text-red-300",
+      bgColor: "bg-red-50 dark:bg-red-400/15",
     },
     {
-      icon: Clock,
-      value: "-250", 
-      label: "days to SPM Amali",
-      color: "text-cyan-500",
-      bgColor: "bg-cyan-50"
+      icon: Target,
+      value: loadingDecks ? "..." : totalQuestions.toString(),
+      label: "questions ready",
+      color: "text-green-500 dark:text-green-300",
+      bgColor: "bg-green-50 dark:bg-green-400/15",
     },
     {
       icon: GraduationCap,
-      value: "-226",
-      label: "days to SPM Bertulis", 
-      color: "text-red-500",
-      bgColor: "bg-red-50"
-    }
+      value: loadingDecks ? "..." : moduleCount.toString(),
+      label: "modules covered",
+      color: "text-purple-500 dark:text-purple-300",
+      bgColor: "bg-purple-50 dark:bg-purple-400/15",
+    },
   ];
-
-  // Get unique subjects from quizzes
-  const subjects = ["All", ...Array.from(new Set(examPapers.map(p => p.subject))).sort()];
-
-  // Filter exam papers
-  const filteredPapers = examPapers.filter(paper => {
-    const matchesSubject = selectedSubject === "All" || paper.subject === selectedSubject;
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = searchQuery === "" || 
-      paper.title.toLowerCase().includes(searchLower) ||
-      (paper.location && paper.location.toLowerCase().includes(searchLower));
-    return matchesSubject && matchesSearch;
-  });
-
-  // Pagination
-  const totalPages = Math.ceil(filteredPapers.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedPapers = filteredPapers.slice(startIndex, startIndex + itemsPerPage);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'Easy': return 'text-green-600 bg-green-50 border-green-200';
-      case 'Medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'Hard': return 'text-red-600 bg-red-50 border-red-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'Easy':
+        return 'text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-500/15 border-green-200 dark:border-green-500/40';
+      case 'Medium':
+        return 'text-yellow-600 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-500/15 border-yellow-200 dark:border-yellow-500/40';
+      case 'Hard':
+        return 'text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-500/15 border-red-200 dark:border-red-500/40';
+      default:
+        return 'text-foreground bg-muted/40 dark:bg-muted/20 border-border';
     }
   };
 
@@ -276,148 +159,150 @@ const Quiz = () => {
           })}
         </div>
 
-        {/* Subject Filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {subjects.map((subject) => (
-            <Button
-              key={subject}
-              variant={selectedSubject === subject ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setSelectedSubject(subject);
-                setCurrentPage(1);
-              }}
-              className={selectedSubject === subject ? "bg-gradient-primary shadow-glow" : ""}
-            >
-              {subject}
-            </Button>
-          ))}
-        </div>
+        {(!openMcReady || deckError) && (
+          <Alert variant={openMcReady ? "destructive" : "default"} className="mb-8">
+            <AlertTitle>{openMcReady ? "Unable to reach OpenMultipleChoice" : "Quiz service offline"}</AlertTitle>
+            <AlertDescription>
+              {openMcReady
+                ? deckError
+                : "Set VITE_OPENMC_API_URL (and optional VITE_OPENMC_API_TOKEN) to load quizzes from OpenMultipleChoice."}
+            </AlertDescription>
+          </Alert>
+        )}
 
-        {/* Search */}
-        <div className="mb-8">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search for exam papers"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Exam Papers Grid */}
-        {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading quizzes...</p>
-          </div>
-        ) : paginatedPapers.length === 0 ? (
-          <Card className="mb-8">
-            <CardContent className="p-12 text-center">
-              <p className="text-muted-foreground mb-4">No quizzes found.</p>
-              <p className="text-sm text-muted-foreground">
-                {searchQuery || selectedSubject !== "All" 
-                  ? "Try adjusting your search or filters." 
-                  : "No decks are available at the moment."}
+        <div className="mb-10">
+          <Card className="shadow-elegant mb-6">
+            <CardHeader>
+              <CardTitle className="text-2xl">Available quizzes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-muted-foreground">
+              <p>
+                Choose any public deck from the OpenMultipleChoice library. We will fetch the latest questions, answers,
+                and media directly from the Laravel backend before each session.
               </p>
+              <div className="text-sm text-muted-foreground">
+                {loadingDecks
+                  ? "Syncing decks..."
+                  : `Loaded ${deckCount} deck${deckCount === 1 ? "" : "s"} with ${totalQuestions} questions.`}
+              </div>
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {paginatedPapers.map((paper) => (
-            <Card key={paper.id} className="shadow-elegant hover:shadow-glow transition-all group">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between mb-2">
-                  <Badge variant="outline" className="text-xs font-medium">
-                    {paper.id}
-                  </Badge>
-                  <Badge className={`text-xs ${getDifficultyColor(paper.difficulty)}`}>
-                    {paper.difficulty}
-                  </Badge>
-                </div>
-                <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
-                  {paper.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <BookOpen className="w-3 h-3" />
-                      <span>{paper.questionCount} questions</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{paper.duration} min</span>
-                    </div>
-                  </div>
-                  
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-1">
-                      <Users className="w-3 h-3" />
-                      <span>{paper.completions.toLocaleString()} completed</span>
-                    </div>
-                    {paper.location && (
-                      <span className="text-xs">{paper.location}</span>
-                    )}
-                  </div>
 
-                  <Button 
-                    className="w-full mt-4 bg-gradient-primary shadow-glow hover:opacity-90 transition-opacity"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleStartExam(paper.id);
-                    }}
-                    disabled={paper.questionCount === 0}
-                  >
-                    {paper.questionCount === 0 ? "No Questions" : "Start Quiz"}
-                  </Button>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {loadingDecks &&
+              Array.from({ length: 6 }).map((_, index) => (
+                <Card key={`skeleton-${index}`} className="shadow-elegant">
+                  <CardHeader>
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/3" />
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <div className="flex gap-3">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-4 w-1/3" />
+                    </div>
+                    <Skeleton className="h-10 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+
+            {!loadingDecks &&
+              decks.map((deck) => (
+                <Card key={deck.id} className="shadow-elegant hover:shadow-glow transition-shadow flex flex-col">
+                  <CardHeader className="space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-xl">{deck.name}</CardTitle>
+                      {deck.access && (
+                        <Badge variant="outline" className="text-xs">
+                          {deck.access}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+                      {deck.module?.subject?.name && <Badge variant="secondary">{deck.module.subject.name}</Badge>}
+                      {deck.module?.name && <span>{deck.module.name}</span>}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      {deck.description ?? "This deck does not include a description yet."}
+                    </p>
+                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-primary" />
+                        {(deck.questions?.length ?? 0).toLocaleString()} questions
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        {deck.exam_at ? new Date(deck.exam_at).toLocaleDateString() : "Flexible exam date"}
+                      </span>
+                    </div>
+                    <Button
+                      className="w-full bg-gradient-primary shadow-glow"
+                      onClick={() => navigate(`/quiz/${deck.id}`)}
+                    >
+                      Start
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+
+          {!loadingDecks && openMcReady && !deckError && decks.length === 0 && (
+            <Card className="shadow-elegant mt-6">
+              <CardContent className="py-6 text-center text-muted-foreground">
+                No public decks are available yet. Publish one from the OpenMultipleChoice admin panel to see it here.
               </CardContent>
             </Card>
-          ))}
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(currentPage - 1)}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <Button
-                key={page}
-                variant={currentPage === page ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCurrentPage(page)}
-                className={currentPage === page ? "bg-gradient-primary" : ""}
-              >
-                {page}
-              </Button>
-            ))}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {placeholderHighlights.map((highlight) => {
+            const Icon = highlight.icon;
+            return (
+              <Card key={highlight.title} className="shadow-elegant hover:shadow-glow transition-shadow">
+                <CardHeader className="flex flex-row items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                    <Icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <CardTitle className="text-lg">{highlight.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="text-muted-foreground">
+                  {highlight.description}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(currentPage + 1)}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
+        <Card className="shadow-elegant">
+          <CardHeader>
+            <CardTitle className="text-xl">What to expect next</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start gap-3">
+              <Badge className={getDifficultyColor("Medium")}>Roadmap</Badge>
+              <div>
+                <p className="font-semibold mb-1">Native AceTerus quizzes</p>
+                <p className="text-muted-foreground">
+                  Structured around Malaysian syllabi and synced with your Supabase profile for instant progress sync.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Badge variant="outline">Community</Badge>
+              <div>
+                <p className="font-semibold mb-1">Deck collaborations</p>
+                <p className="text-muted-foreground">
+                  Build and share question banks with teammates while keeping everything moderated inside AceTerus.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

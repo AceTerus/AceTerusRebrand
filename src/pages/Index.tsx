@@ -57,19 +57,19 @@ const Index = () => {
 
           <div className="container relative mx-auto px-6 py-24">
             <div className="grid items-center gap-12">
-              <div className="space-y-8 text-black">
+              <div className="space-y-8 text-foreground">
                 <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 shadow-sm">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium tracking-wide text-black">Where learning meets achievement</span>
+                  <span className="text-sm font-medium tracking-wide text-foreground">Where learning meets achievement</span>
                 </div>
 
-                <h1 className="text-5xl font-bold leading-tight tracking-tight text-black md:text-7xl lg:text-8xl">
+                <h1 className="text-5xl font-bold leading-tight tracking-tight text-foreground md:text-7xl lg:text-8xl">
                   Ace your
                   <span className="block text-primary">journey</span>
                   with AceTerus
                 </h1>
 
-                <p className="max-w-2xl text-lg text-black/80 md:text-2xl">
+                <p className="max-w-2xl text-lg text-foreground/80 md:text-2xl">
                   Immersive quizzes, collaborative materials, and live insights—crafted to keep you learning, sharing, and celebrating every win.
                 </p>
 
@@ -95,8 +95,8 @@ const Index = () => {
                 <div className="grid gap-6 pt-10 sm:grid-cols-3">
                   {heroStats.map((stat) => (
                     <div key={stat.label} className="rounded-2xl border border-black/10 bg-white/80 p-4 text-center shadow-md">
-                      <p className="text-3xl font-bold text-black">{stat.value}</p>
-                      <p className="text-sm uppercase tracking-wide text-black/70">{stat.label}</p>
+                      <p className="text-3xl font-bold text-foreground">{stat.value}</p>
+                      <p className="text-sm uppercase tracking-wide text-foreground/70">{stat.label}</p>
                     </div>
                   ))}
                 </div>
