@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { clearOpenMcToken, syncOpenMcTokenFromSession } from '@/lib/openmc-client';
 
 interface AuthContextType {
   user: User | null;
@@ -29,12 +30,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const syncOpenMc = (currentSession: Session | null) => {
+      if (!currentSession) {
+        clearOpenMcToken();
+        return;
+      }
+
+      syncOpenMcTokenFromSession(currentSession).catch((error) => {
+        console.warn('Failed to sync OpenMultipleChoice token', error);
+      });
+    };
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
+        syncOpenMc(session);
       }
     );
 
@@ -43,6 +56,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
+      syncOpenMc(session);
     });
 
     return () => subscription.unsubscribe();
@@ -52,7 +66,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('Error signing out:', error);
+      return;
     }
+    clearOpenMcToken();
   };
 
   const value = {

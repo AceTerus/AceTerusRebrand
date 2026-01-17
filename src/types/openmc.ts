@@ -19,6 +19,7 @@ export interface OpenMcImage {
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
+  url?: string | null;
 }
 
 export interface OpenMcAnswer {
@@ -35,6 +36,7 @@ export interface OpenMcQuestionCase {
   id: number;
   title?: string | null;
   description?: string | null;
+  name?: string | null;
 }
 
 export interface OpenMcQuestion {
@@ -70,5 +72,51 @@ export interface OpenMcPaginatedResponse<T> {
   last_page: number;
   per_page: number;
   total: number;
+}
+
+export interface OpenMcDeckSummary {
+  id: number;
+  name: string;
+  description?: string | null;
+  access?: OpenMcAccess | string | null;
+  moduleName?: string | null;
+  subjectName?: string | null;
+  examAt?: string | null;
+  questionCount: number;
+}
+
+export interface OpenMcQuizChoice {
+  id: number;
+  text: string;
+  hint?: string | null;
+  isCorrect: boolean;
+}
+
+export interface OpenMcQuizQuestion {
+  id: number;
+  prompt: string | null;
+  hint?: string | null;
+  explanation?: string | null;
+  case?: OpenMcQuestionCase | null;
+  correctAnswerId: number | null;
+  choices: OpenMcQuizChoice[];
+  images?: OpenMcImage[];
+}
+
+export interface OpenMcQuizDeckMeta {
+  id: number;
+  name: string;
+  moduleId: number | null;
+  moduleName?: string | null;
+  subjectName?: string | null;
+}
+
+export interface OpenMcQuizPayload {
+  deck: OpenMcQuizDeckMeta;
+  questions: OpenMcQuizQuestion[];
+}
+
+export interface OpenMcDeckListPayload {
+  decks: OpenMcDeckSummary[];
 }
 

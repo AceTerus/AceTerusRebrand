@@ -5,13 +5,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Clock, Flame, GraduationCap, Layers, Target, BookOpen } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import {
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Flame,
+  GraduationCap,
+  Layers,
+  Loader2,
+  Sparkles,
+  Target,
+  XCircle,
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Logo from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
-import { fetchOpenMcDecks, isOpenMcConfigured, OpenMcClientError } from "@/lib/openmc-client";
-import type { OpenMcDeck } from "@/types/openmc";
+import {
+  buildOpenMcImageUrl,
+  fetchOpenMcDeckSummaries,
+  fetchOpenMcQuiz,
+  OpenMcClientError,
+} from "@/lib/openmc-client";
+import type { OpenMcDeckSummary, OpenMcQuizPayload, OpenMcQuizQuestion } from "@/types/openmc";
+import { cn } from "@/lib/utils";
 
 const placeholderHighlights = [
   {
@@ -31,47 +51,83 @@ const placeholderHighlights = [
   },
 ];
 
+const HtmlContent = ({ content, className }: { content?: string | null; className?: string }) => {
+  if (!content) {
+    return <p className={cn("text-sm text-muted-foreground italic", className)}>No content provided.</p>;
+  }
+
+  return (
+    <div
+      className={cn(
+        "leading-relaxed text-base text-foreground space-y-4 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_em]:italic",
+        className
+      )}
+      dangerouslySetInnerHTML={{ __html: content }}
+    />
+  );
+};
+
 const Quiz = () => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { streak } = useStreak();
   const navigate = useNavigate();
-  const openMcReady = isOpenMcConfigured();
-  const [decks, setDecks] = useState<OpenMcDeck[]>([]);
-  const [loadingDecks, setLoadingDecks] = useState(openMcReady);
+  const [decks, setDecks] = useState<OpenMcDeckSummary[]>([]);
+  const [loadingDecks, setLoadingDecks] = useState(false);
   const [deckError, setDeckError] = useState<string | null>(null);
+  const [activeDeck, setActiveDeck] = useState<OpenMcDeckSummary | null>(null);
+  const [quizPayload, setQuizPayload] = useState<OpenMcQuizPayload | null>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [sessionComplete, setSessionComplete] = useState(false);
 
   useEffect(() => {
-    if (!openMcReady) {
-      setLoadingDecks(false);
-      return;
+    if (!authLoading && !user) {
+      navigate("/auth");
     }
+  }, [authLoading, user, navigate]);
 
-    const controller = new AbortController();
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
     setLoadingDecks(true);
     setDeckError(null);
 
-    fetchOpenMcDecks(undefined, controller.signal)
-      .then((payload) => setDecks(payload ?? []))
+    fetchOpenMcDeckSummaries()
+      .then((payload) => {
+        if (!cancelled) {
+          setDecks(payload ?? []);
+        }
+      })
       .catch((error) => {
-        if (error.name === "AbortError") return;
-        const message = error instanceof OpenMcClientError ? error.message : "Failed to load quizzes.";
+        if (cancelled) return;
+        const message =
+          error instanceof OpenMcClientError ? error.message : "Failed to sync decks from OpenMultipleChoice.";
         setDeckError(message);
       })
-      .finally(() => setLoadingDecks(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingDecks(false);
+        }
+      });
 
-    return () => controller.abort();
-  }, [openMcReady]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const deckCount = decks.length;
   const totalQuestions = useMemo(
-    () => decks.reduce((acc, deck) => acc + (deck.questions?.length ?? 0), 0),
+    () => decks.reduce((acc, deck) => acc + (deck.questionCount ?? 0), 0),
     [decks]
   );
   const moduleCount = useMemo(() => {
     const modules = new Set(
-      decks
-        .map((deck) => deck.module?.name ?? deck.module?.subject?.name ?? null)
-        .filter(Boolean) as string[]
+      decks.map((deck) => deck.subjectName ?? deck.moduleName ?? deck.name).filter(Boolean) as string[]
     );
     return modules.size;
   }, [decks]);
@@ -107,6 +163,82 @@ const Quiz = () => {
     },
   ];
 
+  const questions: OpenMcQuizQuestion[] = quizPayload?.questions ?? [];
+  const currentQuestion = questions[currentIndex];
+  const progressPercent = questions.length
+    ? ((currentIndex + (showFeedback || sessionComplete ? 1 : 0)) / questions.length) * 100
+    : 0;
+  const accuracy = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
+  const isLastQuestion = currentIndex >= questions.length - 1;
+  const selectedIsCorrect = currentQuestion
+    ? selectedAnswerId === currentQuestion.correctAnswerId
+    : false;
+
+  const resetSessionState = () => {
+    setCurrentIndex(0);
+    setSelectedAnswerId(null);
+    setShowFeedback(false);
+    setCorrectCount(0);
+    setSessionComplete(false);
+  };
+
+  const handleStartQuiz = async (deck: OpenMcDeckSummary) => {
+    setActiveDeck(deck);
+    setQuizLoading(true);
+    setQuizError(null);
+
+    try {
+      const payload = await fetchOpenMcQuiz({ deckId: deck.id, shuffle: true });
+      setQuizPayload(payload);
+      resetSessionState();
+    } catch (error) {
+      const message = error instanceof OpenMcClientError ? error.message : "Failed to load the quiz deck.";
+      setQuizError(message);
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const handleAnswerSelect = (answerId: number) => {
+    if (!currentQuestion || showFeedback) return;
+
+    setSelectedAnswerId(answerId);
+    if (answerId === currentQuestion.correctAnswerId) {
+      setCorrectCount((prev) => prev + 1);
+    }
+    setShowFeedback(true);
+  };
+
+  const handleNextQuestion = () => {
+    if (!showFeedback) return;
+
+    if (isLastQuestion) {
+      setSessionComplete(true);
+      setShowFeedback(false);
+      return;
+    }
+
+    setCurrentIndex((prev) => prev + 1);
+    setSelectedAnswerId(null);
+    setShowFeedback(false);
+  };
+
+  const handleRestartSession = () => {
+    resetSessionState();
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy':
@@ -121,9 +253,9 @@ const Quiz = () => {
   };
 
   return (
-    <div className="min-h-screen pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
-      {!user && <Navbar />}
-      <div className={`container mx-auto px-4 max-w-6xl ${!user ? 'pt-20' : ''}`}>
+    <div className="min-h-screen pb-12 bg-gradient-to-br from-background via-muted/20 to-background">
+      <Navbar />
+      <div className="container mx-auto px-4 max-w-6xl pt-24">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
@@ -159,14 +291,10 @@ const Quiz = () => {
           })}
         </div>
 
-        {(!openMcReady || deckError) && (
-          <Alert variant={openMcReady ? "destructive" : "default"} className="mb-8">
-            <AlertTitle>{openMcReady ? "Unable to reach OpenMultipleChoice" : "Quiz service offline"}</AlertTitle>
-            <AlertDescription>
-              {openMcReady
-                ? deckError
-                : "Set VITE_OPENMC_API_URL (and optional VITE_OPENMC_API_TOKEN) to load quizzes from OpenMultipleChoice."}
-            </AlertDescription>
+        {deckError && (
+          <Alert variant="destructive" className="mb-8">
+            <AlertTitle>Unable to reach OpenMultipleChoice</AlertTitle>
+            <AlertDescription>{deckError}</AlertDescription>
           </Alert>
         )}
 
@@ -177,8 +305,8 @@ const Quiz = () => {
             </CardHeader>
             <CardContent className="space-y-4 text-muted-foreground">
               <p>
-                Choose any public deck from the OpenMultipleChoice library. We will fetch the latest questions, answers,
-                and media directly from the Laravel backend before each session.
+                Choose any public deck from the OpenMultipleChoice library. We secure the request via Supabase auth,
+                normalize the questions, and keep the experience native to AceTerus.
               </p>
               <div className="text-sm text-muted-foreground">
                 {loadingDecks
@@ -221,8 +349,8 @@ const Quiz = () => {
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
-                      {deck.module?.subject?.name && <Badge variant="secondary">{deck.module.subject.name}</Badge>}
-                      {deck.module?.name && <span>{deck.module.name}</span>}
+                      {deck.subjectName && <Badge variant="secondary">{deck.subjectName}</Badge>}
+                      {deck.moduleName && <span>{deck.moduleName}</span>}
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col space-y-4">
@@ -232,31 +360,230 @@ const Quiz = () => {
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-2">
                         <Layers className="w-4 h-4 text-primary" />
-                        {(deck.questions?.length ?? 0).toLocaleString()} questions
+                        {deck.questionCount.toLocaleString()} questions
                       </span>
                       <span className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-primary" />
-                        {deck.exam_at ? new Date(deck.exam_at).toLocaleDateString() : "Flexible exam date"}
+                        {deck.examAt ? new Date(deck.examAt).toLocaleDateString() : "Flexible exam date"}
                       </span>
                     </div>
                     <Button
                       className="w-full bg-gradient-primary shadow-glow"
-                      onClick={() => navigate(`/quiz/${deck.id}`)}
+                      disabled={quizLoading && activeDeck?.id === deck.id}
+                      onClick={() => handleStartQuiz(deck)}
                     >
-                      Start
+                      {quizLoading && activeDeck?.id === deck.id ? (
+                        <>
+                          Preparing... <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                        </>
+                      ) : (
+                        "Start"
+                      )}
                     </Button>
                   </CardContent>
                 </Card>
               ))}
           </div>
 
-          {!loadingDecks && openMcReady && !deckError && decks.length === 0 && (
+          {!loadingDecks && !deckError && decks.length === 0 && (
             <Card className="shadow-elegant mt-6">
               <CardContent className="py-6 text-center text-muted-foreground">
                 No public decks are available yet. Publish one from the OpenMultipleChoice admin panel to see it here.
               </CardContent>
             </Card>
           )}
+        </div>
+
+        <div className="space-y-6 mb-10">
+          <Card className="shadow-elegant">
+            <CardHeader className="space-y-3">
+              <CardTitle className="text-2xl">Live practice</CardTitle>
+              <p className="text-muted-foreground text-sm">
+                Select any deck above to load its questions instantly. Your Supabase session authorizes the Edge
+                Function so only authenticated AceTerus learners can access the quiz data.
+              </p>
+              {activeDeck && (
+                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                  <Badge variant="secondary">{activeDeck.subjectName ?? "General"}</Badge>
+                  {activeDeck.moduleName && <Badge variant="outline">{activeDeck.moduleName}</Badge>}
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Layers className="h-3.5 w-3.5" />
+                    {activeDeck.questionCount} questions
+                  </Badge>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              {quizError && (
+                <Alert variant="destructive" className="mb-6">
+                  <AlertTitle>Unable to load quiz</AlertTitle>
+                  <AlertDescription>{quizError}</AlertDescription>
+                </Alert>
+              )}
+
+              {quizLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-6 w-1/3" />
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-48 w-full" />
+                </div>
+              ) : !quizPayload || !questions.length ? (
+                <div className="py-6 text-center text-muted-foreground">
+                  {activeDeck
+                    ? "This deck does not contain any questions yet."
+                    : "Choose a deck above to begin practising immediately."}
+                </div>
+              ) : sessionComplete ? (
+                <div className="space-y-6">
+                  <div className="rounded-xl border p-6 text-center">
+                    <p className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Session complete</p>
+                    <h3 className="text-3xl font-bold text-primary">{activeDeck?.name}</h3>
+                    <p className="text-muted-foreground mt-2">Great job! Review your results below or restart the deck.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="rounded-xl border p-4 text-center">
+                      <p className="text-sm text-muted-foreground">Accuracy</p>
+                      <p className="text-3xl font-bold text-primary">{accuracy}%</p>
+                    </div>
+                    <div className="rounded-xl border p-4 text-center">
+                      <p className="text-sm text-muted-foreground">Correct answers</p>
+                      <p className="text-3xl font-bold text-primary">{correctCount}</p>
+                    </div>
+                    <div className="rounded-xl border p-4 text-center">
+                      <p className="text-sm text-muted-foreground">Questions</p>
+                      <p className="text-3xl font-bold text-primary">{questions.length}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button className="bg-gradient-primary shadow-glow" onClick={handleRestartSession}>
+                      Retake deck
+                    </Button>
+                    <Button variant="outline" disabled={!activeDeck} onClick={() => activeDeck && handleStartQuiz(activeDeck)}>
+                      Load fresh order
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                currentQuestion && (
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm uppercase tracking-wide text-muted-foreground">
+                          Question {currentIndex + 1} of {questions.length}
+                        </p>
+                        <CardTitle className="text-2xl">Practice mode</CardTitle>
+                      </div>
+                      <Progress value={progressPercent} className="h-2 w-full sm:w-60" />
+                    </div>
+                    <HtmlContent content={currentQuestion.prompt} className="text-lg" />
+
+                    {currentQuestion.images?.length && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {currentQuestion.images.map((image) => {
+                          const url = buildOpenMcImageUrl(image.path ?? undefined, image.url ?? undefined);
+                          if (!url) return null;
+
+                          return (
+                            <div key={image.id} className="rounded-xl overflow-hidden border bg-muted/30">
+                              <img
+                                src={url}
+                                alt={image.comment ?? `Question image ${image.id}`}
+                                className="w-full h-auto object-cover"
+                                loading="lazy"
+                              />
+                              {image.comment && (
+                                <p className="px-3 py-2 text-xs text-muted-foreground border-t border-border/60">
+                                  {image.comment}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {currentQuestion.choices.length ? (
+                        currentQuestion.choices.map((choice) => (
+                          <Button
+                            key={choice.id}
+                            variant="outline"
+                            disabled={showFeedback}
+                            onClick={() => handleAnswerSelect(choice.id)}
+                            className={cn(
+                              "w-full justify-start text-left whitespace-normal",
+                              showFeedback &&
+                                choice.id === currentQuestion.correctAnswerId &&
+                                "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-200",
+                              showFeedback &&
+                                selectedAnswerId === choice.id &&
+                                choice.id !== currentQuestion.correctAnswerId &&
+                                "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-200"
+                            )}
+                          >
+                            <HtmlContent content={choice.text} className="text-base" />
+                          </Button>
+                        ))
+                      ) : (
+                        <Alert>
+                          <AlertTitle>No answers found</AlertTitle>
+                          <AlertDescription>This question has no answer options yet.</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+
+                    {showFeedback && (
+                      <Alert variant={selectedIsCorrect ? "default" : "destructive"}>
+                        <div className="flex items-start gap-3">
+                          {selectedIsCorrect ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-500 mt-1" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-500 mt-1" />
+                          )}
+                          <div>
+                            <AlertTitle>{selectedIsCorrect ? "Correct!" : "Not quite"}</AlertTitle>
+                            <AlertDescription>
+                              {selectedIsCorrect
+                                ? "Great work — keep the streak going."
+                                : "Review the explanation below and try again next round."}
+                            </AlertDescription>
+                          </div>
+                        </div>
+                      </Alert>
+                    )}
+
+                    {currentQuestion.explanation && (
+                      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+                        <p className="text-sm font-semibold text-primary">Explanation</p>
+                        <HtmlContent content={currentQuestion.explanation} className="text-sm" />
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        className="bg-gradient-primary shadow-glow"
+                        disabled={!showFeedback}
+                        onClick={handleNextQuestion}
+                      >
+                        {isLastQuestion ? (
+                          <>
+                            Finish quiz <Sparkles className="ml-2 h-4 w-4" />
+                          </>
+                        ) : (
+                          <>
+                            Next question <ChevronRight className="ml-2 h-4 w-4" />
+                          </>
+                        )}
+                      </Button>
+                      <Button variant="outline" onClick={handleRestartSession}>
+                        Restart deck
+                      </Button>
+                    </div>
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

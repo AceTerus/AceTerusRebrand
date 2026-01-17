@@ -6,21 +6,28 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock, Layers, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Layers, Loader2, Sparkles, XCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  buildOpenMcImageUrl,
-  fetchOpenMcDeckWithQuestions,
-  isOpenMcConfigured,
-  OpenMcClientError,
-} from "@/lib/openmc-client";
-import type { OpenMcDeck, OpenMcQuestion } from "@/types/openmc";
+import { buildOpenMcImageUrl, fetchOpenMcQuiz, OpenMcClientError } from "@/lib/openmc-client";
+import type { OpenMcQuizPayload, OpenMcQuizQuestion } from "@/types/openmc";
 import { cn } from "@/lib/utils";
 
 const HtmlContent = ({ content, className }: { content?: string | null; className?: string }) => {
   if (!content) {
     return <p className={cn("text-sm text-muted-foreground italic", className)}>No content provided.</p>;
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
@@ -38,10 +45,15 @@ export const QuizTaking = () => {
   const { quizId } = useParams<{ quizId: string }>();
   const deckId = Number(quizId);
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const openMcReady = isOpenMcConfigured();
+  const { user, isLoading: authLoading } = useAuth();
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [authLoading, user, navigate]);
 
-  const [deck, setDeck] = useState<OpenMcDeck | null>(null);
+
+  const [quizPayload, setQuizPayload] = useState<OpenMcQuizPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -51,25 +63,21 @@ export const QuizTaking = () => {
   const [sessionComplete, setSessionComplete] = useState(false);
 
   useEffect(() => {
-    if (!openMcReady) {
-      setLoading(false);
-      setError("OpenMultipleChoice API is not configured. Set VITE_OPENMC_API_URL to begin.");
-      return;
-    }
-
     if (!Number.isFinite(deckId)) {
       setLoading(false);
       setError("Invalid quiz identifier.");
       return;
     }
 
-    const controller = new AbortController();
+    let cancelled = false;
+
     setLoading(true);
     setError(null);
 
-    fetchOpenMcDeckWithQuestions(deckId, controller.signal)
+    fetchOpenMcQuiz({ deckId })
       .then((data) => {
-        setDeck(data);
+        if (cancelled) return;
+        setQuizPayload(data);
         setCurrentIndex(0);
         setSelectedAnswerId(null);
         setShowFeedback(false);
@@ -77,35 +85,40 @@ export const QuizTaking = () => {
         setSessionComplete(false);
       })
       .catch((err) => {
-        if (err.name === "AbortError") return;
+        if (cancelled) return;
         const message = err instanceof OpenMcClientError ? err.message : "Failed to load the quiz.";
         setError(message);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
 
-    return () => controller.abort();
-  }, [deckId, openMcReady]);
+    return () => {
+      cancelled = true;
+    };
+  }, [deckId]);
 
-  const questions: OpenMcQuestion[] = useMemo(() => {
-    if (!deck?.questions) return [];
-    return deck.questions
-      .filter((question) => !question.is_invalid)
-      .sort((a, b) => a.id - b.id);
-  }, [deck]);
+  const deckMeta = quizPayload?.deck ?? null;
+  const questions: OpenMcQuizQuestion[] = useMemo(() => {
+    if (!quizPayload?.questions) return [];
+    return [...quizPayload.questions];
+  }, [quizPayload]);
 
   const currentQuestion = questions[currentIndex];
   const progressPercent = questions.length ? ((currentIndex + (showFeedback || sessionComplete ? 1 : 0)) / questions.length) * 100 : 0;
   const accuracy = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
   const isLastQuestion = currentIndex >= questions.length - 1;
   const selectedIsCorrect = currentQuestion
-    ? selectedAnswerId === currentQuestion.correct_answer_id
+    ? selectedAnswerId === currentQuestion.correctAnswerId
     : false;
 
   const handleAnswerSelect = (answerId: number) => {
     if (!currentQuestion || showFeedback) return;
 
     setSelectedAnswerId(answerId);
-    if (answerId === currentQuestion.correct_answer_id) {
+    if (answerId === currentQuestion.correctAnswerId) {
       setCorrectCount((prev) => prev + 1);
     }
     setShowFeedback(true);
@@ -135,7 +148,7 @@ export const QuizTaking = () => {
 
   const handleBackToHub = () => navigate("/quiz");
 
-  const renderImages = (question: OpenMcQuestion) => {
+  const renderImages = (question: OpenMcQuizQuestion) => {
     if (!question.images?.length) {
       return null;
     }
@@ -143,7 +156,7 @@ export const QuizTaking = () => {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {question.images.map((image) => {
-          const url = buildOpenMcImageUrl(image.path);
+          const url = buildOpenMcImageUrl(image.path ?? undefined, image.url ?? undefined);
           if (!url) return null;
 
           return (
@@ -185,45 +198,45 @@ export const QuizTaking = () => {
               <p className="text-sm uppercase tracking-wide text-muted-foreground">Question {currentIndex + 1} of {questions.length}</p>
               <CardTitle className="text-2xl">Practice mode</CardTitle>
             </div>
-            {currentQuestion.type && (
-              <Badge variant="outline" className="text-xs">
-                {currentQuestion.type.toUpperCase()}
-              </Badge>
-            )}
           </div>
           <Progress value={progressPercent} className="h-2" />
         </CardHeader>
         <CardContent className="space-y-6">
-          <HtmlContent content={currentQuestion.text} className="text-lg" />
+          <HtmlContent content={currentQuestion.prompt} className="text-lg" />
           {renderImages(currentQuestion)}
 
           {currentQuestion.case && (
             <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/20 p-4 space-y-2">
               <p className="text-sm font-semibold text-primary">Case context</p>
-              <HtmlContent content={currentQuestion.case.description ?? currentQuestion.case.title} className="text-sm" />
+              <HtmlContent
+                content={
+                  currentQuestion.case.description ?? currentQuestion.case.title ?? currentQuestion.case.name
+                }
+                className="text-sm"
+              />
             </div>
           )}
 
           <div className="space-y-3">
-            {currentQuestion.answers?.length ? (
-              currentQuestion.answers.map((answer) => (
+            {currentQuestion.choices.length ? (
+              currentQuestion.choices.map((choice) => (
                 <Button
-                  key={answer.id}
+                  key={choice.id}
                   variant="outline"
                   disabled={showFeedback}
-                  onClick={() => handleAnswerSelect(answer.id)}
+                  onClick={() => handleAnswerSelect(choice.id)}
                   className={cn(
                     "w-full justify-start text-left whitespace-normal",
                     showFeedback &&
-                      answer.id === currentQuestion.correct_answer_id &&
+                      choice.id === currentQuestion.correctAnswerId &&
                       "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-200",
                     showFeedback &&
-                      selectedAnswerId === answer.id &&
-                      answer.id !== currentQuestion.correct_answer_id &&
+                      selectedAnswerId === choice.id &&
+                      choice.id !== currentQuestion.correctAnswerId &&
                       "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-200"
                   )}
                 >
-                  <HtmlContent content={answer.text} className="text-base" />
+                  <HtmlContent content={choice.text} className="text-base" />
                 </Button>
               ))
             ) : (
@@ -254,10 +267,10 @@ export const QuizTaking = () => {
             </Alert>
           )}
 
-          {currentQuestion.comment && (
+          {currentQuestion.explanation && (
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
               <p className="text-sm font-semibold text-primary">Explanation</p>
-              <HtmlContent content={currentQuestion.comment} className="text-sm" />
+              <HtmlContent content={currentQuestion.explanation} className="text-sm" />
             </div>
           )}
 
@@ -291,7 +304,7 @@ export const QuizTaking = () => {
       <CardHeader>
         <CardTitle className="text-2xl">Great job!</CardTitle>
         <p className="text-muted-foreground">
-          You completed {deck?.name}. Review the results below or jump back into the deck.
+          You completed {deckMeta?.name}. Review the results below or jump back into the deck.
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -350,28 +363,19 @@ export const QuizTaking = () => {
             </CardContent>
           </Card>
         ) : (
-          deck && (
+          deckMeta && (
             <div className="space-y-8">
               <Card className="shadow-elegant">
                 <CardHeader className="space-y-3">
-                  <CardTitle className="text-3xl">{deck.name}</CardTitle>
+                  <CardTitle className="text-3xl">{deckMeta.name}</CardTitle>
                   <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                    {deck.module?.subject?.name && <Badge variant="secondary">{deck.module.subject.name}</Badge>}
-                    {deck.module?.name && <Badge variant="outline">{deck.module.name}</Badge>}
+                    {deckMeta.subjectName && <Badge variant="secondary">{deckMeta.subjectName}</Badge>}
+                    {deckMeta.moduleName && <Badge variant="outline">{deckMeta.moduleName}</Badge>}
                     <Badge variant="outline" className="flex items-center gap-1">
                       <Layers className="h-3.5 w-3.5" />
                       {questions.length} questions
                     </Badge>
-                    {deck.exam_at && (
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {new Date(deck.exam_at).toLocaleDateString()}
-                      </Badge>
-                    )}
                   </div>
-                  {deck.description && (
-                    <p className="text-muted-foreground">{deck.description}</p>
-                  )}
                 </CardHeader>
                 <CardContent className="grid gap-4 sm:grid-cols-3">
                   <div className="rounded-xl border p-4">

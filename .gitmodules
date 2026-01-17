@@ -1,0 +1,3 @@
+[submodule "openmultiplechoice"]
+	path = openmultiplechoice
+	url = https://github.com/openmultiplechoice/openmultiplechoice.git

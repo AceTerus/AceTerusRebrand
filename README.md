@@ -18,21 +18,36 @@ Welcome to AceTerus' evolving learning platform. This repository now contains th
    - **Sanctum session cookie**: log into the Laravel app in the same origin (works best when AceTerus and OpenMC share a parent domain).
    - **Personal access token**: run `php artisan tinker` and call `User::first()->createToken('aceterus')->plainTextToken` to copy a bearer token; revoke it from the Laravel UI if leaked.
 
+## Supabase Edge Function configuration
+
+The React app no longer talks to OpenMultipleChoice directly. Instead, authenticated AceTerus users call the Supabase Edge Function `openmc-quizzes`, which proxies the Laravel API with a server-side bearer token. Configure the function secrets via `supabase secrets set` (or the Dashboard) before deploying:
+
+```
+OPENMC_BASE_URL=http://127.0.0.1:5432
+OPENMC_API_TOKEN=your_personal_access_token
+OPENMC_DEFAULT_DECK_ID=1             # optional fallback when no deckId is provided
+```
+
+- `OPENMC_BASE_URL` should match the Laravel host/port from the previous section.
+- `OPENMC_API_TOKEN` is a Sanctum personal access token with permission to read decks/questions.
+- `OPENMC_DEFAULT_DECK_ID` lets you define a public deck that loads automatically when the frontend does not pass an explicit ID.
+
+To run the function locally: `supabase functions serve openmc-quizzes --env-file ./supabase/.env` (or export the vars in your shell). Deploy with `supabase functions deploy openmc-quizzes`.
+
 ## Frontend environment variables
 
-Add the following entries to your `apps/.env` or `.env.local` (Vite) file:
+The frontend only needs to know how to build media URLs for question images:
 
 ```
-VITE_OPENMC_API_URL=http://127.0.0.1:5432
-VITE_OPENMC_API_TOKEN=your_token_if_using_bearer_auth
+VITE_OPENMC_ASSET_BASE_URL=http://127.0.0.1:5432
 ```
 
-- When using Sanctum cookies, leave `VITE_OPENMC_API_TOKEN` empty and ensure your browser can send credentials to the backend domain.
-- When using bearer tokens, the new OpenMC client will automatically attach the header `Authorization: Bearer <token>`.
+- This should point at the same host that serves Laravel's `storage/` symlink so `<base>/storage/...` resolves correctly.
+- All quiz data now flows through Supabase, so no API tokens are exposed in the browser.
 
 ## Development workflow
 
-1. Ensure the Laravel API is running and reachable at `VITE_OPENMC_API_URL` (now `http://127.0.0.1:5432` by default).
-2. In the project root, install JS deps (`bun install` or `npm install`).
-3. Start the frontend: `bun dev` (or `npm run dev`). It now serves on `http://localhost:5174/` to avoid clashing with the API port.
-4. Visit `http://localhost:5174/quiz` to verify decks load from OpenMultipleChoice.
+1. Ensure the Laravel API is running and reachable at `OPENMC_BASE_URL`.
+2. Start the Supabase stack or functions emulator so `openmc-quizzes` can call the API.
+3. In the project root, install JS deps (`bun install` or `npm install`) and run `bun dev`.
+4. Visit `http://localhost:5174/quiz` while signed into AceTerus. The page now lists decks via the Edge Function and lets you run the entire quiz session inline.
