@@ -27,8 +27,8 @@ export const PostImageCarousel = ({ images, className, onImageClick }: PostImage
   return (
     <div
       className={cn(
-        "relative w-full overflow-hidden rounded-2xl border border-border/60 bg-muted/10 shadow-lg",
-        "min-h-[220px]",
+        "relative w-full overflow-hidden rounded-2xl border border-border/60 shadow-lg",
+        "aspect-[4/5]",
         className
       )}
     >
@@ -39,13 +39,13 @@ export const PostImageCarousel = ({ images, className, onImageClick }: PostImage
         {images.map((src, idx) => (
           <div
             key={`${src}-${idx}`}
-            className="flex h-full w-full flex-shrink-0 cursor-pointer items-center justify-center bg-gradient-to-br from-background via-muted/60 to-background"
+            className="relative w-full h-full flex-shrink-0 cursor-pointer overflow-hidden bg-black"
             onClick={() => onImageClick?.(idx)}
           >
             <img
               src={src}
               alt={`Post image ${idx + 1}`}
-              className="max-h-[520px] max-w-full rounded-xl object-contain shadow-md"
+              className="w-full h-full object-cover"
               loading="lazy"
             />
           </div>

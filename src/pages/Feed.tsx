@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Calendar, Search, TrendingUp, Users } from "lucide-react";
+import { Calendar, Search, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
@@ -290,7 +290,7 @@ export const Feed = () => {
   };
 
   const renderPost = (post: Post) => (
-    <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow">
+    <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow border-l-4 border-l-primary/40">
       <CardContent className="p-6">
         <div className="flex items-start space-x-4 mb-4">
           <Avatar>
@@ -309,7 +309,7 @@ export const Feed = () => {
           </div>
         </div>
 
-        <p className="mb-4 whitespace-pre-wrap">{post.content}</p>
+        <p className="mb-4 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">{post.content}</p>
 
         {(() => {
           const hasGalleryImages = !!(post.images && post.images.length);
@@ -333,15 +333,15 @@ export const Feed = () => {
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
             {post.tags.map((tag, i) => (
-              <Badge key={i} variant="secondary" className="text-xs">
+              <Badge key={i} variant="secondary" className="text-xs bg-primary/10 text-primary hover:bg-primary/20">
                 #{tag}
               </Badge>
             ))}
           </div>
         )}
 
-        <div className="pt-2 border-t">
-          <div className="flex items-center gap-6">
+        <div className="pt-3 mt-2 border-t border-border/60">
+          <div className="flex items-start gap-6">
             <LikeButton
               postId={post.id}
               likesCount={post.likes_count}
@@ -425,7 +425,7 @@ export const Feed = () => {
         <div className="container mx-auto max-w-5xl">
           <div className="grid lg:grid-cols-12 gap-6">
             {/* Main Feed */}
-            <main className="lg:col-span-8">
+            <main className="lg:col-span-12 max-w-2xl mx-auto w-full">
             <h1 className="text-3xl font-bold mb-6">
               <span className="bg-gradient-primary bg-clip-text text-transparent">
                 Your Feed
@@ -553,29 +553,6 @@ export const Feed = () => {
             </Tabs>
           </main>
 
-          {/* Right Sidebar - Trending/Activity */}
-          <aside className="hidden lg:block lg:col-span-4">
-            <div className="sticky top-24 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <TrendingUp className="w-4 h-4" />
-                    Popular Tags
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {["ComputerScience", "Programming", "AI", "WebDev", "DataStructures"].map((tag) => (
-                    <div key={tag} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">#{tag}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {Math.floor(Math.random() * 50 + 10)}
-                      </Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          </aside>
         </div>
       </div>
 

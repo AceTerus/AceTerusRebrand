@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,17 +7,21 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import {
+  Bookmark,
+  BookmarkCheck,
   BookOpen,
+  BookOpenCheck,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
-  Clock,
   Flame,
   GraduationCap,
   Layers,
   Loader2,
   Sparkles,
   Target,
+  X,
   XCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -33,29 +37,12 @@ import {
 import type { OpenMcDeckSummary, OpenMcQuizPayload, OpenMcQuizQuestion } from "@/types/openmc";
 import { cn } from "@/lib/utils";
 
-const placeholderHighlights = [
-  {
-    title: "Personalised Practice",
-    description: "Build quizzes from your saved study materials and focus on weak topics.",
-    icon: Target,
-  },
-  {
-    title: "Live Performance Insights",
-    description: "Track accuracy, speed, and readiness across upcoming exam seasons.",
-    icon: Clock,
-  },
-  {
-    title: "Community Challenges",
-    description: "Compete with friends and unlock streak rewards for consistent study.",
-    icon: Flame,
-  },
-];
+type QuizView = 'categories' | 'decks' | 'taking';
 
 const HtmlContent = ({ content, className }: { content?: string | null; className?: string }) => {
   if (!content) {
     return <p className={cn("text-sm text-muted-foreground italic", className)}>No content provided.</p>;
   }
-
   return (
     <div
       className={cn(
@@ -67,166 +54,218 @@ const HtmlContent = ({ content, className }: { content?: string | null; classNam
   );
 };
 
+const stripHtml = (html: string) => {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent ?? div.innerText ?? '';
+};
+
 const Quiz = () => {
   const { user, isLoading: authLoading } = useAuth();
-  const { streak } = useStreak();
+  const { streak, updateStreak } = useStreak();
   const navigate = useNavigate();
+
+  // Deck state
   const [decks, setDecks] = useState<OpenMcDeckSummary[]>([]);
   const [loadingDecks, setLoadingDecks] = useState(false);
   const [deckError, setDeckError] = useState<string | null>(null);
+
+  // View state
+  const [view, setView] = useState<QuizView>('categories');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Quiz session state
   const [activeDeck, setActiveDeck] = useState<OpenMcDeckSummary | null>(null);
   const [quizPayload, setQuizPayload] = useState<OpenMcQuizPayload | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [correctCount, setCorrectCount] = useState(0);
+  // Maps question index → selected choice id (no isCorrect stored until submit)
+  const [answeredMap, setAnsweredMap] = useState<Map<number, number>>(new Map());
   const [sessionComplete, setSessionComplete] = useState(false);
+  const [submitConfirmPending, setSubmitConfirmPending] = useState(false);
+  const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
+
+  // Bookmark panel state
+  const [showBookmarkPanel, setShowBookmarkPanel] = useState(false);
+  const bookmarkPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
-    }
+    if (!authLoading && !user) navigate("/auth");
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-
     setLoadingDecks(true);
     setDeckError(null);
-
     fetchOpenMcDeckSummaries()
-      .then((payload) => {
-        if (!cancelled) {
-          setDecks(payload ?? []);
-        }
-      })
+      .then((payload) => { if (!cancelled) setDecks(payload ?? []); })
       .catch((error) => {
         if (cancelled) return;
-        const message =
-          error instanceof OpenMcClientError ? error.message : "Failed to sync decks from OpenMultipleChoice.";
-        setDeckError(message);
+        setDeckError(
+          error instanceof OpenMcClientError ? error.message : "Failed to sync decks from OpenMultipleChoice."
+        );
       })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingDecks(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => { if (!cancelled) setLoadingDecks(false); });
+    return () => { cancelled = true; };
   }, [user]);
 
+  // Persist bookmarks to localStorage
+  useEffect(() => {
+    if (!activeDeck) return;
+    localStorage.setItem(
+      `quiz_bookmarks_${activeDeck.id}`,
+      JSON.stringify(Array.from(flaggedQuestions))
+    );
+  }, [flaggedQuestions, activeDeck]);
+
+  // Close bookmark panel on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bookmarkPanelRef.current && !bookmarkPanelRef.current.contains(e.target as Node)) {
+        setShowBookmarkPanel(false);
+      }
+    };
+    if (showBookmarkPanel) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBookmarkPanel]);
+
+  // ── Derived values ───────────────────────────────────────────────────────────
   const deckCount = decks.length;
   const totalQuestions = useMemo(
-    () => decks.reduce((acc, deck) => acc + (deck.questionCount ?? 0), 0),
+    () => decks.reduce((acc, d) => acc + (d.questionCount ?? 0), 0),
     [decks]
   );
   const moduleCount = useMemo(() => {
-    const modules = new Set(
-      decks.map((deck) => deck.subjectName ?? deck.moduleName ?? deck.name).filter(Boolean) as string[]
+    const s = new Set(
+      decks.map((d) => d.subjectName ?? d.moduleName ?? d.name).filter(Boolean) as string[]
     );
-    return modules.size;
+    return s.size;
   }, [decks]);
 
-  const stats = [
-    {
-      icon: Flame,
-      value: streak.toString(),
-      label: "day streak",
-      color: "text-orange-500 dark:text-orange-300",
-      bgColor: "bg-orange-50 dark:bg-orange-400/15",
-    },
-    {
-      icon: BookOpen,
-      value: loadingDecks ? "..." : deckCount.toString(),
-      label: "quizzes online",
-      color: "text-red-500 dark:text-red-300",
-      bgColor: "bg-red-50 dark:bg-red-400/15",
-    },
-    {
-      icon: Target,
-      value: loadingDecks ? "..." : totalQuestions.toString(),
-      label: "questions ready",
-      color: "text-green-500 dark:text-green-300",
-      bgColor: "bg-green-50 dark:bg-green-400/15",
-    },
-    {
-      icon: GraduationCap,
-      value: loadingDecks ? "..." : moduleCount.toString(),
-      label: "modules covered",
-      color: "text-purple-500 dark:text-purple-300",
-      bgColor: "bg-purple-50 dark:bg-purple-400/15",
-    },
-  ];
+  const categories = useMemo(() => {
+    const map = new Map<string, { decks: OpenMcDeckSummary[]; totalQuestions: number }>();
+    for (const deck of decks) {
+      const cat = deck.subjectName ?? 'General';
+      const existing = map.get(cat) ?? { decks: [], totalQuestions: 0 };
+      existing.decks.push(deck);
+      existing.totalQuestions += deck.questionCount ?? 0;
+      map.set(cat, existing);
+    }
+    return Array.from(map.entries()).map(([name, data]) => ({ name, ...data }));
+  }, [decks]);
+
+  const filteredDecks = useMemo(
+    () => decks.filter(d => (d.subjectName ?? 'General') === selectedCategory),
+    [decks, selectedCategory]
+  );
 
   const questions: OpenMcQuizQuestion[] = quizPayload?.questions ?? [];
   const currentQuestion = questions[currentIndex];
-  const progressPercent = questions.length
-    ? ((currentIndex + (showFeedback || sessionComplete ? 1 : 0)) / questions.length) * 100
-    : 0;
+  const selectedAnswerId = answeredMap.get(currentIndex) ?? null;
+  const answeredCount = answeredMap.size;
+
+  const correctCount = useMemo(() => {
+    if (!sessionComplete) return 0;
+    return questions.reduce((acc, q, idx) => {
+      const selected = answeredMap.get(idx);
+      return acc + (selected === q.correctAnswerId ? 1 : 0);
+    }, 0);
+  }, [sessionComplete, answeredMap, questions]);
+
   const accuracy = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
   const isLastQuestion = currentIndex >= questions.length - 1;
-  const selectedIsCorrect = currentQuestion
-    ? selectedAnswerId === currentQuestion.correctAnswerId
-    : false;
 
+  // Progress = answered questions (not position) so it feels meaningful
+  const progressPercent = questions.length ? (answeredCount / questions.length) * 100 : 0;
+
+  const sortedBookmarks = useMemo(
+    () => Array.from(flaggedQuestions).sort((a, b) => a - b),
+    [flaggedQuestions]
+  );
+
+  const stats = [
+    { icon: Flame, value: streak.toString(), label: "day streak", color: "text-orange-500 dark:text-orange-300", bgColor: "bg-orange-50 dark:bg-orange-400/15" },
+    { icon: BookOpen, value: loadingDecks ? "..." : deckCount.toString(), label: "quizzes online", color: "text-red-500 dark:text-red-300", bgColor: "bg-red-50 dark:bg-red-400/15" },
+    { icon: Target, value: loadingDecks ? "..." : totalQuestions.toString(), label: "questions ready", color: "text-green-500 dark:text-green-300", bgColor: "bg-green-50 dark:bg-green-400/15" },
+    { icon: GraduationCap, value: loadingDecks ? "..." : moduleCount.toString(), label: "modules covered", color: "text-purple-500 dark:text-purple-300", bgColor: "bg-purple-50 dark:bg-purple-400/15" },
+  ];
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
   const resetSessionState = () => {
     setCurrentIndex(0);
-    setSelectedAnswerId(null);
-    setShowFeedback(false);
-    setCorrectCount(0);
+    setAnsweredMap(new Map());
     setSessionComplete(false);
+    setSubmitConfirmPending(false);
+    setFlaggedQuestions(new Set());
+    setShowBookmarkPanel(false);
   };
 
   const handleStartQuiz = async (deck: OpenMcDeckSummary) => {
     setActiveDeck(deck);
     setQuizLoading(true);
     setQuizError(null);
-
     try {
       const payload = await fetchOpenMcQuiz({ deckId: deck.id, shuffle: true });
       setQuizPayload(payload);
       resetSessionState();
+      try {
+        const saved = localStorage.getItem(`quiz_bookmarks_${deck.id}`);
+        if (saved) setFlaggedQuestions(new Set(JSON.parse(saved) as number[]));
+      } catch { /* ignore */ }
+      setView('taking');
     } catch (error) {
-      const message = error instanceof OpenMcClientError ? error.message : "Failed to load the quiz deck.";
-      setQuizError(message);
+      setQuizError(error instanceof OpenMcClientError ? error.message : "Failed to load the quiz deck.");
     } finally {
       setQuizLoading(false);
     }
   };
 
-  const handleAnswerSelect = (answerId: number) => {
-    if (!currentQuestion || showFeedback) return;
-
-    setSelectedAnswerId(answerId);
-    if (answerId === currentQuestion.correctAnswerId) {
-      setCorrectCount((prev) => prev + 1);
-    }
-    setShowFeedback(true);
+  // During quiz: just record the selection, allow changing, no locking
+  const handleAnswerSelect = (choiceId: number) => {
+    if (sessionComplete) return;
+    setAnsweredMap(prev => {
+      const next = new Map(prev);
+      next.set(currentIndex, choiceId);
+      return next;
+    });
+    setSubmitConfirmPending(false);
   };
 
   const handleNextQuestion = () => {
-    if (!showFeedback) return;
+    if (!isLastQuestion) setCurrentIndex(prev => prev + 1);
+  };
 
-    if (isLastQuestion) {
-      setSessionComplete(true);
-      setShowFeedback(false);
-      return;
+  const handlePrevQuestion = () => {
+    setCurrentIndex(prev => Math.max(0, prev - 1));
+  };
+
+  const handleSubmitQuiz = () => {
+    setSessionComplete(true);
+    setShowBookmarkPanel(false);
+    setSubmitConfirmPending(false);
+    // Increment streak once per day on quiz submission
+    if (activeDeck) {
+      updateStreak(String(activeDeck.id));
     }
-
-    setCurrentIndex((prev) => prev + 1);
-    setSelectedAnswerId(null);
-    setShowFeedback(false);
   };
 
-  const handleRestartSession = () => {
-    resetSessionState();
+  const handleToggleFlag = (index: number) => {
+    setFlaggedQuestions(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   };
 
+  const handleJumpToBookmark = (idx: number) => {
+    setCurrentIndex(idx);
+    setShowBookmarkPanel(false);
+  };
+
+  // ── Auth guard ───────────────────────────────────────────────────────────────
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -234,42 +273,26 @@ const Quiz = () => {
       </div>
     );
   }
+  if (!user) return null;
 
-  if (!user) {
-    return null;
-  }
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Easy':
-        return 'text-green-600 dark:text-green-300 bg-green-50 dark:bg-green-500/15 border-green-200 dark:border-green-500/40';
-      case 'Medium':
-        return 'text-yellow-600 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-500/15 border-yellow-200 dark:border-yellow-500/40';
-      case 'Hard':
-        return 'text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-500/15 border-red-200 dark:border-red-500/40';
-      default:
-        return 'text-foreground bg-muted/40 dark:bg-muted/20 border-border';
-    }
-  };
+  const isInActiveQuiz = view === 'taking' && !sessionComplete && !quizLoading && !!questions.length;
+  const unansweredCount = questions.length - answeredCount;
 
   return (
     <div className="min-h-screen pb-12 bg-gradient-to-br from-background via-muted/20 to-background">
       <Navbar />
       <div className="container mx-auto px-4 max-w-6xl pt-24">
-        {/* Header */}
+
+        {/* ── Header ── */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
             <img src={Logo} alt="AceTerus Logo" className="w-16 h-16" />
-            <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              AceTerus
-            </h1>
+            <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">AceTerus</h1>
           </div>
-          <p className="text-muted-foreground">
-            Practice with authentic exam papers and track your progress
-          </p>
+          <p className="text-muted-foreground">Practice with authentic exam papers and track your progress</p>
         </div>
 
-        {/* Statistics Cards */}
+        {/* ── Stats ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
@@ -279,12 +302,8 @@ const Quiz = () => {
                   <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center mx-auto mb-3`}>
                     <Icon className={`w-6 h-6 ${stat.color}`} />
                   </div>
-                  <div className="text-2xl font-bold text-primary mb-1">
-                    {stat.value}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {stat.label}
-                  </div>
+                  <div className="text-2xl font-bold text-primary mb-1">{stat.value}</div>
+                  <div className="text-xs text-muted-foreground">{stat.label}</div>
                 </CardContent>
               </Card>
             );
@@ -298,55 +317,75 @@ const Quiz = () => {
           </Alert>
         )}
 
-        <div className="mb-10">
-          <Card className="shadow-elegant mb-6">
-            <CardHeader>
-              <CardTitle className="text-2xl">Available quizzes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-muted-foreground">
-              <p>
-                Choose any public deck from the OpenMultipleChoice library. We secure the request via Supabase auth,
-                normalize the questions, and keep the experience native to AceTerus.
-              </p>
-              <div className="text-sm text-muted-foreground">
-                {loadingDecks
-                  ? "Syncing decks..."
-                  : `Loaded ${deckCount} deck${deckCount === 1 ? "" : "s"} with ${totalQuestions} questions.`}
+        {/* ── View: Categories ── */}
+        {view === 'categories' && (
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold mb-6">Select a Category</h2>
+            {loadingDecks ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Card key={i} className="shadow-elegant">
+                    <CardContent className="p-6 space-y-3">
+                      <Skeleton className="h-6 w-3/4" /><Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-4 w-1/3" /><Skeleton className="h-10 w-full" />
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </CardContent>
-          </Card>
+            ) : categories.length === 0 ? (
+              <Card className="shadow-elegant">
+                <CardContent className="py-6 text-center text-muted-foreground">No public decks are available yet.</CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {categories.map((cat) => (
+                  <Card key={cat.name} className="shadow-elegant hover:shadow-glow transition-shadow flex flex-col">
+                    <CardHeader className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <BookOpenCheck className="w-5 h-5 text-primary" />
+                        </div>
+                        <CardTitle className="text-xl">{cat.name}</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col space-y-4">
+                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" />{cat.decks.length} {cat.decks.length === 1 ? 'quiz' : 'quizzes'}</span>
+                        <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-primary" />{cat.totalQuestions.toLocaleString()} questions</span>
+                      </div>
+                      <Button className="w-full bg-gradient-primary shadow-glow mt-auto" onClick={() => { setSelectedCategory(cat.name); setView('decks'); }}>
+                        View Quizzes <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {loadingDecks &&
-              Array.from({ length: 6 }).map((_, index) => (
-                <Card key={`skeleton-${index}`} className="shadow-elegant">
-                  <CardHeader>
-                    <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-4 w-1/3" />
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-5/6" />
-                    <div className="flex gap-3">
-                      <Skeleton className="h-4 w-1/3" />
-                      <Skeleton className="h-4 w-1/3" />
-                    </div>
-                    <Skeleton className="h-10 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
-
-            {!loadingDecks &&
-              decks.map((deck) => (
+        {/* ── View: Decks ── */}
+        {view === 'decks' && (
+          <div className="mb-10">
+            <div className="flex items-center gap-4 mb-6">
+              <Button variant="outline" onClick={() => setView('categories')} className="flex items-center gap-2">
+                <ChevronLeft className="h-4 w-4" /> Back to Categories
+              </Button>
+              <h2 className="text-2xl font-bold">{selectedCategory}</h2>
+            </div>
+            {quizError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertTitle>Unable to load quiz</AlertTitle>
+                <AlertDescription>{quizError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {filteredDecks.map((deck) => (
                 <Card key={deck.id} className="shadow-elegant hover:shadow-glow transition-shadow flex flex-col">
                   <CardHeader className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <CardTitle className="text-xl">{deck.name}</CardTitle>
-                      {deck.access && (
-                        <Badge variant="outline" className="text-xs">
-                          {deck.access}
-                        </Badge>
-                      )}
+                      {deck.access && <Badge variant="outline" className="text-xs">{deck.access}</Badge>}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
                       {deck.subjectName && <Badge variant="secondary">{deck.subjectName}</Badge>}
@@ -354,176 +393,335 @@ const Quiz = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      {deck.description ?? "This deck does not include a description yet."}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{deck.description ?? "This deck does not include a description yet."}</p>
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-primary" />
-                        {deck.questionCount.toLocaleString()} questions
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-primary" />
-                        {deck.examAt ? new Date(deck.examAt).toLocaleDateString() : "Flexible exam date"}
-                      </span>
+                      <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-primary" />{deck.questionCount.toLocaleString()} questions</span>
+                      <span className="flex items-center gap-2"><Calendar className="w-4 h-4 text-primary" />{deck.examAt ? new Date(deck.examAt).toLocaleDateString() : "Flexible exam date"}</span>
                     </div>
-                    <Button
-                      className="w-full bg-gradient-primary shadow-glow"
-                      disabled={quizLoading && activeDeck?.id === deck.id}
-                      onClick={() => handleStartQuiz(deck)}
-                    >
-                      {quizLoading && activeDeck?.id === deck.id ? (
-                        <>
-                          Preparing... <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                        </>
-                      ) : (
-                        "Start"
-                      )}
+                    <Button className="w-full bg-gradient-primary shadow-glow" disabled={quizLoading && activeDeck?.id === deck.id} onClick={() => handleStartQuiz(deck)}>
+                      {quizLoading && activeDeck?.id === deck.id ? (<>Preparing... <Loader2 className="ml-2 h-4 w-4 animate-spin" /></>) : "Start"}
                     </Button>
                   </CardContent>
                 </Card>
               ))}
+            </div>
+            {filteredDecks.length === 0 && (
+              <Card className="shadow-elegant mt-6">
+                <CardContent className="py-6 text-center text-muted-foreground">No quizzes found in this category.</CardContent>
+              </Card>
+            )}
           </div>
+        )}
 
-          {!loadingDecks && !deckError && decks.length === 0 && (
-            <Card className="shadow-elegant mt-6">
-              <CardContent className="py-6 text-center text-muted-foreground">
-                No public decks are available yet. Publish one from the OpenMultipleChoice admin panel to see it here.
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        {/* ── View: Taking ── */}
+        {view === 'taking' && (
+          <div className="space-y-6 mb-10">
+            {quizLoading ? (
+              <Card className="shadow-elegant">
+                <CardContent className="p-6 space-y-4">
+                  <Skeleton className="h-6 w-1/3" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-48 w-full" />
+                </CardContent>
+              </Card>
+            ) : quizError ? (
+              <Alert variant="destructive">
+                <AlertTitle>Unable to load quiz</AlertTitle>
+                <AlertDescription>{quizError}</AlertDescription>
+              </Alert>
+            ) : !quizPayload || !questions.length ? (
+              <Card className="shadow-elegant">
+                <CardContent className="py-6 text-center text-muted-foreground">This deck does not contain any questions yet.</CardContent>
+              </Card>
 
-        <div className="space-y-6 mb-10">
-          <Card className="shadow-elegant">
-            <CardHeader className="space-y-3">
-              <CardTitle className="text-2xl">Live practice</CardTitle>
-              <p className="text-muted-foreground text-sm">
-                Select any deck above to load its questions instantly. Your Supabase session authorizes the Edge
-                Function so only authenticated AceTerus learners can access the quiz data.
-              </p>
-              {activeDeck && (
-                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                  <Badge variant="secondary">{activeDeck.subjectName ?? "General"}</Badge>
-                  {activeDeck.moduleName && <Badge variant="outline">{activeDeck.moduleName}</Badge>}
-                  <Badge variant="outline" className="flex items-center gap-1">
-                    <Layers className="h-3.5 w-3.5" />
-                    {activeDeck.questionCount} questions
-                  </Badge>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent>
-              {quizError && (
-                <Alert variant="destructive" className="mb-6">
-                  <AlertTitle>Unable to load quiz</AlertTitle>
-                  <AlertDescription>{quizError}</AlertDescription>
-                </Alert>
-              )}
+            ) : sessionComplete ? (
+              /* ════════════════════════════════════════════════════════════════
+                 RESULTS VIEW — shown after submission
+              ═══════════════════════════════════════════════════════════════ */
+              <div className="space-y-8">
 
-              {quizLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-6 w-1/3" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-48 w-full" />
+                {/* Score hero */}
+                <div className="rounded-xl border p-8 text-center bg-gradient-to-br from-background to-muted/30">
+                  <p className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Quiz submitted</p>
+                  <h3 className="text-3xl font-bold text-primary mb-1">{activeDeck?.name}</h3>
+                  <p className="text-5xl font-extrabold mt-4 mb-1 text-primary">
+                    {correctCount} <span className="text-2xl font-semibold text-muted-foreground">/ {questions.length}</span>
+                  </p>
+                  <p className="text-muted-foreground text-sm">questions correct</p>
                 </div>
-              ) : !quizPayload || !questions.length ? (
-                <div className="py-6 text-center text-muted-foreground">
-                  {activeDeck
-                    ? "This deck does not contain any questions yet."
-                    : "Choose a deck above to begin practising immediately."}
-                </div>
-              ) : sessionComplete ? (
-                <div className="space-y-6">
-                  <div className="rounded-xl border p-6 text-center">
-                    <p className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Session complete</p>
-                    <h3 className="text-3xl font-bold text-primary">{activeDeck?.name}</h3>
-                    <p className="text-muted-foreground mt-2">Great job! Review your results below or restart the deck.</p>
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="rounded-xl border p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Score</p>
+                    <p className="text-2xl font-bold text-primary">{accuracy}%</p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="rounded-xl border p-4 text-center">
-                      <p className="text-sm text-muted-foreground">Accuracy</p>
-                      <p className="text-3xl font-bold text-primary">{accuracy}%</p>
-                    </div>
-                    <div className="rounded-xl border p-4 text-center">
-                      <p className="text-sm text-muted-foreground">Correct answers</p>
-                      <p className="text-3xl font-bold text-primary">{correctCount}</p>
-                    </div>
-                    <div className="rounded-xl border p-4 text-center">
-                      <p className="text-sm text-muted-foreground">Questions</p>
-                      <p className="text-3xl font-bold text-primary">{questions.length}</p>
-                    </div>
+                  <div className="rounded-xl border p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Correct</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{correctCount}</p>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    <Button className="bg-gradient-primary shadow-glow" onClick={handleRestartSession}>
-                      Retake deck
-                    </Button>
-                    <Button variant="outline" disabled={!activeDeck} onClick={() => activeDeck && handleStartQuiz(activeDeck)}>
-                      Load fresh order
-                    </Button>
+                  <div className="rounded-xl border p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Wrong</p>
+                    <p className="text-2xl font-bold text-red-500 dark:text-red-400">{answeredCount - correctCount}</p>
+                  </div>
+                  <div className="rounded-xl border p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Skipped</p>
+                    <p className="text-2xl font-bold text-muted-foreground">{questions.length - answeredCount}</p>
                   </div>
                 </div>
-              ) : (
-                currentQuestion && (
+
+                {/* Full question review */}
+                <div>
+                  <h4 className="text-xl font-bold mb-4">Answer Review</h4>
                   <div className="space-y-6">
+                    {questions.map((q, idx) => {
+                      const selected = answeredMap.get(idx) ?? null;
+                      const isCorrect = selected === q.correctAnswerId;
+                      const isSkipped = selected === null;
+                      const isBookmarked = flaggedQuestions.has(idx);
+
+                      return (
+                        <Card
+                          key={idx}
+                          className={cn(
+                            "shadow-elegant border-l-4",
+                            isSkipped ? "border-l-muted-foreground/30" :
+                            isCorrect ? "border-l-green-500" : "border-l-red-500"
+                          )}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <Badge variant="outline" className="shrink-0">Q{idx + 1}</Badge>
+                                {isSkipped ? (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground border-muted-foreground/40">Skipped</Badge>
+                                ) : isCorrect ? (
+                                  <Badge className="text-xs bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-300 dark:border-green-500/40" variant="outline">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" /> Correct
+                                  </Badge>
+                                ) : (
+                                  <Badge className="text-xs bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-red-300 dark:border-red-500/40" variant="outline">
+                                    <XCircle className="w-3 h-3 mr-1" /> Wrong
+                                  </Badge>
+                                )}
+                                {isBookmarked && (
+                                  <Badge className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-300 dark:border-amber-500/40" variant="outline">
+                                    <BookmarkCheck className="w-3 h-3 mr-1" /> Bookmarked
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <HtmlContent content={q.prompt} className="text-base mt-2" />
+                          </CardHeader>
+                          <CardContent className="space-y-2 pt-0">
+                            {/* Question images */}
+                            {q.images?.length ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                {q.images.map((image) => {
+                                  const url = buildOpenMcImageUrl(image.path ?? undefined, image.url ?? undefined);
+                                  if (!url) return null;
+                                  return (
+                                    <div key={image.id} className="rounded-xl overflow-hidden border bg-muted/30">
+                                      <img src={url} alt={image.comment ?? `Q${idx + 1} image`} className="w-full h-auto object-cover" loading="lazy" />
+                                      {image.comment && <p className="px-3 py-2 text-xs text-muted-foreground border-t">{image.comment}</p>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+
+                            {/* Choices with correct/wrong highlighting */}
+                            <div className="space-y-2">
+                              {q.choices.map((choice) => {
+                                const isThisCorrect = choice.id === q.correctAnswerId;
+                                const isThisSelected = choice.id === selected;
+                                const isThisWrong = isThisSelected && !isThisCorrect;
+
+                                return (
+                                  <div
+                                    key={choice.id}
+                                    className={cn(
+                                      "flex items-start gap-3 rounded-lg border px-4 py-3 text-sm",
+                                      isThisCorrect
+                                        ? "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-200"
+                                        : isThisWrong
+                                          ? "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-200"
+                                          : "border-border bg-muted/20 text-muted-foreground"
+                                    )}
+                                  >
+                                    <span className="shrink-0 mt-0.5">
+                                      {isThisCorrect ? (
+                                        <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                      ) : isThisWrong ? (
+                                        <XCircle className="w-4 h-4 text-red-500" />
+                                      ) : (
+                                        <span className="w-4 h-4 block rounded-full border-2 border-muted-foreground/30" />
+                                      )}
+                                    </span>
+                                    <div className="flex-1">
+                                      <HtmlContent content={choice.text} className="text-sm" />
+                                    </div>
+                                    {isThisCorrect && (
+                                      <span className="shrink-0 text-xs font-semibold text-green-700 dark:text-green-300">Correct answer</span>
+                                    )}
+                                    {isThisWrong && (
+                                      <span className="shrink-0 text-xs font-semibold text-red-600 dark:text-red-400">Your answer</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Explanation */}
+                            {q.explanation && (
+                              <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-1">
+                                <p className="text-xs font-semibold text-primary uppercase tracking-wide">Explanation</p>
+                                <HtmlContent content={q.explanation} className="text-sm" />
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Bookmarked questions summary */}
+                {flaggedQuestions.size > 0 && (
+                  <Card className="shadow-elegant">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <BookmarkCheck className="w-5 h-5 text-amber-500" />
+                        Bookmarked Questions ({flaggedQuestions.size})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {sortedBookmarks.map((idx) => {
+                        const q = questions[idx];
+                        if (!q) return null;
+                        const wasCorrect = answeredMap.get(idx) === q.correctAnswerId;
+                        const wasSkipped = !answeredMap.has(idx);
+                        return (
+                          <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                            <Badge variant="outline" className="shrink-0">Q{idx + 1}</Badge>
+                            <p className="text-sm text-muted-foreground line-clamp-2 flex-1">{stripHtml(q.prompt ?? '')}</p>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "shrink-0 text-xs",
+                                wasSkipped ? "text-muted-foreground" :
+                                wasCorrect ? "border-green-500 text-green-600 dark:text-green-400" :
+                                "border-red-500 text-red-600 dark:text-red-400"
+                              )}
+                            >
+                              {wasSkipped ? "Skipped" : wasCorrect ? "Correct" : "Wrong"}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap gap-3">
+                  <Button className="bg-gradient-primary shadow-glow" onClick={resetSessionState}>
+                    Retake deck
+                  </Button>
+                  <Button variant="outline" disabled={!activeDeck} onClick={() => activeDeck && handleStartQuiz(activeDeck)}>
+                    Load fresh order
+                  </Button>
+                  <Button variant="outline" onClick={() => { resetSessionState(); setView('decks'); }}>
+                    Back to category
+                  </Button>
+                </div>
+              </div>
+
+            ) : (
+              /* ════════════════════════════════════════════════════════════════
+                 QUIZ TAKING VIEW — no answer feedback shown
+              ═══════════════════════════════════════════════════════════════ */
+              currentQuestion && (
+                <Card className="shadow-elegant">
+                  <CardHeader className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
                         <p className="text-sm uppercase tracking-wide text-muted-foreground">
                           Question {currentIndex + 1} of {questions.length}
                         </p>
-                        <CardTitle className="text-2xl">Practice mode</CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                          {answeredCount} answered · {unansweredCount} remaining
+                        </p>
                       </div>
-                      <Progress value={progressPercent} className="h-2 w-full sm:w-60" />
+                      <div className="flex items-center gap-3">
+                        <Progress value={progressPercent} className="h-2 w-40 sm:w-60" title={`${answeredCount} of ${questions.length} answered`} />
+                        {/* Bookmark button */}
+                        <Button
+                          variant={flaggedQuestions.has(currentIndex) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleToggleFlag(currentIndex)}
+                          title={flaggedQuestions.has(currentIndex) ? "Remove bookmark" : "Bookmark this question"}
+                          className={cn(
+                            "gap-1.5 transition-all",
+                            flaggedQuestions.has(currentIndex)
+                              ? "bg-amber-500 hover:bg-amber-600 border-amber-500 text-white shadow-md"
+                              : "text-muted-foreground hover:text-amber-500 hover:border-amber-400"
+                          )}
+                        >
+                          {flaggedQuestions.has(currentIndex) ? (
+                            <><BookmarkCheck className="w-4 h-4" /><span className="hidden sm:inline text-xs font-medium">Marked</span></>
+                          ) : (
+                            <><Bookmark className="w-4 h-4" /><span className="hidden sm:inline text-xs font-medium">Mark</span></>
+                          )}
+                        </Button>
+                      </div>
                     </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-6">
                     <HtmlContent content={currentQuestion.prompt} className="text-lg" />
 
-                    {currentQuestion.images?.length && (
+                    {/* Images */}
+                    {currentQuestion.images?.length ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {currentQuestion.images.map((image) => {
                           const url = buildOpenMcImageUrl(image.path ?? undefined, image.url ?? undefined);
                           if (!url) return null;
-
                           return (
                             <div key={image.id} className="rounded-xl overflow-hidden border bg-muted/30">
-                              <img
-                                src={url}
-                                alt={image.comment ?? `Question image ${image.id}`}
-                                className="w-full h-auto object-cover"
-                                loading="lazy"
-                              />
-                              {image.comment && (
-                                <p className="px-3 py-2 text-xs text-muted-foreground border-t border-border/60">
-                                  {image.comment}
-                                </p>
-                              )}
+                              <img src={url} alt={image.comment ?? `Question image ${image.id}`} className="w-full h-auto object-cover" loading="lazy" />
+                              {image.comment && <p className="px-3 py-2 text-xs text-muted-foreground border-t border-border/60">{image.comment}</p>}
                             </div>
                           );
                         })}
                       </div>
-                    )}
+                    ) : null}
 
+                    {/* Answer choices — no correct/wrong styling, just selected highlight */}
                     <div className="space-y-3">
                       {currentQuestion.choices.length ? (
-                        currentQuestion.choices.map((choice) => (
-                          <Button
-                            key={choice.id}
-                            variant="outline"
-                            disabled={showFeedback}
-                            onClick={() => handleAnswerSelect(choice.id)}
-                            className={cn(
-                              "w-full justify-start text-left whitespace-normal",
-                              showFeedback &&
-                                choice.id === currentQuestion.correctAnswerId &&
-                                "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-200",
-                              showFeedback &&
-                                selectedAnswerId === choice.id &&
-                                choice.id !== currentQuestion.correctAnswerId &&
-                                "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-200"
-                            )}
-                          >
-                            <HtmlContent content={choice.text} className="text-base" />
-                          </Button>
-                        ))
+                        currentQuestion.choices.map((choice) => {
+                          const isSelected = selectedAnswerId === choice.id;
+                          return (
+                            <Button
+                              key={choice.id}
+                              variant="outline"
+                              onClick={() => handleAnswerSelect(choice.id)}
+                              className={cn(
+                                "w-full justify-start text-left whitespace-normal transition-all",
+                                isSelected
+                                  ? "border-primary bg-primary/8 dark:bg-primary/15 ring-1 ring-primary text-foreground"
+                                  : "hover:border-primary/50 hover:bg-muted/60"
+                              )}
+                            >
+                              <span className={cn(
+                                "shrink-0 mr-3 w-4 h-4 rounded-full border-2 flex items-center justify-center",
+                                isSelected ? "border-primary bg-primary" : "border-muted-foreground/40"
+                              )}>
+                                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              </span>
+                              <HtmlContent content={choice.text} className="text-base" />
+                            </Button>
+                          );
+                        })
                       ) : (
                         <Alert>
                           <AlertTitle>No answers found</AlertTitle>
@@ -532,105 +730,115 @@ const Quiz = () => {
                       )}
                     </div>
 
-                    {showFeedback && (
-                      <Alert variant={selectedIsCorrect ? "default" : "destructive"}>
-                        <div className="flex items-start gap-3">
-                          {selectedIsCorrect ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-500 mt-1" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-red-500 mt-1" />
-                          )}
+                    {/* Submit confirmation banner */}
+                    {submitConfirmPending && (
+                      <Alert className="border-orange-300 bg-orange-50 dark:bg-orange-500/10 dark:border-orange-500/40">
+                        <div className="flex items-start justify-between gap-4">
                           <div>
-                            <AlertTitle>{selectedIsCorrect ? "Correct!" : "Not quite"}</AlertTitle>
-                            <AlertDescription>
-                              {selectedIsCorrect
-                                ? "Great work — keep the streak going."
-                                : "Review the explanation below and try again next round."}
+                            <AlertTitle className="text-orange-800 dark:text-orange-300">Submit quiz?</AlertTitle>
+                            <AlertDescription className="text-orange-700 dark:text-orange-400 mt-1">
+                              {unansweredCount > 0
+                                ? `You have ${unansweredCount} unanswered question${unansweredCount > 1 ? 's' : ''}. You cannot change answers after submitting.`
+                                : "You cannot change your answers after submitting."}
                             </AlertDescription>
+                          </div>
+                          <div className="flex gap-2 shrink-0 mt-0.5">
+                            <Button size="sm" variant="outline" onClick={() => setSubmitConfirmPending(false)}>Cancel</Button>
+                            <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white border-0" onClick={handleSubmitQuiz}>
+                              Confirm Submit
+                            </Button>
                           </div>
                         </div>
                       </Alert>
                     )}
 
-                    {currentQuestion.explanation && (
-                      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
-                        <p className="text-sm font-semibold text-primary">Explanation</p>
-                        <HtmlContent content={currentQuestion.explanation} className="text-sm" />
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-3">
-                      <Button
-                        className="bg-gradient-primary shadow-glow"
-                        disabled={!showFeedback}
-                        onClick={handleNextQuestion}
-                      >
-                        {isLastQuestion ? (
-                          <>
-                            Finish quiz <Sparkles className="ml-2 h-4 w-4" />
-                          </>
-                        ) : (
-                          <>
-                            Next question <ChevronRight className="ml-2 h-4 w-4" />
-                          </>
-                        )}
+                    {/* Navigation + submit footer */}
+                    <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/40">
+                      {/* Navigation */}
+                      <Button variant="outline" disabled={currentIndex === 0} onClick={handlePrevQuestion}>
+                        <ChevronLeft className="mr-2 h-4 w-4" /> Previous
                       </Button>
-                      <Button variant="outline" onClick={handleRestartSession}>
-                        Restart deck
+                      <Button variant="outline" disabled={isLastQuestion} onClick={handleNextQuestion}>
+                        Next <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+
+                      <div className="flex-1" />
+
+                      {/* Submit & exit */}
+                      <Button
+                        variant="outline"
+                        className="border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/60"
+                        onClick={() => { setSubmitConfirmPending(true); setShowBookmarkPanel(false); }}
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" /> Submit Quiz
+                      </Button>
+                      <Button variant="outline" onClick={() => { resetSessionState(); setView('decks'); }}>
+                        Exit
                       </Button>
                     </div>
-                  </div>
-                )
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {placeholderHighlights.map((highlight) => {
-            const Icon = highlight.icon;
-            return (
-              <Card key={highlight.title} className="shadow-elegant hover:shadow-glow transition-shadow">
-                <CardHeader className="flex flex-row items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                    <Icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <CardTitle className="text-lg">{highlight.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-muted-foreground">
-                  {highlight.description}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        <Card className="shadow-elegant">
-          <CardHeader>
-            <CardTitle className="text-xl">What to expect next</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-3">
-              <Badge className={getDifficultyColor("Medium")}>Roadmap</Badge>
-              <div>
-                <p className="font-semibold mb-1">Native AceTerus quizzes</p>
-                <p className="text-muted-foreground">
-                  Structured around Malaysian syllabi and synced with your Supabase profile for instant progress sync.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Badge variant="outline">Community</Badge>
-              <div>
-                <p className="font-semibold mb-1">Deck collaborations</p>
-                <p className="text-muted-foreground">
-                  Build and share question banks with teammates while keeping everything moderated inside AceTerus.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  </CardContent>
+                </Card>
+              )
+            )}
+          </div>
+        )}
       </div>
+
+      {/* ── Floating Bookmarks Panel ── */}
+      {isInActiveQuiz && flaggedQuestions.size > 0 && (
+        <div ref={bookmarkPanelRef} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+          {showBookmarkPanel && (
+            <div className="w-72 rounded-xl border bg-background shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-amber-50 dark:bg-amber-500/10">
+                <div className="flex items-center gap-2">
+                  <BookmarkCheck className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Bookmarks ({flaggedQuestions.size})</span>
+                </div>
+                <button onClick={() => setShowBookmarkPanel(false)} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close bookmarks panel">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="max-h-64 overflow-y-auto divide-y">
+                {sortedBookmarks.map((idx) => {
+                  const q = questions[idx];
+                  if (!q) return null;
+                  const isCurrent = idx === currentIndex;
+                  const isAnswered = answeredMap.has(idx);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleJumpToBookmark(idx)}
+                      className={cn(
+                        "w-full text-left px-4 py-3 flex items-start gap-3 transition-colors hover:bg-muted/60",
+                        isCurrent && "bg-amber-50 dark:bg-amber-500/10"
+                      )}
+                    >
+                      <Badge
+                        variant={isCurrent ? "default" : "outline"}
+                        className={cn("shrink-0 mt-0.5 text-xs", isCurrent && "bg-amber-500 border-amber-500 text-white")}
+                      >
+                        Q{idx + 1}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-snug flex-1">
+                        {stripHtml(q.prompt ?? '') || '(No prompt)'}
+                      </p>
+                      {isAnswered && <span className="shrink-0 w-2 h-2 rounded-full bg-primary mt-1" title="Answered" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <Button
+            onClick={() => setShowBookmarkPanel(prev => !prev)}
+            className="gap-2 shadow-lg bg-amber-500 hover:bg-amber-600 text-white"
+          >
+            <BookmarkCheck className="w-4 h-4" />
+            <span className="font-medium">Bookmarks</span>
+            <Badge className="bg-white text-amber-600 text-xs px-1.5 py-0 ml-0.5 font-bold">{flaggedQuestions.size}</Badge>
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
