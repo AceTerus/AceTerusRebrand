@@ -67,7 +67,7 @@ const Quiz = () => {
 
   // Deck state
   const [decks, setDecks] = useState<OpenMcDeckSummary[]>([]);
-  const [loadingDecks, setLoadingDecks] = useState(false);
+  const [loadingDecks, setLoadingDecks] = useState(true);
   const [deckError, setDeckError] = useState<string | null>(null);
 
   // View state
@@ -95,7 +95,7 @@ const Quiz = () => {
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
-    if (!user) return;
+    if (authLoading || !user) return;
     let cancelled = false;
     setLoadingDecks(true);
     setDeckError(null);
@@ -109,7 +109,7 @@ const Quiz = () => {
       })
       .finally(() => { if (!cancelled) setLoadingDecks(false); });
     return () => { cancelled = true; };
-  }, [user]);
+  }, [authLoading, user]);
 
   // Persist bookmarks to localStorage
   useEffect(() => {
