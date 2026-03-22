@@ -36,9 +36,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       supabase
         .from("profiles")
         .select("is_admin")
-        .eq("id", userId)
+        .eq("user_id", userId)
         .single()
-        .then(({ data }) => setIsAdmin(data?.is_admin ?? false));
+        .then(({ data }) => setIsAdmin((data as any)?.is_admin ?? false));
     };
 
     // Set up auth state listener
