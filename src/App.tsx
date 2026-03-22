@@ -12,7 +12,7 @@ import { Discover } from "./pages/Discover";
 import { Feed } from "./pages/Feed";
 import { Materials } from "./pages/Materials";
 import Quiz from "./pages/Quiz";
-import { QuizTaking } from "./pages/QuizTaking";
+import AdminQuiz from "./pages/AdminQuiz";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Chat } from "./pages/Chat";
@@ -32,7 +32,7 @@ const AppContent = () => {
             <Route path="/" element={<Index />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/quiz" element={<Quiz />} />
-            <Route path="/quiz/:quizId" element={<QuizTaking />} />
+            <Route path="/admin" element={<AdminQuiz />} />
             <Route path="/materials" element={<Materials />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:userId" element={<Profile />} />

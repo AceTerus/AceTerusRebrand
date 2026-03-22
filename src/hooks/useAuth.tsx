@@ -1,12 +1,12 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { clearOpenMcToken, syncOpenMcTokenFromSession } from '@/lib/openmc-client';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
+  isAdmin: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -28,17 +28,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const syncOpenMc = (currentSession: Session | null) => {
-      if (!currentSession) {
-        clearOpenMcToken();
-        return;
-      }
-
-      syncOpenMcTokenFromSession(currentSession).catch((error) => {
-        console.warn('Failed to sync OpenMultipleChoice token', error);
-      });
+    const syncProfile = (userId: string | undefined) => {
+      if (!userId) { setIsAdmin(false); return; }
+      supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", userId)
+        .single()
+        .then(({ data }) => setIsAdmin(data?.is_admin ?? false));
     };
 
     // Set up auth state listener
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
-        syncOpenMc(session);
+        syncProfile(session?.user?.id);
       }
     );
 
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
-      syncOpenMc(session);
+      syncProfile(session?.user?.id);
     });
 
     return () => subscription.unsubscribe();
@@ -68,13 +68,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.error('Error signing out:', error);
       return;
     }
-    clearOpenMcToken();
+    setIsAdmin(false);
   };
 
   const value = {
     user,
     session,
     isLoading,
+    isAdmin,
     signOut,
   };
 

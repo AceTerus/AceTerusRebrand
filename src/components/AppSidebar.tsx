@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, User, Search, LogOut, Compass, FileText, MessageCircle } from "lucide-react";
+import { BookOpen, User, Search, LogOut, Compass, FileText, MessageCircle, ShieldCheck } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useChatNotifications } from "@/context/ChatNotificationsContext";
 export const AppSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const { toast } = useToast();
   const { totalSenders } = useChatNotifications();
 
@@ -53,6 +53,7 @@ export const AppSidebar = () => {
           { href: "/quiz", label: "Quiz", icon: BookOpen },
           { href: "/materials", label: "Materials", icon: FileText },
           { href: "/profile", label: "Profile", icon: User },
+          ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: ShieldCheck }] : []),
         ].map((item) => {
           const Icon = item.icon;
           return (
