@@ -2,51 +2,89 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Deck, Question, QuizPayload } from "@/types/quiz";
 
 export const fetchDecks = async (): Promise<Deck[]> => {
-  const { data, error } = await supabase
+  const { data: deckRows, error: deckError } = await supabase
     .from("decks")
-    .select("id, name, description, subject, created_by, created_at, questions(id)")
+    .select("id, name, description, subject, created_by, created_at")
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (deckError) throw new Error(deckError.message);
+  if (!deckRows?.length) return [];
 
-  return (data ?? []).map((deck: any) => ({
+  const deckIds = deckRows.map((d: any) => d.id);
+  const { data: questionRows } = await supabase
+    .from("questions")
+    .select("id, deck_id")
+    .in("deck_id", deckIds);
+
+  const countMap: Record<string, number> = {};
+  for (const q of questionRows ?? []) {
+    countMap[(q as any).deck_id] = (countMap[(q as any).deck_id] ?? 0) + 1;
+  }
+
+  return deckRows.map((deck: any) => ({
     id: deck.id,
     name: deck.name,
     description: deck.description ?? null,
     subject: deck.subject ?? null,
     created_by: deck.created_by ?? null,
     created_at: deck.created_at,
-    question_count: Array.isArray(deck.questions) ? deck.questions.length : 0,
+    question_count: countMap[deck.id] ?? 0,
   }));
 };
 
 export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
-  const { data, error } = await supabase
+  const { data: deck, error: deckError } = await supabase
     .from("decks")
-    .select("*, questions(*, answers(*))")
+    .select("id, name, description, subject, created_by, created_at")
     .eq("id", deckId)
     .single();
 
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Deck not found");
+  if (deckError) throw new Error(deckError.message);
+  if (!deck) throw new Error("Deck not found");
 
-  const questions: Question[] = ((data as any).questions ?? []).map((q: any) => ({
+  const { data: questionRows, error: qError } = await supabase
+    .from("questions")
+    .select("id, deck_id, text, explanation, order")
+    .eq("deck_id", deckId)
+    .order("order", { ascending: true });
+
+  if (qError) throw new Error(qError.message);
+
+  const questionIds = (questionRows ?? []).map((q: any) => q.id);
+  let answerRows: any[] = [];
+
+  if (questionIds.length > 0) {
+    const { data: aRows, error: aError } = await supabase
+      .from("answers")
+      .select("id, question_id, text, is_correct")
+      .in("question_id", questionIds);
+    if (aError) throw new Error(aError.message);
+    answerRows = aRows ?? [];
+  }
+
+  const answersByQuestion: Record<string, any[]> = {};
+  for (const a of answerRows) {
+    if (!answersByQuestion[a.question_id]) answersByQuestion[a.question_id] = [];
+    answersByQuestion[a.question_id].push(a);
+  }
+
+  const questions: Question[] = (questionRows ?? []).map((q: any) => ({
     id: q.id,
     deck_id: q.deck_id,
     text: q.text,
     explanation: q.explanation ?? null,
     order: q.order ?? 0,
-    answers: (q.answers ?? []).sort(() => Math.random() - 0.5),
+    answers: (answersByQuestion[q.id] ?? []).sort(() => Math.random() - 0.5),
   }));
 
   return {
     deck: {
-      id: data.id,
-      name: data.name,
-      description: (data as any).description ?? null,
-      subject: (data as any).subject ?? null,
-      created_by: (data as any).created_by ?? null,
-      created_at: data.created_at,
+      id: (deck as any).id,
+      name: (deck as any).name,
+      description: (deck as any).description ?? null,
+      subject: (deck as any).subject ?? null,
+      created_by: (deck as any).created_by ?? null,
+      created_at: (deck as any).created_at,
       question_count: questions.length,
     },
     questions,
@@ -90,15 +128,38 @@ export const deleteDeck = async (id: string) => {
 };
 
 export const fetchQuestionsForDeck = async (deckId: string): Promise<Question[]> => {
-  const { data, error } = await supabase
+  const { data: questionRows, error: qError } = await supabase
     .from("questions")
-    .select("*, answers(*)")
+    .select("id, deck_id, text, explanation, order")
     .eq("deck_id", deckId)
     .order("order", { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((q: any) => ({
-    ...q,
-    answers: q.answers ?? [],
+  if (qError) throw new Error(qError.message);
+
+  const questionIds = (questionRows ?? []).map((q: any) => q.id);
+  let answerRows: any[] = [];
+
+  if (questionIds.length > 0) {
+    const { data: aRows, error: aError } = await supabase
+      .from("answers")
+      .select("id, question_id, text, is_correct")
+      .in("question_id", questionIds);
+    if (aError) throw new Error(aError.message);
+    answerRows = aRows ?? [];
+  }
+
+  const answersByQuestion: Record<string, any[]> = {};
+  for (const a of answerRows) {
+    if (!answersByQuestion[a.question_id]) answersByQuestion[a.question_id] = [];
+    answersByQuestion[a.question_id].push(a);
+  }
+
+  return (questionRows ?? []).map((q: any) => ({
+    id: q.id,
+    deck_id: q.deck_id,
+    text: q.text,
+    explanation: q.explanation ?? null,
+    order: q.order ?? 0,
+    answers: answersByQuestion[q.id] ?? [],
   }));
 };
 
