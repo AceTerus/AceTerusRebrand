@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(du -sh /c/Users/Dhiren23/Documents/AceTerusRebrand-1/openmultiplechoice/*)",
+      "Bash(supabase db:*)",
+      "Bash(supabase migration:*)",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/psql\" --version 2>&1)",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/psql\" -U postgres -l 2>&1)",
+      "Bash(PGPASSWORD=giantblackspider \"/c/Program Files/PostgreSQL/18/bin/psql\" -U postgres -d AceTerus -c \"\\\\dt\" 2>&1)",
+      "Bash(PGPASSWORD=giantblackspider \"/c/Program Files/PostgreSQL/18/bin/psql\" -U postgres -c \"\\\\l\" 2>&1)",
+      "Bash(PGPASSWORD=giantblackspider \"/c/Program Files/PostgreSQL/18/bin/psql\" -U postgres -d postgres -c \"\\\\dt\" 2>&1)",
+      "Bash(curl:*)",
+      "Bash(php artisan:*)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
