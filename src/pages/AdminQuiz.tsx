@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, ChevronLeft, Loader2, ShieldAlert } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronLeft, Loader2, ShieldAlert, ImagePlus, X, Globe, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,11 +21,14 @@ import {
   createDeck,
   updateDeck,
   deleteDeck,
+  toggleDeckPublished,
   fetchQuestionsForDeck,
   createQuestion,
   updateQuestion,
   replaceAnswers,
   deleteQuestion,
+  uploadQuizImage,
+  deleteQuizImage,
 } from "@/lib/quiz-client";
 import type { Deck, Question } from "@/types/quiz";
 
@@ -70,6 +73,12 @@ const AdminQuiz = () => {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionForm, setQuestionForm] = useState(blankQuestionForm());
   const [savingQuestion, setSavingQuestion] = useState(false);
+
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -140,6 +149,18 @@ const AdminQuiz = () => {
     }
   };
 
+  const handleTogglePublish = async (deck: Deck) => {
+    try {
+      await toggleDeckPublished(deck.id, !deck.is_published);
+      setDecks((prev) =>
+        prev.map((d) => d.id === deck.id ? { ...d, is_published: !d.is_published } : d)
+      );
+      toast({ title: deck.is_published ? "Deck unpublished" : "Deck published" });
+    } catch (e: any) {
+      toast({ title: "Failed to update", description: e.message, variant: "destructive" });
+    }
+  };
+
   const handleDeleteDeck = async (deck: Deck) => {
     if (!confirm(`Delete "${deck.name}" and all its questions?`)) return;
     try {
@@ -152,9 +173,17 @@ const AdminQuiz = () => {
   };
 
   // ── Question dialog helpers ─────────────────────────────────────────────────
+  const resetImageState = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setExistingImageUrl(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
   const openAddQuestion = () => {
     setEditingQuestion(null);
     setQuestionForm(blankQuestionForm());
+    resetImageState();
     setQuestionDialogOpen(true);
   };
 
@@ -170,6 +199,8 @@ const AdminQuiz = () => {
       answers: answers.slice(0, 4).map((a) => a.text),
       correctIndex: correctIndex >= 0 ? correctIndex : 0,
     });
+    resetImageState();
+    setExistingImageUrl(q.image_url ?? null);
     setQuestionDialogOpen(true);
   };
 
@@ -190,10 +221,23 @@ const AdminQuiz = () => {
 
     setSavingQuestion(true);
     try {
+      // Upload new image if selected
+      let finalImageUrl: string | null | undefined = undefined;
+      if (imageFile) {
+        // Delete old image first if replacing
+        if (existingImageUrl) await deleteQuizImage(existingImageUrl).catch(() => {});
+        finalImageUrl = await uploadQuizImage(imageFile);
+      } else if (existingImageUrl === null && editingQuestion?.image_url) {
+        // User explicitly removed the image
+        await deleteQuizImage(editingQuestion.image_url).catch(() => {});
+        finalImageUrl = null;
+      }
+
       if (editingQuestion) {
         await updateQuestion(editingQuestion.id, {
           text: questionForm.text,
           explanation: questionForm.explanation || undefined,
+          ...(finalImageUrl !== undefined ? { image_url: finalImageUrl } : {}),
         });
         await replaceAnswers(editingQuestion.id, answers);
         toast({ title: "Question updated" });
@@ -202,6 +246,7 @@ const AdminQuiz = () => {
           deck_id: selectedDeck!.id,
           text: questionForm.text,
           explanation: questionForm.explanation || undefined,
+          image_url: finalImageUrl ?? undefined,
           order: questions.length,
           answers,
         });
@@ -295,6 +340,9 @@ const AdminQuiz = () => {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-lg">{deck.name}</h3>
                         {deck.subject && <Badge variant="secondary">{deck.subject}</Badge>}
+                        <Badge variant={deck.is_published ? "default" : "outline"} className={deck.is_published ? "bg-green-500 hover:bg-green-500 text-white border-green-500" : "text-muted-foreground"}>
+                          {deck.is_published ? "Published" : "Draft"}
+                        </Badge>
                       </div>
                       {deck.description && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{deck.description}</p>
@@ -304,6 +352,16 @@ const AdminQuiz = () => {
                     <div className="flex gap-2 shrink-0">
                       <Button size="sm" variant="outline" onClick={() => loadQuestions(deck)}>
                         Manage Questions
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={deck.is_published ? "outline" : "default"}
+                        className={deck.is_published ? "gap-1.5 text-muted-foreground" : "gap-1.5 bg-green-500 hover:bg-green-600 text-white border-0"}
+                        onClick={() => handleTogglePublish(deck)}
+                      >
+                        {deck.is_published
+                          ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</>
+                          : <><Globe className="w-3.5 h-3.5" /> Publish</>}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEditDeck(deck)}>
                         <Pencil className="w-4 h-4" />
@@ -352,6 +410,13 @@ const AdminQuiz = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 space-y-1.5">
+                    {q.image_url && (
+                      <img
+                        src={q.image_url}
+                        alt="Question image"
+                        className="w-full max-h-48 object-contain rounded-lg border bg-muted/20 mb-3"
+                      />
+                    )}
                     {q.answers.map((a, i) => (
                       <div
                         key={a.id}
@@ -471,6 +536,55 @@ const AdminQuiz = () => {
                 onChange={(e) => setQuestionForm((f) => ({ ...f, explanation: e.target.value }))}
                 rows={2}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Image (optional)</Label>
+              {/* Show existing or newly selected preview */}
+              {(imagePreview || existingImageUrl) && (
+                <div className="relative w-full rounded-lg overflow-hidden border bg-muted/20">
+                  <img
+                    src={imagePreview ?? existingImageUrl!}
+                    alt="Question preview"
+                    className="w-full max-h-48 object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreview(null);
+                      setExistingImageUrl(null);
+                      if (imageInputRef.current) imageInputRef.current.value = "";
+                    }}
+                    className="absolute top-2 right-2 rounded-full bg-background/80 border p-1 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setImageFile(file);
+                  setImagePreview(URL.createObjectURL(file));
+                }}
+              />
+              {!imagePreview && !existingImageUrl && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 border-dashed"
+                  onClick={() => imageInputRef.current?.click()}
+                >
+                  <ImagePlus className="w-4 h-4" />
+                  Upload image
+                </Button>
+              )}
             </div>
           </div>
           <DialogFooter>

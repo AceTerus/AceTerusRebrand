@@ -1,10 +1,25 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Deck, Question, QuizPayload } from "@/types/quiz";
 
+export const uploadQuizImage = async (file: File): Promise<string> => {
+  const ext = file.name.split(".").pop();
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from("quiz-images").upload(path, file);
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from("quiz-images").getPublicUrl(path);
+  return data.publicUrl;
+};
+
+export const deleteQuizImage = async (url: string) => {
+  const path = url.split("/quiz-images/")[1];
+  if (!path) return;
+  await supabase.storage.from("quiz-images").remove([path]);
+};
+
 export const fetchDecks = async (): Promise<Deck[]> => {
   const { data: deckRows, error: deckError } = await supabase
     .from("decks")
-    .select("id, name, description, subject, created_by, created_at")
+    .select("id, name, description, subject, created_by, created_at, is_published")
     .order("created_at", { ascending: false });
 
   if (deckError) throw new Error(deckError.message);
@@ -29,13 +44,14 @@ export const fetchDecks = async (): Promise<Deck[]> => {
     created_by: deck.created_by ?? null,
     created_at: deck.created_at,
     question_count: countMap[deck.id] ?? 0,
+    is_published: deck.is_published ?? false,
   }));
 };
 
 export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
   const { data: deck, error: deckError } = await supabase
     .from("decks")
-    .select("id, name, description, subject, created_by, created_at")
+    .select("id, name, description, subject, created_by, created_at, is_published")
     .eq("id", deckId)
     .single();
 
@@ -44,7 +60,7 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
 
   const { data: questionRows, error: qError } = await supabase
     .from("questions")
-    .select("id, deck_id, text, explanation, order")
+    .select("id, deck_id, text, explanation, image_url, order")
     .eq("deck_id", deckId)
     .order("order", { ascending: true });
 
@@ -73,6 +89,7 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
     deck_id: q.deck_id,
     text: q.text,
     explanation: q.explanation ?? null,
+    image_url: q.image_url ?? null,
     order: q.order ?? 0,
     answers: (answersByQuestion[q.id] ?? []).sort(() => Math.random() - 0.5),
   }));
@@ -86,6 +103,7 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
       created_by: (deck as any).created_by ?? null,
       created_at: (deck as any).created_at,
       question_count: questions.length,
+      is_published: (deck as any).is_published ?? false,
     },
     questions,
   };
@@ -122,6 +140,14 @@ export const updateDeck = async (
   return data;
 };
 
+export const toggleDeckPublished = async (id: string, isPublished: boolean) => {
+  const { error } = await supabase
+    .from("decks")
+    .update({ is_published: isPublished })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+};
+
 export const deleteDeck = async (id: string) => {
   const { error } = await supabase.from("decks").delete().eq("id", id);
   if (error) throw new Error(error.message);
@@ -130,7 +156,7 @@ export const deleteDeck = async (id: string) => {
 export const fetchQuestionsForDeck = async (deckId: string): Promise<Question[]> => {
   const { data: questionRows, error: qError } = await supabase
     .from("questions")
-    .select("id, deck_id, text, explanation, order")
+    .select("id, deck_id, text, explanation, image_url, order")
     .eq("deck_id", deckId)
     .order("order", { ascending: true });
   if (qError) throw new Error(qError.message);
@@ -158,6 +184,7 @@ export const fetchQuestionsForDeck = async (deckId: string): Promise<Question[]>
     deck_id: q.deck_id,
     text: q.text,
     explanation: q.explanation ?? null,
+    image_url: q.image_url ?? null,
     order: q.order ?? 0,
     answers: answersByQuestion[q.id] ?? [],
   }));
@@ -167,6 +194,7 @@ export const createQuestion = async (question: {
   deck_id: string;
   text: string;
   explanation?: string;
+  image_url?: string;
   order?: number;
   answers: { text: string; is_correct: boolean }[];
 }) => {
@@ -188,7 +216,7 @@ export const createQuestion = async (question: {
 
 export const updateQuestion = async (
   id: string,
-  data: { text?: string; explanation?: string }
+  data: { text?: string; explanation?: string; image_url?: string | null }
 ) => {
   const { error } = await supabase.from("questions").update(data).eq("id", id);
   if (error) throw new Error(error.message);

@@ -439,6 +439,13 @@ const Quiz = () => {
                             <p className="text-base mt-2">{q.text}</p>
                           </CardHeader>
                           <CardContent className="space-y-2 pt-0">
+                            {q.image_url && (
+                              <img
+                                src={q.image_url}
+                                alt="Question image"
+                                className="w-full max-h-48 object-contain rounded-xl border bg-muted/20 mb-3"
+                              />
+                            )}
                             {q.answers.map((a) => {
                               const isThisCorrect = a.is_correct;
                               const isThisSelected = a.id === selected;
@@ -540,6 +547,14 @@ const Quiz = () => {
 
                   <CardContent className="space-y-6">
                     <p className="text-lg leading-relaxed">{currentQuestion.text}</p>
+
+                    {currentQuestion.image_url && (
+                      <img
+                        src={currentQuestion.image_url}
+                        alt="Question image"
+                        className="w-full max-h-72 object-contain rounded-xl border bg-muted/20"
+                      />
+                    )}
 
                     <div className="space-y-3">
                       {currentQuestion.answers.length ? (

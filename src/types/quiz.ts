@@ -6,6 +6,7 @@ export interface Deck {
   created_by: string | null;
   created_at: string;
   question_count: number;
+  is_published: boolean;
 }
 
 export interface Answer {
@@ -20,6 +21,7 @@ export interface Question {
   deck_id: string;
   text: string;
   explanation: string | null;
+  image_url: string | null;
   order: number;
   answers: Answer[];
 }
