@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, ChevronLeft, Loader2, ShieldAlert, ImagePlus, X, Globe, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronLeft, Loader2, ShieldAlert, ImagePlus, X, Globe, EyeOff, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +31,7 @@ import {
   deleteQuizImage,
 } from "@/lib/quiz-client";
 import type { Deck, Question } from "@/types/quiz";
+import { PdfQuizGenerator } from "@/components/PdfQuizGenerator";
 
 // ── Blank form shapes ─────────────────────────────────────────────────────────
 
@@ -73,6 +74,9 @@ const AdminQuiz = () => {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionForm, setQuestionForm] = useState(blankQuestionForm());
   const [savingQuestion, setSavingQuestion] = useState(false);
+
+  // PDF generator dialog
+  const [pdfGeneratorOpen, setPdfGeneratorOpen] = useState(false);
 
   // Image upload state
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -305,9 +309,14 @@ const AdminQuiz = () => {
           </p>
         </div>
         {view === "decks" ? (
-          <Button onClick={openCreateDeck} className="gap-2">
-            <Plus className="w-4 h-4" /> New Deck
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setPdfGeneratorOpen(true)} className="gap-2">
+              <Sparkles className="w-4 h-4" /> Generate from PDF
+            </Button>
+            <Button onClick={openCreateDeck} className="gap-2">
+              <Plus className="w-4 h-4" /> New Deck
+            </Button>
+          </div>
         ) : (
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setView("decks")} className="gap-2">
@@ -441,6 +450,13 @@ const AdminQuiz = () => {
           )}
         </>
       )}
+
+      {/* ── PDF Quiz Generator ── */}
+      <PdfQuizGenerator
+        open={pdfGeneratorOpen}
+        onOpenChange={setPdfGeneratorOpen}
+        onSuccess={loadDecks}
+      />
 
       {/* ── Deck Dialog ── */}
       <Dialog open={deckDialogOpen} onOpenChange={setDeckDialogOpen}>
