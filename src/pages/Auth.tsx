@@ -79,8 +79,8 @@ const Auth = () => {
 
     try {
       const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -89,7 +89,18 @@ const Auth = () => {
       });
 
       if (error) {
-        setError(error.message);
+        // Supabase returns this error when email confirmation is disabled
+        if (
+          error.message.toLowerCase().includes("already registered") ||
+          error.message.toLowerCase().includes("already in use")
+        ) {
+          setError("An account with this email already exists. Please sign in instead.");
+        } else {
+          setError(error.message);
+        }
+      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+        // When email confirmation is enabled, duplicate emails return an empty identities array
+        setError("An account with this email already exists. Please sign in instead.");
       } else {
         setSuccess("Check your email for the confirmation link!");
         toast({

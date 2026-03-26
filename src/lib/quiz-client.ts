@@ -1,5 +1,48 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Deck, Question, QuizPayload } from "@/types/quiz";
+import type { Category, Deck, Question, QuizPayload } from "@/types/quiz";
+
+// ── Category functions ─────────────────────────────────────────────────────────
+
+export const fetchCategories = async (): Promise<Category[]> => {
+  const { data, error } = await supabase
+    .from("quiz_categories")
+    .select("*")
+    .order("name", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+};
+
+export const createCategory = async (category: {
+  name: string;
+  description?: string;
+}): Promise<Category> => {
+  const { data, error } = await supabase
+    .from("quiz_categories")
+    .insert([category])
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+export const updateCategory = async (
+  id: string,
+  category: { name?: string; description?: string }
+): Promise<Category> => {
+  const { data, error } = await supabase
+    .from("quiz_categories")
+    .update(category)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+export const deleteCategory = async (id: string) => {
+  const { error } = await supabase.from("quiz_categories").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+};
 
 export const uploadQuizImage = async (file: File): Promise<string> => {
   const ext = file.name.split(".").pop();
@@ -16,11 +59,15 @@ export const deleteQuizImage = async (url: string) => {
   await supabase.storage.from("quiz-images").remove([path]);
 };
 
-export const fetchDecks = async (): Promise<Deck[]> => {
-  const { data: deckRows, error: deckError } = await supabase
+export const fetchDecks = async (publishedOnly = false): Promise<Deck[]> => {
+  let query = supabase
     .from("decks")
     .select("id, name, description, subject, created_by, created_at, is_published")
     .order("created_at", { ascending: false });
+
+  if (publishedOnly) query = query.eq("is_published", true);
+
+  const { data: deckRows, error: deckError } = await query;
 
   if (deckError) throw new Error(deckError.message);
   if (!deckRows?.length) return [];

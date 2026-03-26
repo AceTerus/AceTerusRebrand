@@ -1,3 +1,10 @@
+export interface Category {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
 export interface Deck {
   id: string;
   name: string;

@@ -24,11 +24,12 @@ import {
   XCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import StreakFireOverlay from "@/components/StreakFireOverlay";
 import Logo from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
-import { fetchDecks, fetchQuiz } from "@/lib/quiz-client";
-import type { Deck, Question, QuizPayload } from "@/types/quiz";
+import { fetchCategories, fetchDecks, fetchQuiz } from "@/lib/quiz-client";
+import type { Category, Deck, Question, QuizPayload } from "@/types/quiz";
 import { cn } from "@/lib/utils";
 
 type QuizView = "categories" | "decks" | "taking";
@@ -37,6 +38,9 @@ const Quiz = () => {
   const { user, isLoading: authLoading } = useAuth();
   const { streak, updateStreak } = useStreak();
   const navigate = useNavigate();
+
+  // Category state
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Deck state
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -62,6 +66,9 @@ const Quiz = () => {
   const [showBookmarkPanel, setShowBookmarkPanel] = useState(false);
   const bookmarkPanelRef = useRef<HTMLDivElement>(null);
 
+  // Streak fire overlay
+  const [fireOverlay, setFireOverlay] = useState<{ show: boolean; newStreak: number }>({ show: false, newStreak: 0 });
+
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
   }, [authLoading, user, navigate]);
@@ -71,9 +78,19 @@ const Quiz = () => {
     let cancelled = false;
     setLoadingDecks(true);
     setDeckError(null);
-    fetchDecks()
-      .then((data) => { if (!cancelled) setDecks(data ?? []); })
-      .catch((e) => { if (!cancelled) setDeckError(e.message ?? "Failed to load decks."); })
+    Promise.all([
+      fetchCategories(),
+      fetchDecks(true), // published only
+    ])
+      .then(([cats, data]) => {
+        if (!cancelled) {
+          // Only show categories that have at least one published deck
+          const publishedSubjects = new Set(data.map((d) => d.subject ?? "General"));
+          setCategories(cats.filter((c) => publishedSubjects.has(c.name)));
+          setDecks(data ?? []);
+        }
+      })
+      .catch((e) => { if (!cancelled) setDeckError(e.message ?? "Failed to load quizzes."); })
       .finally(() => { if (!cancelled) setLoadingDecks(false); });
     return () => { cancelled = true; };
   }, [authLoading, user]);
@@ -99,19 +116,19 @@ const Quiz = () => {
   // ── Derived values ────────────────────────────────────────────────────────────
   const deckCount = decks.length;
   const totalQuestions = useMemo(() => decks.reduce((acc, d) => acc + (d.question_count ?? 0), 0), [decks]);
-  const subjectCount = useMemo(() => new Set(decks.map((d) => d.subject ?? "General").filter(Boolean)).size, [decks]);
+  const subjectCount = categories.length;
 
-  const categories = useMemo(() => {
-    const map = new Map<string, { decks: Deck[]; totalQuestions: number }>();
-    for (const deck of decks) {
-      const cat = deck.subject ?? "General";
-      const existing = map.get(cat) ?? { decks: [], totalQuestions: 0 };
-      existing.decks.push(deck);
-      existing.totalQuestions += deck.question_count ?? 0;
-      map.set(cat, existing);
-    }
-    return Array.from(map.entries()).map(([name, data]) => ({ name, ...data }));
-  }, [decks]);
+  // Enrich categories with deck counts from the loaded decks
+  const enrichedCategories = useMemo(() => {
+    return categories.map((cat) => {
+      const catDecks = decks.filter((d) => (d.subject ?? "General") === cat.name);
+      return {
+        ...cat,
+        decks: catDecks,
+        totalQuestions: catDecks.reduce((acc, d) => acc + (d.question_count ?? 0), 0),
+      };
+    });
+  }, [categories, decks]);
 
   const filteredDecks = useMemo(
     () => decks.filter((d) => (d.subject ?? "General") === selectedCategory),
@@ -193,11 +210,16 @@ const Quiz = () => {
   const handleNextQuestion = () => { if (!isLastQuestion) setCurrentIndex((prev) => prev + 1); };
   const handlePrevQuestion = () => { setCurrentIndex((prev) => Math.max(0, prev - 1)); };
 
-  const handleSubmitQuiz = () => {
+  const handleSubmitQuiz = async () => {
     setSessionComplete(true);
     setShowBookmarkPanel(false);
     setSubmitConfirmPending(false);
-    if (activeDeck) updateStreak(activeDeck.id);
+    if (activeDeck) {
+      const result = await updateStreak(activeDeck.id);
+      if (result?.success && result.newStreak) {
+        setFireOverlay({ show: true, newStreak: result.newStreak });
+      }
+    }
   };
 
   const handleToggleFlag = (index: number) => {
@@ -280,13 +302,13 @@ const Quiz = () => {
                   </Card>
                 ))}
               </div>
-            ) : categories.length === 0 ? (
+            ) : enrichedCategories.length === 0 ? (
               <Card className="shadow-elegant">
                 <CardContent className="py-6 text-center text-muted-foreground">No quizzes available yet.</CardContent>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {categories.map((cat) => (
+                {enrichedCategories.map((cat) => (
                   <Card key={cat.name} className="shadow-elegant hover:shadow-glow transition-shadow flex flex-col">
                     <CardHeader className="space-y-2">
                       <div className="flex items-center gap-3">
@@ -295,6 +317,9 @@ const Quiz = () => {
                         </div>
                         <CardTitle className="text-xl">{cat.name}</CardTitle>
                       </div>
+                      {cat.description && (
+                        <p className="text-sm text-muted-foreground">{cat.description}</p>
+                      )}
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col space-y-4">
                       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
@@ -615,6 +640,14 @@ const Quiz = () => {
           </div>
         )}
       </div>
+
+      {/* Streak fire overlay */}
+      {fireOverlay.show && (
+        <StreakFireOverlay
+          streak={fireOverlay.newStreak}
+          onDismiss={() => setFireOverlay({ show: false, newStreak: 0 })}
+        />
+      )}
 
       {/* Floating bookmarks panel */}
       {isInActiveQuiz && flaggedQuestions.size > 0 && (

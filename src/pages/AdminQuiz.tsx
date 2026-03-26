@@ -1,48 +1,45 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, ChevronLeft, Loader2, ShieldAlert, ImagePlus, X, Globe, EyeOff, Sparkles } from "lucide-react";
+import {
+  Plus, Pencil, Trash2, ChevronLeft, Loader2, ShieldAlert,
+  ImagePlus, X, Globe, EyeOff, Sparkles, FolderOpen, BookOpen,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
-  fetchDecks,
-  createDeck,
-  updateDeck,
-  deleteDeck,
-  toggleDeckPublished,
-  fetchQuestionsForDeck,
-  createQuestion,
-  updateQuestion,
-  replaceAnswers,
-  deleteQuestion,
-  uploadQuizImage,
-  deleteQuizImage,
+  fetchCategories, createCategory, updateCategory, deleteCategory,
+  fetchDecks, createDeck, updateDeck, deleteDeck, toggleDeckPublished,
+  fetchQuestionsForDeck, createQuestion, updateQuestion,
+  replaceAnswers, deleteQuestion, uploadQuizImage, deleteQuizImage,
 } from "@/lib/quiz-client";
-import type { Deck, Question } from "@/types/quiz";
+import type { Category, Deck, Question } from "@/types/quiz";
 import { PdfQuizGenerator } from "@/components/PdfQuizGenerator";
+import { TextQuizImporter } from "@/components/TextQuizImporter";
 
 // ── Blank form shapes ─────────────────────────────────────────────────────────
 
+const blankCategoryForm = () => ({ name: "", description: "" });
 const blankDeckForm = () => ({ name: "", subject: "", description: "" });
-
 const blankQuestionForm = () => ({
   text: "",
   explanation: "",
   answers: ["", "", "", ""],
   correctIndex: 0,
 });
+
+const LABELS = ["A", "B", "C", "D"];
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -51,17 +48,28 @@ const AdminQuiz = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Views
-  const [view, setView] = useState<"decks" | "questions">("decks");
+  // View hierarchy: categories → decks → questions
+  const [view, setView] = useState<"categories" | "decks" | "questions">("categories");
+
+  // Category state
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
   // Deck state
   const [decks, setDecks] = useState<Deck[]>([]);
-  const [loadingDecks, setLoadingDecks] = useState(true);
+  const [loadingDecks, setLoadingDecks] = useState(false);
   const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null);
 
   // Question state
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
+
+  // Category dialog
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryForm, setCategoryForm] = useState(blankCategoryForm());
+  const [savingCategory, setSavingCategory] = useState(false);
 
   // Deck dialog
   const [deckDialogOpen, setDeckDialogOpen] = useState(false);
@@ -75,25 +83,45 @@ const AdminQuiz = () => {
   const [questionForm, setQuestionForm] = useState(blankQuestionForm());
   const [savingQuestion, setSavingQuestion] = useState(false);
 
-  // PDF generator dialog
+  // PDF generator
   const [pdfGeneratorOpen, setPdfGeneratorOpen] = useState(false);
 
-  // Image upload state
+  // Text importer
+  const [textImporterOpen, setTextImporterOpen] = useState(false);
+
+  // Image state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Auth guard ──────────────────────────────────────────────────────────────
+  // ── Auth guard ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
   }, [authLoading, user, navigate]);
 
-  // ── Load decks ──────────────────────────────────────────────────────────────
-  const loadDecks = async () => {
+  // ── Load categories ──────────────────────────────────────────────────────────
+  const loadCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      setCategories(await fetchCategories());
+    } catch (e: any) {
+      toast({ title: "Error loading categories", description: e.message, variant: "destructive" });
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  useEffect(() => { loadCategories(); }, []);
+
+  // ── Load decks for a category ────────────────────────────────────────────────
+  const loadDecksForCategory = async (category: Category) => {
+    setSelectedCategory(category);
+    setView("decks");
     setLoadingDecks(true);
     try {
-      setDecks(await fetchDecks());
+      const all = await fetchDecks();
+      setDecks(all.filter((d) => d.subject === category.name));
     } catch (e: any) {
       toast({ title: "Error loading decks", description: e.message, variant: "destructive" });
     } finally {
@@ -101,9 +129,7 @@ const AdminQuiz = () => {
     }
   };
 
-  useEffect(() => { loadDecks(); }, []);
-
-  // ── Load questions for selected deck ────────────────────────────────────────
+  // ── Load questions for a deck ────────────────────────────────────────────────
   const loadQuestions = async (deck: Deck) => {
     setSelectedDeck(deck);
     setView("questions");
@@ -117,10 +143,58 @@ const AdminQuiz = () => {
     }
   };
 
-  // ── Deck dialog helpers ─────────────────────────────────────────────────────
+  // ── Category dialog helpers ──────────────────────────────────────────────────
+  const openCreateCategory = () => {
+    setEditingCategory(null);
+    setCategoryForm(blankCategoryForm());
+    setCategoryDialogOpen(true);
+  };
+
+  const openEditCategory = (cat: Category) => {
+    setEditingCategory(cat);
+    setCategoryForm({ name: cat.name, description: cat.description ?? "" });
+    setCategoryDialogOpen(true);
+  };
+
+  const handleSaveCategory = async () => {
+    if (!categoryForm.name.trim()) {
+      toast({ title: "Category name is required", variant: "destructive" });
+      return;
+    }
+    setSavingCategory(true);
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, categoryForm);
+        toast({ title: "Category updated" });
+      } else {
+        await createCategory(categoryForm);
+        toast({ title: "Category created" });
+      }
+      setCategoryDialogOpen(false);
+      loadCategories();
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (cat: Category) => {
+    if (!confirm(`Delete category "${cat.name}"? This will NOT delete its quizzes, but they will become uncategorised.`)) return;
+    try {
+      await deleteCategory(cat.id);
+      toast({ title: "Category deleted" });
+      loadCategories();
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // ── Deck dialog helpers ──────────────────────────────────────────────────────
   const openCreateDeck = () => {
     setEditingDeck(null);
-    setDeckForm(blankDeckForm());
+    // Pre-fill subject with the current category
+    setDeckForm({ name: "", subject: selectedCategory?.name ?? "", description: "" });
     setDeckDialogOpen(true);
   };
 
@@ -132,7 +206,11 @@ const AdminQuiz = () => {
 
   const handleSaveDeck = async () => {
     if (!deckForm.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
+      toast({ title: "Deck name is required", variant: "destructive" });
+      return;
+    }
+    if (!deckForm.subject.trim()) {
+      toast({ title: "You must select a category", variant: "destructive" });
       return;
     }
     setSavingDeck(true);
@@ -145,7 +223,7 @@ const AdminQuiz = () => {
         toast({ title: "Deck created" });
       }
       setDeckDialogOpen(false);
-      loadDecks();
+      if (selectedCategory) loadDecksForCategory(selectedCategory);
     } catch (e: any) {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
     } finally {
@@ -170,13 +248,13 @@ const AdminQuiz = () => {
     try {
       await deleteDeck(deck.id);
       toast({ title: "Deck deleted" });
-      loadDecks();
+      if (selectedCategory) loadDecksForCategory(selectedCategory);
     } catch (e: any) {
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
     }
   };
 
-  // ── Question dialog helpers ─────────────────────────────────────────────────
+  // ── Question dialog helpers ──────────────────────────────────────────────────
   const resetImageState = () => {
     setImageFile(null);
     setImagePreview(null);
@@ -194,7 +272,6 @@ const AdminQuiz = () => {
   const openEditQuestion = (q: Question) => {
     setEditingQuestion(q);
     const answers = [...q.answers];
-    // Pad to 4 if fewer
     while (answers.length < 4) answers.push({ id: "", question_id: q.id, text: "", is_correct: false });
     const correctIndex = answers.findIndex((a) => a.is_correct);
     setQuestionForm({
@@ -225,14 +302,11 @@ const AdminQuiz = () => {
 
     setSavingQuestion(true);
     try {
-      // Upload new image if selected
       let finalImageUrl: string | null | undefined = undefined;
       if (imageFile) {
-        // Delete old image first if replacing
         if (existingImageUrl) await deleteQuizImage(existingImageUrl).catch(() => {});
         finalImageUrl = await uploadQuizImage(imageFile);
       } else if (existingImageUrl === null && editingQuestion?.image_url) {
-        // User explicitly removed the image
         await deleteQuizImage(editingQuestion.image_url).catch(() => {});
         finalImageUrl = null;
       }
@@ -276,7 +350,7 @@ const AdminQuiz = () => {
     }
   };
 
-  // ── Render guards ───────────────────────────────────────────────────────────
+  // ── Render guards ────────────────────────────────────────────────────────────
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -296,86 +370,134 @@ const AdminQuiz = () => {
     );
   }
 
-  const LABELS = ["A", "B", "C", "D"];
+  // ── Breadcrumb ───────────────────────────────────────────────────────────────
+  const breadcrumb = (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+      <button
+        className="hover:text-foreground transition-colors"
+        onClick={() => setView("categories")}
+      >
+        Categories
+      </button>
+      {(view === "decks" || view === "questions") && selectedCategory && (
+        <>
+          <span>/</span>
+          <button
+            className="hover:text-foreground transition-colors"
+            onClick={() => loadDecksForCategory(selectedCategory)}
+          >
+            {selectedCategory.name}
+          </button>
+        </>
+      )}
+      {view === "questions" && selectedDeck && (
+        <>
+          <span>/</span>
+          <span className="text-foreground font-medium">{selectedDeck.name}</span>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background p-6 max-w-5xl mx-auto">
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold">Quiz Admin</h1>
-          <p className="text-muted-foreground mt-1">
-            {view === "decks" ? "Manage quiz decks" : `Questions in "${selectedDeck?.name}"`}
-          </p>
+          {breadcrumb}
         </div>
-        {view === "decks" ? (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setPdfGeneratorOpen(true)} className="gap-2">
-              <Sparkles className="w-4 h-4" /> Generate from PDF
+
+        <div className="flex gap-2">
+          {view === "categories" && (
+            <Button onClick={openCreateCategory} className="gap-2">
+              <Plus className="w-4 h-4" /> New Category
             </Button>
-            <Button onClick={openCreateDeck} className="gap-2">
-              <Plus className="w-4 h-4" /> New Deck
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setView("decks")} className="gap-2">
-              <ChevronLeft className="w-4 h-4" /> Back to Decks
-            </Button>
-            <Button onClick={openAddQuestion} className="gap-2">
-              <Plus className="w-4 h-4" /> Add Question
-            </Button>
-          </div>
-        )}
+          )}
+
+          {view === "decks" && (
+            <>
+              <Button variant="outline" onClick={() => setView("categories")} className="gap-2">
+                <ChevronLeft className="w-4 h-4" /> Back
+              </Button>
+              <Button variant="outline" onClick={() => setPdfGeneratorOpen(true)} className="gap-2">
+                <Sparkles className="w-4 h-4" /> Generate from PDF
+              </Button>
+              <Button onClick={openCreateDeck} className="gap-2">
+                <Plus className="w-4 h-4" /> New Quiz
+              </Button>
+            </>
+          )}
+
+          {view === "questions" && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => selectedCategory && loadDecksForCategory(selectedCategory)}
+                className="gap-2"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </Button>
+              <Button variant="outline" onClick={() => setTextImporterOpen(true)} className="gap-2">
+                <Sparkles className="w-4 h-4" /> Import from Text
+              </Button>
+              <Button onClick={openAddQuestion} className="gap-2">
+                <Plus className="w-4 h-4" /> Add Question
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ── Deck List ── */}
-      {view === "decks" && (
+      {/* ── Categories view ── */}
+      {view === "categories" && (
         <>
-          {loadingDecks ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : decks.length === 0 ? (
+          {loadingCategories ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : categories.length === 0 ? (
             <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                No decks yet. Click "New Deck" to create your first quiz.
+              <CardContent className="py-16 text-center">
+                <FolderOpen className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="font-medium">No categories yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Create a category first, then add quizzes inside it.
+                </p>
+                <Button className="mt-4 gap-2" onClick={openCreateCategory}>
+                  <Plus className="w-4 h-4" /> New Category
+                </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {decks.map((deck) => (
-                <Card key={deck.id} className="hover:shadow-md transition-shadow">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {categories.map((cat) => (
+                <Card
+                  key={cat.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => loadDecksForCategory(cat)}
+                >
                   <CardContent className="p-5 flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-lg">{deck.name}</h3>
-                        {deck.subject && <Badge variant="secondary">{deck.subject}</Badge>}
-                        <Badge variant={deck.is_published ? "default" : "outline"} className={deck.is_published ? "bg-green-500 hover:bg-green-500 text-white border-green-500" : "text-muted-foreground"}>
-                          {deck.is_published ? "Published" : "Draft"}
-                        </Badge>
-                      </div>
-                      {deck.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{deck.description}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">{deck.question_count} question{deck.question_count !== 1 ? "s" : ""}</p>
+                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <FolderOpen className="w-6 h-6 text-primary" />
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <Button size="sm" variant="outline" onClick={() => loadQuestions(deck)}>
-                        Manage Questions
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base truncate">{cat.name}</h3>
+                      {cat.description && (
+                        <p className="text-sm text-muted-foreground truncate">{cat.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="ghost" onClick={() => openEditCategory(cat)}>
+                        <Pencil className="w-4 h-4" />
                       </Button>
                       <Button
                         size="sm"
-                        variant={deck.is_published ? "outline" : "default"}
-                        className={deck.is_published ? "gap-1.5 text-muted-foreground" : "gap-1.5 bg-green-500 hover:bg-green-600 text-white border-0"}
-                        onClick={() => handleTogglePublish(deck)}
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteCategory(cat)}
                       >
-                        {deck.is_published
-                          ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</>
-                          : <><Globe className="w-3.5 h-3.5" /> Publish</>}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => openEditDeck(deck)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteDeck(deck)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
@@ -387,11 +509,93 @@ const AdminQuiz = () => {
         </>
       )}
 
-      {/* ── Question List ── */}
+      {/* ── Decks view ── */}
+      {view === "decks" && (
+        <>
+          {loadingDecks ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : decks.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <BookOpen className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="font-medium">No quizzes in this category</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Add a quiz to <span className="font-semibold">{selectedCategory?.name}</span>.
+                </p>
+                <Button className="mt-4 gap-2" onClick={openCreateDeck}>
+                  <Plus className="w-4 h-4" /> New Quiz
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {decks.map((deck) => (
+                <Card key={deck.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-lg">{deck.name}</h3>
+                        <Badge
+                          variant={deck.is_published ? "default" : "outline"}
+                          className={deck.is_published
+                            ? "bg-green-500 hover:bg-green-500 text-white border-green-500"
+                            : "text-muted-foreground"}
+                        >
+                          {deck.is_published ? "Published" : "Draft"}
+                        </Badge>
+                      </div>
+                      {deck.description && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{deck.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {deck.question_count} question{deck.question_count !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => loadQuestions(deck)}>
+                        Manage Questions
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={deck.is_published ? "outline" : "default"}
+                        className={deck.is_published
+                          ? "gap-1.5 text-muted-foreground"
+                          : "gap-1.5 bg-green-500 hover:bg-green-600 text-white border-0"}
+                        onClick={() => handleTogglePublish(deck)}
+                      >
+                        {deck.is_published
+                          ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</>
+                          : <><Globe className="w-3.5 h-3.5" /> Publish</>}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => openEditDeck(deck)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteDeck(deck)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Questions view ── */}
       {view === "questions" && (
         <>
           {loadingQuestions ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
           ) : questions.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
@@ -412,7 +616,12 @@ const AdminQuiz = () => {
                         <Button size="sm" variant="ghost" onClick={() => openEditQuestion(q)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteQuestion(q)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteQuestion(q)}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -437,11 +646,17 @@ const AdminQuiz = () => {
                       >
                         <span className="font-semibold shrink-0">{LABELS[i]}.</span>
                         <span>{a.text}</span>
-                        {a.is_correct && <span className="ml-auto text-xs font-semibold text-green-600 dark:text-green-400">Correct</span>}
+                        {a.is_correct && (
+                          <span className="ml-auto text-xs font-semibold text-green-600 dark:text-green-400">
+                            Correct
+                          </span>
+                        )}
                       </div>
                     ))}
                     {q.explanation && (
-                      <p className="text-xs text-muted-foreground mt-2 italic">Explanation: {q.explanation}</p>
+                      <p className="text-xs text-muted-foreground mt-2 italic">
+                        Explanation: {q.explanation}
+                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -455,31 +670,92 @@ const AdminQuiz = () => {
       <PdfQuizGenerator
         open={pdfGeneratorOpen}
         onOpenChange={setPdfGeneratorOpen}
-        onSuccess={loadDecks}
+        onSuccess={() => selectedCategory && loadDecksForCategory(selectedCategory)}
       />
 
-      {/* ── Deck Dialog ── */}
-      <Dialog open={deckDialogOpen} onOpenChange={setDeckDialogOpen}>
+      {/* ── Text Quiz Importer ── */}
+      {selectedDeck && (
+        <TextQuizImporter
+          open={textImporterOpen}
+          onOpenChange={setTextImporterOpen}
+          deck={selectedDeck}
+          existingCount={questions.length}
+          onSuccess={() => selectedDeck && loadQuestions(selectedDeck)}
+        />
+      )}
+
+      {/* ── Category Dialog ── */}
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingDeck ? "Edit Deck" : "New Deck"}</DialogTitle>
+            <DialogTitle>{editingCategory ? "Edit Category" : "New Category"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>Name *</Label>
               <Input
-                placeholder="e.g. Biology Paper 1"
+                placeholder="e.g. Biology, Mathematics, History"
+                value={categoryForm.name}
+                onChange={(e) => setCategoryForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Short description of this category"
+                value={categoryForm.description}
+                onChange={(e) => setCategoryForm((f) => ({ ...f, description: e.target.value }))}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveCategory} disabled={savingCategory}>
+              {savingCategory && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {editingCategory ? "Save Changes" : "Create Category"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Deck Dialog ── */}
+      <Dialog open={deckDialogOpen} onOpenChange={setDeckDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingDeck ? "Edit Quiz" : "New Quiz"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Quiz Name *</Label>
+              <Input
+                placeholder="e.g. Biology Paper 1 2023"
                 value={deckForm.name}
                 onChange={(e) => setDeckForm((f) => ({ ...f, name: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Subject / Category</Label>
-              <Input
-                placeholder="e.g. Biology, History, Maths"
+              <Label>Category *</Label>
+              <Select
                 value={deckForm.subject}
-                onChange={(e) => setDeckForm((f) => ({ ...f, subject: e.target.value }))}
-              />
+                onValueChange={(val) => setDeckForm((f) => ({ ...f, subject: val }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {categories.length === 0 && (
+                <p className="text-xs text-destructive">
+                  No categories exist. Create a category first.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Description</Label>
@@ -493,9 +769,9 @@ const AdminQuiz = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeckDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveDeck} disabled={savingDeck}>
+            <Button onClick={handleSaveDeck} disabled={savingDeck || categories.length === 0}>
               {savingDeck && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {editingDeck ? "Save Changes" : "Create Deck"}
+              {editingDeck ? "Save Changes" : "Create Quiz"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -517,7 +793,6 @@ const AdminQuiz = () => {
                 rows={3}
               />
             </div>
-
             <div className="space-y-2">
               <Label>Answer Choices (select the correct one)</Label>
               {questionForm.answers.map((answer, idx) => (
@@ -541,9 +816,10 @@ const AdminQuiz = () => {
                   />
                 </div>
               ))}
-              <p className="text-xs text-muted-foreground">Select the radio button next to the correct answer.</p>
+              <p className="text-xs text-muted-foreground">
+                Select the radio button next to the correct answer.
+              </p>
             </div>
-
             <div className="space-y-1.5">
               <Label>Explanation (optional)</Label>
               <Textarea
@@ -553,10 +829,8 @@ const AdminQuiz = () => {
                 rows={2}
               />
             </div>
-
             <div className="space-y-2">
               <Label>Image (optional)</Label>
-              {/* Show existing or newly selected preview */}
               {(imagePreview || existingImageUrl) && (
                 <div className="relative w-full rounded-lg overflow-hidden border bg-muted/20">
                   <img
@@ -597,8 +871,7 @@ const AdminQuiz = () => {
                   className="w-full gap-2 border-dashed"
                   onClick={() => imageInputRef.current?.click()}
                 >
-                  <ImagePlus className="w-4 h-4" />
-                  Upload image
+                  <ImagePlus className="w-4 h-4" /> Upload image
                 </Button>
               )}
             </div>

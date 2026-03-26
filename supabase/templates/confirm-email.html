@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirm your AceTerus account</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f4f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+    <tr>
+      <td align="center" style="padding:48px 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:560px;">
+
+          <!-- Logo row -->
+          <tr>
+            <td align="center" style="padding-bottom:28px;">
+              <table cellpadding="0" cellspacing="0" border="0" role="presentation">
+                <tr>
+                  <td style="background:linear-gradient(135deg,#2661D9,#1FB2FA);border-radius:12px;padding:10px 13px;vertical-align:middle;">
+                    <span style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:-0.5px;line-height:1;">A</span>
+                  </td>
+                  <td style="padding-left:10px;vertical-align:middle;">
+                    <span style="font-size:21px;font-weight:700;color:#2661D9;letter-spacing:-0.3px;">AceTerus</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 20px rgba(38,97,217,0.10);">
+
+              <!-- Gradient top bar -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+                <tr>
+                  <td style="background:linear-gradient(135deg,#2661D9,#1FB2FA);height:5px;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+
+              <!-- Card body -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+                <tr>
+                  <td style="padding:40px 48px 36px;">
+
+                    <!-- Icon -->
+                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin-bottom:24px;">
+                      <tr>
+                        <td style="background:linear-gradient(135deg,rgba(38,97,217,0.10),rgba(31,178,250,0.10));border-radius:12px;padding:14px;width:48px;height:48px;text-align:center;">
+                          <span style="font-size:24px;line-height:1;">✉️</span>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <h1 style="margin:0 0 10px;font-size:22px;font-weight:700;color:#0f172a;letter-spacing:-0.4px;">Confirm your email address</h1>
+                    <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#475569;">
+                      Welcome to <strong style="color:#0f172a;">AceTerus</strong> — your smart study companion! Please confirm your email address to activate your account and start your learning journey.
+                    </p>
+
+                    <!-- CTA Button -->
+                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin-bottom:32px;">
+                      <tr>
+                        <td align="center" style="border-radius:10px;background:linear-gradient(135deg,#2661D9,#1FB2FA);box-shadow:0 4px 14px rgba(38,97,217,0.35);">
+                          <a href="{{ .ConfirmationURL }}"
+                             style="display:inline-block;padding:14px 36px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;letter-spacing:0.1px;">
+                            Confirm Email Address →
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Divider -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="margin-bottom:20px;">
+                      <tr>
+                        <td style="border-top:1px solid #e2e8f0;font-size:0;line-height:0;">&nbsp;</td>
+                      </tr>
+                    </table>
+
+                    <!-- Fallback link -->
+                    <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">
+                      Button not working? Copy and paste this link into your browser:
+                    </p>
+                    <p style="margin:0 0 24px;font-size:12px;word-break:break-all;">
+                      <a href="{{ .ConfirmationURL }}" style="color:#2661D9;text-decoration:underline;">{{ .ConfirmationURL }}</a>
+                    </p>
+
+                    <!-- Security note -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation">
+                      <tr>
+                        <td style="background:#f8fafc;border-radius:10px;padding:16px 20px;border-left:3px solid #2661D9;">
+                          <p style="margin:0;font-size:12px;color:#64748b;line-height:1.6;">
+                            🔒 <strong style="color:#475569;">Security notice:</strong> If you didn't create an AceTerus account, you can safely ignore this email. This confirmation link expires in <strong style="color:#475569;">24 hours</strong>.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:28px 20px 0;">
+              <p style="margin:0 0 6px;font-size:12px;color:#94a3b8;line-height:1.6;">
+                © 2025 AceTerus · Your smart study companion
+              </p>
+              <p style="margin:0;font-size:11px;color:#cbd5e1;">
+                You're receiving this because someone signed up with this email address.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

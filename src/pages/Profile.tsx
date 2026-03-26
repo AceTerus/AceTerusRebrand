@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useStreak } from '@/hooks/useStreak';
@@ -18,7 +18,8 @@ import { CommentSection } from '@/components/CommentSection';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Heart, MessageCircle, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search } from 'lucide-react';
+import { Calendar, Heart, MessageCircle, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock } from 'lucide-react';
+import { useMutualFollow } from '@/hooks/useMutualFollow';
 
 interface Post {
   id: string;
@@ -103,6 +104,11 @@ export const Profile = () => {
   const profileUserId = userId || user?.id;
   const isOwnProfile = !userId || userId === user?.id;
 
+  // Mutual follow check — own profile is always "open"
+  const { isMutual, isLoading: isMutualLoading } = useMutualFollow(
+    isOwnProfile ? undefined : profileUserId
+  );
+
   useEffect(() => {
     if (profileUserId) {
       fetchProfile();
@@ -128,11 +134,12 @@ export const Profile = () => {
       }
 
       if (!data) {
-        // Create profile if it doesn't exist
+        // Only auto-create a profile for the currently logged-in user
+        if (!user) return;
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
-            user_id: user.id,
+            user_id: profileUserId,
             username: user.email?.split('@')[0] || 'Anonymous',
           })
           .select()
@@ -656,7 +663,29 @@ export const Profile = () => {
           </TabsList>
           
           <TabsContent value="posts" className="space-y-6">
-            <PostUpload onPostCreated={fetchPosts} />
+            {/* Lock posts for non-mutual follows when viewing another user's profile */}
+            {!isOwnProfile && !isMutual && !isMutualLoading ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                  <div className="rounded-full bg-muted p-4">
+                    <Lock className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-base">Posts are private</p>
+                    <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+                      Follow each other to see{' '}
+                      <span className="font-medium text-foreground">
+                        {profile?.username || 'this user'}
+                      </span>
+                      's posts.
+                    </p>
+                  </div>
+                  {profileUserId && <FollowButton targetUserId={profileUserId} />}
+                </CardContent>
+              </Card>
+            ) : (
+            <>
+            {isOwnProfile && <PostUpload onPostCreated={fetchPosts} />}
             
             <Card>
               <CardHeader>
@@ -676,28 +705,36 @@ export const Profile = () => {
                       <div key={post.id} className="border-b pb-6 last:border-b-0">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback>
-                                {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                              </AvatarFallback>
-                            </Avatar>
+                            <Link to={`/profile/${profileUserId}`} className="flex-shrink-0">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={profile?.avatar_url || undefined} />
+                                <AvatarFallback>
+                                  {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                            </Link>
                             <div>
-                              <p className="font-medium text-sm">
+                              <Link
+                                to={`/profile/${profileUserId}`}
+                                className="font-medium text-sm hover:underline"
+                              >
                                 {profile?.username || user?.email?.split('@')[0] || 'Anonymous'}
-                              </p>
+                              </Link>
                               <p className="text-xs text-muted-foreground">
                                 {new Date(post.created_at).toLocaleDateString()}
                               </p>
                             </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deletePost(post.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {isOwnProfile && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deletePost(post.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                         
                         <p className="text-sm mb-3">{post.content}</p>
@@ -763,6 +800,8 @@ export const Profile = () => {
                 )}
               </CardContent>
             </Card>
+            </>
+            )}
           </TabsContent>
 
           <TabsContent value="followers">
