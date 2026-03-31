@@ -102,29 +102,16 @@ export const PdfQuizGenerator = ({ open, onOpenChange, onSuccess }: PdfQuizGener
     setStatus("generating");
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
       const formData = new FormData();
       formData.append("pdf", pdfFile);
       formData.append("numQuestions", String(numQuestions));
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL ?? "https://lsqkfzuymgkmvnudkktv.supabase.co"}/functions/v1/pdf-quiz-generator`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-          body: formData,
-        }
-      );
+      const { data, error } = await supabase.functions.invoke("pdf-quiz-generator", {
+        body: formData,
+      });
+      if (error) throw new Error(error.message ?? "Edge function error");
 
-      const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json.error ?? `Server error ${res.status}`);
-      }
-
-      const generated: GeneratedQuestion[] = json.questions;
+      const generated: GeneratedQuestion[] = data.questions;
       if (!generated || generated.length === 0) {
         throw new Error("No questions returned. Try a different PDF.");
       }

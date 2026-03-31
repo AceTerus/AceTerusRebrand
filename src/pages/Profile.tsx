@@ -18,7 +18,7 @@ import { CommentSection } from '@/components/CommentSection';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Heart, MessageCircle, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock } from 'lucide-react';
+import { Calendar, Heart, MessageCircle, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
 import { useMutualFollow } from '@/hooks/useMutualFollow';
 
 interface Post {
@@ -73,6 +73,9 @@ export const Profile = () => {
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [isQuizHistoryOpen, setIsQuizHistoryOpen] = useState(false);
+  const [quizHistory, setQuizHistory] = useState<any[]>([]);
+  const [quizHistoryLoading, setQuizHistoryLoading] = useState(false);
   
   const [achievements] = useState<Achievement[]>([
     {
@@ -440,6 +443,19 @@ export const Profile = () => {
   };
 
 
+  const fetchQuizHistory = async () => {
+    if (!user) return;
+    setQuizHistoryLoading(true);
+    const { data, error } = await supabase
+      .from('quiz_performance_results' as any)
+      .select('*')
+      .eq('user_id', user.id)
+      .order('completed_at', { ascending: false })
+      .limit(50);
+    if (!error) setQuizHistory(data ?? []);
+    setQuizHistoryLoading(false);
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
@@ -473,6 +489,7 @@ export const Profile = () => {
                   {profile?.bio || 'No bio yet. Click edit to add one.'}
                 </p>
                 {isOwnProfile && (
+                  <div className="flex flex-col items-center gap-3 w-full">
                   <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" className="w-full max-w-xs">
@@ -529,6 +546,120 @@ export const Profile = () => {
                       </div>
                     </DialogContent>
                   </Dialog>
+
+                  {/* Quiz History Button */}
+                  <Dialog open={isQuizHistoryOpen} onOpenChange={(open) => { setIsQuizHistoryOpen(open); if (open) fetchQuizHistory(); }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full max-w-xs flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Quiz Analysis History
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <BarChart2 className="h-5 w-5" />
+                          Quiz Analysis History
+                        </DialogTitle>
+                      </DialogHeader>
+                      {quizHistoryLoading ? (
+                        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
+                      ) : quizHistory.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-8 text-center">No quiz history yet. Complete a quiz to see your results here.</p>
+                      ) : (
+                        <div className="space-y-4 py-2">
+                          {quizHistory.map((result: any) => {
+                            const ai = result.ai_analysis;
+                            return (
+                              <div key={result.id} className="rounded-lg border p-4 space-y-3">
+                                {/* Header */}
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="font-semibold text-sm">{result.deck_name}</p>
+                                    <p className="text-xs text-muted-foreground">{result.category} · {new Date(result.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                  </div>
+                                  <span className={`text-lg font-bold ${Number(result.score) >= 70 ? 'text-green-600' : Number(result.score) >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
+                                    {Number(result.score).toFixed(1)}%
+                                  </span>
+                                </div>
+
+                                {/* Score breakdown */}
+                                <div className="flex gap-4 text-xs">
+                                  <span className="flex items-center gap-1 text-green-600">
+                                    <CheckCircle className="h-3 w-3" /> {result.correct_count} correct
+                                  </span>
+                                  <span className="flex items-center gap-1 text-red-500">
+                                    <XCircle className="h-3 w-3" /> {result.wrong_count} wrong
+                                  </span>
+                                  <span className="flex items-center gap-1 text-muted-foreground">
+                                    <SkipForward className="h-3 w-3" /> {result.skipped_count} skipped
+                                  </span>
+                                  <span className="text-muted-foreground ml-auto">{result.total_count} total</span>
+                                </div>
+
+                                {/* AI Analysis */}
+                                {ai ? (
+                                  <div className="bg-muted/40 rounded-lg p-3 space-y-2 text-xs">
+                                    <p className="font-semibold text-sm flex items-center gap-1">
+                                      <BarChart2 className="h-3.5 w-3.5 text-primary" /> AI Analysis
+                                      {ai.overall_trend && (
+                                        <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-medium ${
+                                          ai.overall_trend === 'improving' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' :
+                                          ai.overall_trend === 'declining' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' :
+                                          'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
+                                        }`}>
+                                          {ai.overall_trend.replace('_', ' ')}
+                                        </span>
+                                      )}
+                                    </p>
+                                    {ai.performance_summary && (
+                                      <p className="text-muted-foreground">{ai.performance_summary}</p>
+                                    )}
+                                    {ai.weak_areas?.length > 0 && (
+                                      <div>
+                                        <p className="font-medium text-red-600 dark:text-red-400 mb-1">Weak areas</p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {ai.weak_areas.map((a: string, i: number) => (
+                                            <span key={i} className="px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{a}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {ai.strong_areas?.length > 0 && (
+                                      <div>
+                                        <p className="font-medium text-green-600 dark:text-green-400 mb-1">Strong areas</p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {ai.strong_areas.map((a: string, i: number) => (
+                                            <span key={i} className="px-2 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">{a}</span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {ai.improvement_tips?.length > 0 && (
+                                      <div>
+                                        <p className="font-medium mb-1">Tips</p>
+                                        <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                                          {ai.improvement_tips.map((tip: string, i: number) => (
+                                            <li key={i}>{tip}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {ai.comparison_note && (
+                                      <p className="text-muted-foreground italic">{ai.comparison_note}</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground italic">No AI analysis saved for this attempt.</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  </div>
                 )}
                 {!isOwnProfile && profileUserId && (
                   <FollowButton targetUserId={profileUserId} />

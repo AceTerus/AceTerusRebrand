@@ -12,9 +12,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { createQuestion, uploadQuizImage } from "@/lib/quiz-client";
 import type { Deck } from "@/types/quiz";
+import { supabase } from "@/integrations/supabase/client";
 
 const LABELS = ["A", "B", "C", "D"];
 
@@ -70,7 +70,7 @@ export const TextQuizImporter = ({
     onOpenChange(false);
   };
 
-  // ── Step 1: Parse with Gemini via Supabase edge function ─────────────────
+  // ── Step 1: Parse via edge function ──────────────────────────────────────
   const handleParse = async () => {
     if (!rawText.trim()) {
       toast({ title: "Please paste some text first", variant: "destructive" });
@@ -81,22 +81,22 @@ export const TextQuizImporter = ({
       const { data, error } = await supabase.functions.invoke("text-quiz-parser", {
         body: { text: rawText },
       });
+      if (error) throw new Error(error.message ?? "Edge function error");
 
-      if (error) throw new Error(error.message);
-      if (!data?.questions || data.questions.length === 0) {
-        throw new Error(
-          "No questions found. Make sure the text has numbered questions with A/B/C/D choices."
-        );
+      const parsed: ParsedQuestion[] = (data.questions as any[])
+        .filter((q: any) => q.text && Array.isArray(q.answers) && q.answers.length >= 2)
+        .map((q: any) => ({
+          text: String(q.text ?? ""),
+          explanation: String(q.explanation ?? ""),
+          answers: (q.answers as any[]).map((a: any) => ({
+            text: String(a.text ?? ""),
+            is_correct: Boolean(a.is_correct),
+          })),
+        }));
+
+      if (!parsed.length) {
+        throw new Error("No questions found. Make sure the text has numbered questions with A/B/C/D choices.");
       }
-
-      const parsed: ParsedQuestion[] = (data.questions as any[]).map((q: any) => ({
-        text: String(q.text ?? ""),
-        explanation: String(q.explanation ?? ""),
-        answers: (q.answers as any[]).map((a: any) => ({
-          text: String(a.text ?? ""),
-          is_correct: Boolean(a.is_correct),
-        })),
-      }));
 
       setQuestions(parsed);
       setStep("review");

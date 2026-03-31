@@ -25,12 +25,15 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import StreakFireOverlay from "@/components/StreakFireOverlay";
+import QuizAnalysis from "@/components/QuizAnalysis";
+import type { PerformanceAnalysis } from "@/components/QuizAnalysis";
 import Logo from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
 import { fetchCategories, fetchDecks, fetchQuiz } from "@/lib/quiz-client";
 import type { Category, Deck, Question, QuizPayload } from "@/types/quiz";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 type QuizView = "categories" | "decks" | "taking";
 
@@ -68,6 +71,11 @@ const Quiz = () => {
 
   // Streak fire overlay
   const [fireOverlay, setFireOverlay] = useState<{ show: boolean; newStreak: number }>({ show: false, newStreak: 0 });
+
+  // AI performance analysis
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<PerformanceAnalysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -173,6 +181,9 @@ const Quiz = () => {
     setSubmitConfirmPending(false);
     setFlaggedQuestions(new Set());
     setShowBookmarkPanel(false);
+    setAnalysisResult(null);
+    setAnalysisError(null);
+    setAnalysisLoading(false);
   };
 
   const handleStartQuiz = async (deck: Deck) => {
@@ -214,10 +225,103 @@ const Quiz = () => {
     setSessionComplete(true);
     setShowBookmarkPanel(false);
     setSubmitConfirmPending(false);
+
+    // Snapshot quiz state before any async operations
+    const snapshotQuestions = quizPayload?.questions ?? [];
+    const snapshotAnsweredMap = new Map(answeredMap);
+
     if (activeDeck) {
       const result = await updateStreak(activeDeck.id);
       if (result?.success && result.newStreak) {
         setFireOverlay({ show: true, newStreak: result.newStreak });
+      }
+    }
+
+    // Build per-question data for analysis
+    const questionsData = snapshotQuestions.map((q) => {
+      const selectedId = snapshotAnsweredMap.get(snapshotQuestions.indexOf(q)) ?? null;
+      const correctAnswer = q.answers.find((a) => a.is_correct);
+      const wasSkipped = selectedId === null;
+      const isCorrect = !wasSkipped && selectedId === correctAnswer?.id;
+      return { text: q.text, is_correct: isCorrect, was_skipped: wasSkipped };
+    });
+
+    const snapshotCorrect = questionsData.filter((q) => q.is_correct).length;
+    const snapshotWrong = questionsData.filter((q) => !q.is_correct && !q.was_skipped).length;
+    const snapshotSkipped = questionsData.filter((q) => q.was_skipped).length;
+    const snapshotTotal = snapshotQuestions.length;
+    const snapshotScore = snapshotTotal > 0 ? Math.round((snapshotCorrect / snapshotTotal) * 100 * 100) / 100 : 0;
+    const deckCategory = activeDeck?.subject ?? "General";
+
+    // Save result to database
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session && activeDeck) {
+      await supabase.from("quiz_performance_results" as any).insert({
+        user_id: session.user.id,
+        deck_id: activeDeck.id,
+        deck_name: activeDeck.name,
+        category: deckCategory,
+        score: snapshotScore,
+        correct_count: snapshotCorrect,
+        wrong_count: snapshotWrong,
+        skipped_count: snapshotSkipped,
+        total_count: snapshotTotal,
+        questions_data: questionsData,
+      });
+    }
+
+    // Call AI analysis
+    if (session && activeDeck) {
+      setAnalysisLoading(true);
+      setAnalysisError(null);
+      try {
+        // Fetch history from client side (avoids Supabase client in edge function)
+        const { data: historyRows } = await supabase
+          .from("quiz_performance_results" as any)
+          .select("deck_name, category, score, correct_count, total_count, completed_at")
+          .eq("user_id", session.user.id)
+          .order("completed_at", { ascending: false })
+          .limit(10);
+
+        const current = {
+          deck_name: activeDeck.name,
+          category: deckCategory,
+          score: snapshotScore,
+          correct_count: snapshotCorrect,
+          wrong_count: snapshotWrong,
+          skipped_count: snapshotSkipped,
+          total_count: snapshotTotal,
+          questions_data: questionsData,
+        };
+        const history = historyRows ?? [];
+
+        const { data: resData, error: fnError } = await supabase.functions.invoke(
+          "quiz-performance-analyzer",
+          { body: { current, history } }
+        );
+        if (fnError) throw new Error(fnError.message ?? "Edge function error");
+        const analysis = resData.analysis;
+        setAnalysisResult(analysis);
+
+        // Save analysis back to the most recent result row
+        const { data: latestRow } = await supabase
+          .from("quiz_performance_results" as any)
+          .select("id")
+          .eq("user_id", session.user.id)
+          .eq("deck_id", activeDeck.id)
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (latestRow?.id) {
+          await supabase
+            .from("quiz_performance_results" as any)
+            .update({ ai_analysis: analysis })
+            .eq("id", latestRow.id);
+        }
+      } catch (e: any) {
+        setAnalysisError(e.message ?? "Could not generate analysis.");
+      } finally {
+        setAnalysisLoading(false);
       }
     }
   };
@@ -428,6 +532,13 @@ const Quiz = () => {
                     </div>
                   ))}
                 </div>
+
+                {/* AI Performance Analysis */}
+                <QuizAnalysis
+                  analysis={analysisResult}
+                  loading={analysisLoading}
+                  error={analysisError}
+                />
 
                 <div>
                   <h4 className="text-xl font-bold mb-4">Answer Review</h4>
