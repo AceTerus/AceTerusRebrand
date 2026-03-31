@@ -299,7 +299,14 @@ const Quiz = () => {
           "quiz-performance-analyzer",
           { body: { current, history } }
         );
-        if (fnError) throw new Error(fnError.message ?? "Edge function error");
+        if (fnError) {
+          let msg = fnError.message ?? "Edge function error";
+          try {
+            const body = await (fnError as any).context?.json();
+            if (body?.error) msg = body.error;
+          } catch {}
+          throw new Error(msg);
+        }
         const analysis = resData.analysis;
         setAnalysisResult(analysis);
 
