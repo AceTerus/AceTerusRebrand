@@ -19,7 +19,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
-  fetchCategories, createCategory, updateCategory, deleteCategory,
+  fetchCategories, createCategory, updateCategory, deleteCategory, toggleCategoryPublished,
   fetchDecks, createDeck, updateDeck, deleteDeck, toggleDeckPublished,
   fetchQuestionsForDeck, createQuestion, updateQuestion,
   replaceAnswers, deleteQuestion, uploadQuizImage, deleteQuizImage,
@@ -164,7 +164,7 @@ const AdminQuiz = () => {
     setSavingCategory(true);
     try {
       if (editingCategory) {
-        await updateCategory(editingCategory.id, categoryForm);
+        await updateCategory(editingCategory.id, categoryForm, editingCategory.name);
         toast({ title: "Category updated" });
       } else {
         await createCategory(categoryForm);
@@ -187,6 +187,16 @@ const AdminQuiz = () => {
       loadCategories();
     } catch (e: any) {
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleToggleCategoryPublish = async (cat: Category) => {
+    try {
+      await toggleCategoryPublished(cat.id, !cat.is_published);
+      toast({ title: cat.is_published ? "Category unpublished" : "Category published" });
+      loadCategories();
+    } catch (e: any) {
+      toast({ title: "Failed to update", description: e.message, variant: "destructive" });
     }
   };
 
@@ -483,12 +493,34 @@ const AdminQuiz = () => {
                       <FolderOpen className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base truncate">{cat.name}</h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-base truncate">{cat.name}</h3>
+                        <Badge
+                          variant={cat.is_published ? "default" : "outline"}
+                          className={cat.is_published
+                            ? "bg-green-500 hover:bg-green-500 text-white border-green-500"
+                            : "text-muted-foreground"}
+                        >
+                          {cat.is_published ? "Published" : "Draft"}
+                        </Badge>
+                      </div>
                       {cat.description && (
                         <p className="text-sm text-muted-foreground truncate">{cat.description}</p>
                       )}
                     </div>
                     <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant={cat.is_published ? "outline" : "default"}
+                        className={cat.is_published
+                          ? "gap-1.5 text-muted-foreground"
+                          : "gap-1.5 bg-green-500 hover:bg-green-600 text-white border-0"}
+                        onClick={() => handleToggleCategoryPublish(cat)}
+                      >
+                        {cat.is_published
+                          ? <><EyeOff className="w-3.5 h-3.5" /> Unpublish</>
+                          : <><Globe className="w-3.5 h-3.5" /> Publish</>}
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEditCategory(cat)}>
                         <Pencil className="w-4 h-4" />
                       </Button>

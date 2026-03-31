@@ -20,6 +20,7 @@ import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, Heart, MessageCircle, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
 import { useMutualFollow } from '@/hooks/useMutualFollow';
+import { StreakLeaderboard } from '@/components/StreakLeaderboard';
 
 interface Post {
   id: string;
@@ -120,6 +121,7 @@ export const Profile = () => {
       fetchFollowing();
     }
   }, [profileUserId]);
+
 
   const fetchProfile = async () => {
     if (!profileUserId) return;
@@ -727,6 +729,9 @@ export const Profile = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Streak Leaderboard */}
+        <StreakLeaderboard currentUserId={user?.id} currentStreak={streak} />
 
         {/* User Search Section */}
         <Card className="mb-8">

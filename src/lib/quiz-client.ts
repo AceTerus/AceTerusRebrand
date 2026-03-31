@@ -27,7 +27,8 @@ export const createCategory = async (category: {
 
 export const updateCategory = async (
   id: string,
-  category: { name?: string; description?: string }
+  category: { name?: string; description?: string },
+  oldName?: string
 ): Promise<Category> => {
   const { data, error } = await supabase
     .from("quiz_categories")
@@ -36,7 +37,25 @@ export const updateCategory = async (
     .select()
     .single();
   if (error) throw new Error(error.message);
+
+  // Keep decks in sync when the category name changes
+  if (category.name && oldName && category.name !== oldName) {
+    const { error: deckError } = await supabase
+      .from("decks")
+      .update({ subject: category.name })
+      .eq("subject", oldName);
+    if (deckError) throw new Error(deckError.message);
+  }
+
   return data;
+};
+
+export const toggleCategoryPublished = async (id: string, isPublished: boolean) => {
+  const { error } = await supabase
+    .from("quiz_categories")
+    .update({ is_published: isPublished })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 };
 
 export const deleteCategory = async (id: string) => {

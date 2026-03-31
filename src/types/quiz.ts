@@ -3,6 +3,7 @@ export interface Category {
   name: string;
   description: string | null;
   created_at: string;
+  is_published: boolean;
 }
 
 export interface Deck {

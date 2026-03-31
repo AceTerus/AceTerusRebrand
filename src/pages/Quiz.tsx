@@ -92,9 +92,8 @@ const Quiz = () => {
     ])
       .then(([cats, data]) => {
         if (!cancelled) {
-          // Only show categories that have at least one published deck
-          const publishedSubjects = new Set(data.map((d) => d.subject ?? "General"));
-          setCategories(cats.filter((c) => publishedSubjects.has(c.name)));
+          // Only show categories that have been published by admin
+          setCategories(cats.filter((c) => c.is_published));
           setDecks(data ?? []);
         }
       })
@@ -433,13 +432,21 @@ const Quiz = () => {
                       )}
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col space-y-4">
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" />{cat.decks.length} {cat.decks.length === 1 ? "quiz" : "quizzes"}</span>
-                        <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-primary" />{cat.totalQuestions.toLocaleString()} questions</span>
-                      </div>
-                      <Button className="w-full bg-gradient-primary shadow-glow mt-auto" onClick={() => { setSelectedCategory(cat.name); setView("decks"); }}>
-                        View Quizzes <ChevronRight className="ml-2 h-4 w-4" />
-                      </Button>
+                      {cat.decks.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic mt-auto">
+                          Quizzes will be added soon.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" />{cat.decks.length} {cat.decks.length === 1 ? "quiz" : "quizzes"}</span>
+                            <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-primary" />{cat.totalQuestions.toLocaleString()} questions</span>
+                          </div>
+                          <Button className="w-full bg-gradient-primary shadow-glow mt-auto" onClick={() => { setSelectedCategory(cat.name); setView("decks"); }}>
+                            View Quizzes <ChevronRight className="ml-2 h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
