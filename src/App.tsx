@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { AppSidebar } from "./components/AppSidebar";
 import { MobileNav } from "./components/MobileNav";
-import { ThemeToggle } from "./components/ThemeToggle";
 import Index from "./pages/Index";
 import { Profile } from "./pages/Profile";
 import { Discover } from "./pages/Discover";
@@ -57,7 +56,6 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <ThemeToggle />
           <AppContent />
         </TooltipProvider>
       </ChatNotificationsProvider>
