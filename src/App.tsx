@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { AppSidebar } from "./components/AppSidebar";
+import { MobileNav } from "./components/MobileNav";
 import { ThemeToggle } from "./components/ThemeToggle";
 import Index from "./pages/Index";
 import { Profile } from "./pages/Profile";
@@ -27,6 +28,7 @@ const AppContent = () => {
     <BrowserRouter>
       <div className="flex min-h-screen w-full">
         {user && <AppSidebar />}
+        {user && <MobileNav />}
         <main className={`flex-1 ${user ? 'lg:pl-64' : ''}`}>
           <Routes>
             <Route path="/" element={<Index />} />

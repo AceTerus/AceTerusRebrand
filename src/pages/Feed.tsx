@@ -421,7 +421,7 @@ export const Feed = () => {
     currentLightboxPost.images[lightboxIndex];
 
   return (
-    <div className="min-h-screen px-4 py-8 bg-gradient-to-br from-background via-muted/20 to-background">
+    <div className="min-h-screen px-4 pt-8 pb-20 lg:pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
         <div className="container mx-auto max-w-5xl">
           <div className="grid lg:grid-cols-12 gap-6">
             {/* Main Feed */}

@@ -55,7 +55,7 @@ export const Discover = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 pt-8 pb-20 lg:pb-8 max-w-4xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-4 flex items-center gap-2">
             <Users className="h-8 w-8" />

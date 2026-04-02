@@ -23,7 +23,6 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
 import StreakFireOverlay from "@/components/StreakFireOverlay";
 import QuizAnalysis from "@/components/QuizAnalysis";
 import type { PerformanceAnalysis } from "@/components/QuizAnalysis";
@@ -359,9 +358,8 @@ const Quiz = () => {
   const unansweredCount = questions.length - answeredCount;
 
   return (
-    <div className="min-h-screen pb-12 bg-gradient-to-br from-background via-muted/20 to-background">
-      <Navbar />
-      <div className="container mx-auto px-4 max-w-6xl pt-24">
+    <div className="min-h-screen pb-20 lg:pb-12 bg-gradient-to-br from-background via-muted/20 to-background">
+      <div className="container mx-auto px-4 max-w-6xl pt-8">
 
         {/* Header */}
         <div className="text-center mb-8">

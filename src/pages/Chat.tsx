@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, MessageSquare, Search, Send, Users } from "lucide-react";
+import { ChevronLeft, Loader2, MessageSquare, Search, Send, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { useChatNotifications } from "@/context/ChatNotificationsContext";
@@ -63,6 +63,7 @@ export const Chat = () => {
   const [isLoadingContacts, setIsLoadingContacts] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showContactsList, setShowContactsList] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -365,6 +366,7 @@ export const Chat = () => {
     setSelectedContact(contact);
     setSearchParams(contact ? { userId: contact.user_id } : {});
     clearUnread(contact.user_id);
+    setShowContactsList(false);
   };
 
   const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -387,9 +389,9 @@ export const Chat = () => {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-[calc(100vh-4rem)] lg:h-screen w-full overflow-hidden bg-background">
       {/* ── Left panel: contacts ── */}
-      <div className="flex w-80 flex-shrink-0 flex-col border-r bg-muted/20">
+      <div className={`${showContactsList ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 flex-shrink-0 flex-col border-r bg-muted/20`}>
         {/* Panel header */}
         <div className="border-b px-5 py-4">
           <h1 className="text-base font-semibold tracking-tight">Messages</h1>
@@ -529,12 +531,20 @@ export const Chat = () => {
       </div>
 
       {/* ── Right panel: conversation ── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className={`${!showContactsList ? 'flex' : 'hidden'} lg:flex flex-1 flex-col overflow-hidden`}>
         {selectedContact ? (
           <>
             {/* Chat header */}
-            <div className="flex items-center justify-between border-b bg-background px-6 py-3.5">
+            <div className="flex items-center justify-between border-b bg-background px-4 lg:px-6 py-3.5">
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowContactsList(true)}
+                  className="lg:hidden flex items-center justify-center w-8 h-8 rounded-full hover:bg-muted transition-colors mr-1"
+                  aria-label="Back to contacts"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
                 <Link
                   to={`/profile/${selectedContact.user_id}`}
                   className="relative flex-shrink-0"
