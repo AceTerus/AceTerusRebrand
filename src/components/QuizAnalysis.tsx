@@ -65,8 +65,8 @@ export default function QuizAnalysis({ analysis, loading, error }: QuizAnalysisP
         <CardContent className="py-6 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-orange-700 dark:text-orange-400">Analysis unavailable</p>
-            <p className="text-sm text-muted-foreground mt-1">{error}</p>
+            <p className="font-semibold text-orange-700 dark:text-orange-400">AI analysis is under maintenance</p>
+            <p className="text-sm text-muted-foreground mt-1">Please try again later.</p>
           </div>
         </CardContent>
       </Card>

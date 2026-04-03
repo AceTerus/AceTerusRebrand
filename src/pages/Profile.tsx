@@ -139,8 +139,8 @@ export const Profile = () => {
       }
 
       if (!data) {
-        // Only auto-create a profile for the currently logged-in user
-        if (!user) return;
+        // Only auto-create a profile for the currently logged-in user's own profile
+        if (!user || profileUserId !== user.id) return;
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({

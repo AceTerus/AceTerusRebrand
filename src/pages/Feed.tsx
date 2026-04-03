@@ -102,20 +102,21 @@ export const Feed = () => {
 
       const postsArray = postsData || [];
 
-      const postsWithProfiles = await Promise.all(
-        postsArray.map(async (post) => {
-          const { data: profileData } = await supabase
+      const postUserIds = [...new Set(postsArray.map((p) => p.user_id))];
+      const { data: postProfilesData } = postUserIds.length
+        ? await supabase
             .from("profiles")
-            .select("username, avatar_url")
-            .eq("user_id", post.user_id)
-            .single();
-
-          return {
-            ...post,
-            profiles: profileData || { username: "Anonymous", avatar_url: "" },
-          };
-        })
+            .select("user_id, username, avatar_url")
+            .in("user_id", postUserIds)
+        : { data: [] };
+      const postProfilesMap = new Map(
+        (postProfilesData || []).map((p) => [p.user_id, p])
       );
+
+      const postsWithProfiles = postsArray.map((post) => ({
+        ...post,
+        profiles: postProfilesMap.get(post.user_id) || { username: "Anonymous", avatar_url: "" },
+      }));
 
       // Fetch all images for these posts in one query
       const postIds = postsArray.map((p) => p.id);
@@ -155,20 +156,22 @@ export const Feed = () => {
 
       if (uploadsError) throw uploadsError;
 
-      const uploadsWithProfiles = await Promise.all(
-        (uploadsData || []).map(async (upload) => {
-          const { data: profileData } = await supabase
+      const uploadsArray = uploadsData || [];
+      const uploadUserIds = [...new Set(uploadsArray.map((u) => u.user_id))];
+      const { data: uploadProfilesData } = uploadUserIds.length
+        ? await supabase
             .from("profiles")
-            .select("username, avatar_url")
-            .eq("user_id", upload.user_id)
-            .single();
-
-          return {
-            ...upload,
-            profiles: profileData || { username: "Anonymous", avatar_url: "" },
-          };
-        })
+            .select("user_id, username, avatar_url")
+            .in("user_id", uploadUserIds)
+        : { data: [] };
+      const uploadProfilesMap = new Map(
+        (uploadProfilesData || []).map((p) => [p.user_id, p])
       );
+
+      const uploadsWithProfiles = uploadsArray.map((upload) => ({
+        ...upload,
+        profiles: uploadProfilesMap.get(upload.user_id) || { username: "Anonymous", avatar_url: "" },
+      }));
 
       setPosts(postsWithImages);
       setUploads(uploadsWithProfiles);

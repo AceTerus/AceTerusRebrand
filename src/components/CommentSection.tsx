@@ -54,21 +54,20 @@ export const CommentSection = ({
 
       if (error) throw error;
 
-      // Fetch profile data for comments
-      const commentsWithProfiles = await Promise.all(
-        (commentsData || []).map(async (comment) => {
-          const { data: profileData } = await supabase
+      // Batch-fetch profiles for all commenters in one query
+      const commentUserIds = [...new Set((commentsData || []).map((c) => c.user_id))];
+      const { data: profilesData } = commentUserIds.length
+        ? await supabase
             .from("profiles")
-            .select("username, avatar_url")
-            .eq("user_id", comment.user_id)
-            .single();
+            .select("user_id, username, avatar_url")
+            .in("user_id", commentUserIds)
+        : { data: [] };
+      const profilesMap = new Map((profilesData || []).map((p) => [p.user_id, p]));
 
-          return {
-            ...comment,
-            profiles: profileData || { username: "Anonymous", avatar_url: "" },
-          };
-        })
-      );
+      const commentsWithProfiles = (commentsData || []).map((comment) => ({
+        ...comment,
+        profiles: profilesMap.get(comment.user_id) || { username: "Anonymous", avatar_url: "" },
+      }));
 
       setComments(commentsWithProfiles);
     } catch (error) {

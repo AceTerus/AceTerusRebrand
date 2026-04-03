@@ -230,7 +230,11 @@ Bab 7: Malaysia dan Kerjasama Antarabangsa
 - 7.8 Hubungan diplomatik: dengan negara-negara jiran, kuasa besar (AS, China, UK), negara Timur Tengah
 `;
 
-    const prompt = `You are an expert educational AI tutor specialising in SPM Sejarah. Analyze this student's quiz performance and return ONLY a valid JSON object (no markdown, no code fences). Write ALL text fields in Bahasa Malaysia.
+    const categoryLower = (current.category ?? "").toLowerCase();
+    const isSejarah = categoryLower.includes("sejarah") && categoryLower.includes("spm");
+
+    const prompt = isSejarah
+      ? `You are an expert educational AI tutor specialising in SPM Sejarah. Analyze this student's quiz performance and return ONLY a valid JSON object (no markdown, no code fences). Write ALL text fields in Bahasa Malaysia.
 
 Use the SPM Sejarah syllabus below to identify the exact BAB (chapter) and SUBTOPIK the student is weak or strong in, based on the questions they got wrong or skipped. Be specific — name the bab number and subtopik title from the syllabus.
 
@@ -247,7 +251,21 @@ ${skippedList ? `\nSoalan yang dilangkau:\n${skippedList}` : ""}
 ${historySection}
 
 Return this JSON structure only (all values in Bahasa Malaysia):
-{"overall_trend":"improving atau declining atau stable atau first_attempt","performance_summary":"1-2 ayat ringkasan prestasi","weak_areas":["Bab X: Nama Bab — Subtopik"],"strong_areas":["Bab X: Nama Bab — Subtopik"],"improvement_tips":["tip1","tip2","tip3"],"comparison_note":"1 ayat perbandingan dengan percubaan lepas"}`;
+{"overall_trend":"improving atau declining atau stable atau first_attempt","performance_summary":"1-2 ayat ringkasan prestasi","weak_areas":["Bab X: Nama Bab — Subtopik"],"strong_areas":["Bab X: Nama Bab — Subtopik"],"improvement_tips":["tip1","tip2","tip3"],"comparison_note":"1 ayat perbandingan dengan percubaan lepas"}`
+      : `You are an expert educational AI tutor. Analyze this student's quiz performance and return ONLY a valid JSON object (no markdown, no code fences). Write ALL text fields in Bahasa Malaysia.
+
+Identify what topics or concepts the student is weak or strong in based on the actual question content below. Do NOT assume a specific subject — base your analysis solely on the questions and answers provided.
+
+Current quiz: "${current.deck_name}" (${current.category})
+Score: ${Number(current.score).toFixed(1)}% — ${current.correct_count} betul, ${current.wrong_count} salah, ${current.skipped_count} dilangkau daripada ${current.total_count}
+
+${wrongList ? `Soalan yang dijawab salah:\n${wrongList}` : "Semua soalan dijawab dengan betul!"}
+${skippedList ? `\nSoalan yang dilangkau:\n${skippedList}` : ""}
+
+${historySection}
+
+Return this JSON structure only (all values in Bahasa Malaysia):
+{"overall_trend":"improving atau declining atau stable atau first_attempt","performance_summary":"1-2 ayat ringkasan prestasi berdasarkan soalan-soalan ini","weak_areas":["Topik atau konsep yang perlu diperbaiki berdasarkan soalan yang salah"],"strong_areas":["Topik atau konsep yang dikuasai berdasarkan soalan yang betul"],"improvement_tips":["tip1","tip2","tip3"],"comparison_note":"1 ayat perbandingan dengan percubaan lepas"}`;
 
     // Call Gemini — same pattern as pdf-quiz-generator
     const geminiRes = await fetch(
