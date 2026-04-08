@@ -12,10 +12,13 @@ interface MascotContextType {
   mood: MascotMood;
   isVisible: boolean;
   isMinimized: boolean;
+  isChatOpen: boolean;
   pushMessage: (text: string, priority?: 'high' | 'normal', mood?: MascotMood) => void;
   dismissMessage: () => void;
   setMood: (mood: MascotMood) => void;
   toggleMinimized: () => void;
+  openChat: () => void;
+  closeChat: () => void;
 }
 
 const MascotContext = createContext<MascotContextType | null>(null);
@@ -30,6 +33,7 @@ export const MascotProvider = ({ children }: { children: ReactNode }) => {
   const [currentMessage, setCurrentMessage] = useState<string | null>(null);
   const [mood, setMoodState] = useState<MascotMood>('idle');
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const queueRef = useRef<MascotMessage[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -78,6 +82,8 @@ export const MascotProvider = ({ children }: { children: ReactNode }) => {
 
   const setMood = useCallback((m: MascotMood) => setMoodState(m), []);
   const toggleMinimized = useCallback(() => setIsMinimized((v) => !v), []);
+  const openChat = useCallback(() => setIsChatOpen(true), []);
+  const closeChat = useCallback(() => setIsChatOpen(false), []);
 
   return (
     <MascotContext.Provider
@@ -86,10 +92,13 @@ export const MascotProvider = ({ children }: { children: ReactNode }) => {
         mood,
         isVisible: true,
         isMinimized,
+        isChatOpen,
         pushMessage,
         dismissMessage,
         setMood,
         toggleMinimized,
+        openChat,
+        closeChat,
       }}
     >
       {children}

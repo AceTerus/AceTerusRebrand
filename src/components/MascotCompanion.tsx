@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useMascot } from '@/context/MascotContext';
 import { useStreak } from '@/hooks/useStreak';
-import mascotVideo from '@/assets/mascot.mp4';
+import mascotGif from '@/assets/mascot1.gif';
 
 /**
  * Ace — the AceTerus star mascot companion.
@@ -10,10 +10,8 @@ import mascotVideo from '@/assets/mascot.mp4';
  * Duolingo-style animations and a speech bubble.
  */
 const MascotCompanion = () => {
-  const { currentMessage, mood, isMinimized, dismissMessage, toggleMinimized } = useMascot();
+  const { currentMessage, mood, isMinimized, dismissMessage, toggleMinimized, openChat } = useMascot();
   const { streak } = useStreak();
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   const [entered, setEntered] = useState(false);
   const [isWiggling, setIsWiggling] = useState(false);
   // Key trick: re-mount speech bubble on each new message so bubble-pop replays
@@ -29,11 +27,6 @@ const MascotCompanion = () => {
   useEffect(() => {
     if (currentMessage) setBubbleKey((k) => k + 1);
   }, [currentMessage]);
-
-  // Ensure video plays (muted required for autoplay)
-  useEffect(() => {
-    videoRef.current?.play().catch(() => {});
-  }, []);
 
   const handleMouseEnter = () => {
     if (mood === 'idle' || mood === 'happy') setIsWiggling(true);
@@ -109,32 +102,30 @@ const MascotCompanion = () => {
         </div>
       )}
 
-      {/* Mascot character — no circle, just the video */}
+      {/* Mascot character */}
       <div
-        className={`relative cursor-pointer select-none ${animClass}`}
+        className={`relative select-none cursor-pointer ${animClass}`}
         style={{ pointerEvents: 'auto' }}
         onMouseEnter={handleMouseEnter}
         onAnimationEnd={() => {
           if (isWiggling) setIsWiggling(false);
         }}
-        onClick={toggleMinimized}
-        title="Click to minimize Ace"
+        onClick={openChat}
+        title="Chat with Ace"
       >
-        {/* Streak badge */}
-        {streak > 0 && (
-          <div className="absolute -top-3 -right-3 z-10 flex items-center gap-0.5 rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-bold text-white shadow-lg">
-            🔥 {streak}
-          </div>
-        )}
+        {/* Minimize button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); toggleMinimized(); }}
+          className="absolute -top-1 -right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-gray-500 shadow hover:bg-gray-300 transition-colors"
+          aria-label="Minimize Ace"
+        >
+          <X size={11} />
+        </button>
 
-        <video
-          ref={videoRef}
-          src={mascotVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-36 h-auto drop-shadow-xl"
+        <img
+          src={mascotGif}
+          alt="Ace mascot"
+          className="w-48 h-auto drop-shadow-xl"
           style={{
             filter:
               mood === 'celebrating' ? 'brightness(1.12) saturate(1.4)' :

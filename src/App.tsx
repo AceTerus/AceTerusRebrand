@@ -21,6 +21,7 @@ import { NotificationsProvider } from "./context/NotificationsContext";
 import { MascotProvider } from "./context/MascotContext";
 import MascotCompanion from "./components/MascotCompanion";
 import MascotGreeter from "./components/MascotGreeter";
+import MascotChat from "./components/MascotChat";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const AppContent = () => {
         {user && <MobileNav />}
         {user && <MascotGreeter />}
         {user && <MascotCompanion />}
+        {user && <MascotChat />}
         <main className={`flex-1 ${user ? 'lg:pl-64' : ''}`}>
           <Routes>
             <Route path="/" element={<Index />} />
