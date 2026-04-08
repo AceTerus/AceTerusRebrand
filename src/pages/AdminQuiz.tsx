@@ -89,11 +89,17 @@ const AdminQuiz = () => {
   // Text importer
   const [textImporterOpen, setTextImporterOpen] = useState(false);
 
-  // Image state
+  // Question image state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Answer image state (one slot per answer option A–D)
+  const [answerImageFiles, setAnswerImageFiles] = useState<(File | null)[]>([null, null, null, null]);
+  const [answerImagePreviews, setAnswerImagePreviews] = useState<(string | null)[]>([null, null, null, null]);
+  const [existingAnswerImageUrls, setExistingAnswerImageUrls] = useState<(string | null)[]>([null, null, null, null]);
+  const answerImageInputRefs = useRef<(HTMLInputElement | null)[]>([null, null, null, null]);
 
   // ── Auth guard ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -270,6 +276,10 @@ const AdminQuiz = () => {
     setImagePreview(null);
     setExistingImageUrl(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
+    setAnswerImageFiles([null, null, null, null]);
+    setAnswerImagePreviews([null, null, null, null]);
+    setExistingAnswerImageUrls([null, null, null, null]);
+    answerImageInputRefs.current.forEach((ref) => { if (ref) ref.value = ""; });
   };
 
   const openAddQuestion = () => {
@@ -292,6 +302,10 @@ const AdminQuiz = () => {
     });
     resetImageState();
     setExistingImageUrl(q.image_url ?? null);
+    // Load existing answer image URLs (answers padded to 4)
+    const paddedAnswers = [...q.answers];
+    while (paddedAnswers.length < 4) paddedAnswers.push({ id: "", question_id: q.id, text: "", is_correct: false, image_url: null });
+    setExistingAnswerImageUrls(paddedAnswers.slice(0, 4).map((a) => a.image_url ?? null));
     setQuestionDialogOpen(true);
   };
 
@@ -300,15 +314,36 @@ const AdminQuiz = () => {
       toast({ title: "Question text is required", variant: "destructive" });
       return;
     }
-    const filledAnswers = questionForm.answers.filter((a) => a.trim());
+    const filledAnswers = questionForm.answers.filter(
+      (a, idx) => a.trim() || answerImageFiles[idx] || existingAnswerImageUrls[idx]
+    );
     if (filledAnswers.length < 2) {
       toast({ title: "At least 2 answer choices are required", variant: "destructive" });
       return;
     }
 
+    // Upload any new answer images, reuse existing URLs otherwise
+    const resolvedAnswerImageUrls: (string | null)[] = await Promise.all(
+      questionForm.answers.map(async (_, idx) => {
+        const newFile = answerImageFiles[idx];
+        const existingUrl = existingAnswerImageUrls[idx];
+        if (newFile) {
+          if (existingUrl) await deleteQuizImage(existingUrl).catch(() => {});
+          return uploadQuizImage(newFile);
+        }
+        // If preview was cleared (null preview + had existing) treat as removed
+        if (!answerImagePreviews[idx] && !existingUrl) return null;
+        return existingUrl ?? null;
+      })
+    );
+
     const answers = questionForm.answers
-      .map((text, idx) => ({ text: text.trim(), is_correct: idx === questionForm.correctIndex }))
-      .filter((a) => a.text);
+      .map((text, idx) => ({
+        text: text.trim(),
+        is_correct: idx === questionForm.correctIndex,
+        image_url: resolvedAnswerImageUrls[idx] ?? null,
+      }))
+      .filter((a) => a.text || a.image_url);
 
     setSavingQuestion(true);
     try {
@@ -825,31 +860,89 @@ const AdminQuiz = () => {
                 rows={3}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label>Answer Choices (select the correct one)</Label>
-              {questionForm.answers.map((answer, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="correctAnswer"
-                    checked={questionForm.correctIndex === idx}
-                    onChange={() => setQuestionForm((f) => ({ ...f, correctIndex: idx }))}
-                    className="accent-primary w-4 h-4 shrink-0"
-                  />
-                  <span className="font-semibold text-sm w-5 shrink-0">{LABELS[idx]}.</span>
-                  <Input
-                    placeholder={`Answer ${LABELS[idx]}`}
-                    value={answer}
-                    onChange={(e) => {
-                      const answers = [...questionForm.answers];
-                      answers[idx] = e.target.value;
-                      setQuestionForm((f) => ({ ...f, answers }));
-                    }}
-                  />
-                </div>
-              ))}
+              {questionForm.answers.map((answer, idx) => {
+                const preview = answerImagePreviews[idx];
+                const existing = existingAnswerImageUrls[idx];
+                const hasImage = preview || existing;
+                return (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="correctAnswer"
+                        checked={questionForm.correctIndex === idx}
+                        onChange={() => setQuestionForm((f) => ({ ...f, correctIndex: idx }))}
+                        className="accent-primary w-4 h-4 shrink-0"
+                      />
+                      <span className="font-semibold text-sm w-5 shrink-0">{LABELS[idx]}.</span>
+                      <Input
+                        placeholder={`Answer ${LABELS[idx]}`}
+                        value={answer}
+                        onChange={(e) => {
+                          const answers = [...questionForm.answers];
+                          answers[idx] = e.target.value;
+                          setQuestionForm((f) => ({ ...f, answers }));
+                        }}
+                      />
+                      {/* Hidden file input */}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        ref={(el) => { answerImageInputRefs.current[idx] = el; }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const files = [...answerImageFiles]; files[idx] = file;
+                          const previews = [...answerImagePreviews]; previews[idx] = URL.createObjectURL(file);
+                          setAnswerImageFiles(files);
+                          setAnswerImagePreviews(previews);
+                        }}
+                      />
+                      {/* Image toggle button */}
+                      <button
+                        type="button"
+                        title={hasImage ? "Change image" : "Add image"}
+                        onClick={() => answerImageInputRefs.current[idx]?.click()}
+                        className={`shrink-0 rounded-md border p-1.5 transition-colors ${hasImage ? "border-primary bg-primary/10 text-primary" : "border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary"}`}
+                      >
+                        <ImagePlus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Answer image preview */}
+                    {hasImage && (
+                      <div className="ml-12 relative w-full max-w-[200px] rounded-lg overflow-hidden border bg-muted/20">
+                        <img
+                          src={preview ?? existing!}
+                          alt={`Answer ${LABELS[idx]} image`}
+                          className="w-full max-h-28 object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const files = [...answerImageFiles]; files[idx] = null;
+                            const previews = [...answerImagePreviews]; previews[idx] = null;
+                            const urls = [...existingAnswerImageUrls]; urls[idx] = null;
+                            setAnswerImageFiles(files);
+                            setAnswerImagePreviews(previews);
+                            setExistingAnswerImageUrls(urls);
+                            const ref = answerImageInputRefs.current[idx];
+                            if (ref) ref.value = "";
+                          }}
+                          className="absolute top-1 right-1 rounded-full bg-background/80 border p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               <p className="text-xs text-muted-foreground">
-                Select the radio button next to the correct answer.
+                Select the radio button next to the correct answer. Use 📷 to add an image to any option.
               </p>
             </div>
             <div className="space-y-1.5">

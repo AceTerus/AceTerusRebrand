@@ -22,6 +22,7 @@ export interface Answer {
   question_id: string;
   text: string;
   is_correct: boolean;
+  image_url?: string | null;
 }
 
 export interface Question {

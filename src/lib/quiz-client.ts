@@ -51,11 +51,30 @@ export const updateCategory = async (
 };
 
 export const toggleCategoryPublished = async (id: string, isPublished: boolean) => {
+  // Fetch category name before updating (needed for notification metadata)
+  const { data: category } = await supabase
+    .from("quiz_categories")
+    .select("name")
+    .eq("id", id)
+    .single();
+
   const { error } = await supabase
     .from("quiz_categories")
     .update({ is_published: isPublished })
     .eq("id", id);
   if (error) throw new Error(error.message);
+
+  // Fan-out notification to all users when publishing (not unpublishing)
+  if (isPublished && category) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await (supabase as any).rpc("notify_quiz_published", {
+        p_category_id: id,
+        p_admin_id: user.id,
+        p_category_name: category.name,
+      });
+    }
+  }
 };
 
 export const deleteCategory = async (id: string) => {
@@ -138,7 +157,7 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
   if (questionIds.length > 0) {
     const { data: aRows, error: aError } = await supabase
       .from("answers")
-      .select("id, question_id, text, is_correct")
+      .select("id, question_id, text, is_correct, image_url")
       .in("question_id", questionIds);
     if (aError) throw new Error(aError.message);
     answerRows = aRows ?? [];
@@ -157,7 +176,13 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
     explanation: q.explanation ?? null,
     image_url: q.image_url ?? null,
     order: q.order ?? 0,
-    answers: (answersByQuestion[q.id] ?? []).sort(() => Math.random() - 0.5),
+    answers: (answersByQuestion[q.id] ?? []).sort(() => Math.random() - 0.5).map((a: any) => ({
+      id: a.id,
+      question_id: a.question_id,
+      text: a.text,
+      is_correct: a.is_correct,
+      image_url: a.image_url ?? null,
+    })),
   }));
 
   return {
@@ -233,7 +258,7 @@ export const fetchQuestionsForDeck = async (deckId: string): Promise<Question[]>
   if (questionIds.length > 0) {
     const { data: aRows, error: aError } = await supabase
       .from("answers")
-      .select("id, question_id, text, is_correct")
+      .select("id, question_id, text, is_correct, image_url")
       .in("question_id", questionIds);
     if (aError) throw new Error(aError.message);
     answerRows = aRows ?? [];
@@ -252,7 +277,13 @@ export const fetchQuestionsForDeck = async (deckId: string): Promise<Question[]>
     explanation: q.explanation ?? null,
     image_url: q.image_url ?? null,
     order: q.order ?? 0,
-    answers: answersByQuestion[q.id] ?? [],
+    answers: (answersByQuestion[q.id] ?? []).map((a: any) => ({
+      id: a.id,
+      question_id: a.question_id,
+      text: a.text,
+      is_correct: a.is_correct,
+      image_url: a.image_url ?? null,
+    })),
   }));
 };
 
@@ -262,7 +293,7 @@ export const createQuestion = async (question: {
   explanation?: string;
   image_url?: string;
   order?: number;
-  answers: { text: string; is_correct: boolean }[];
+  answers: { text: string; is_correct: boolean; image_url?: string | null }[];
 }) => {
   const { answers, ...questionData } = question;
   const { data: q, error: qError } = await supabase
@@ -290,7 +321,7 @@ export const updateQuestion = async (
 
 export const replaceAnswers = async (
   questionId: string,
-  answers: { text: string; is_correct: boolean }[]
+  answers: { text: string; is_correct: boolean; image_url?: string | null }[]
 ) => {
   const { error: delError } = await supabase
     .from("answers")

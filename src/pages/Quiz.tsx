@@ -642,20 +642,29 @@ const Quiz = () => {
                                 <div
                                   key={a.id}
                                   className={cn(
-                                    "flex items-start gap-3 rounded-lg border px-4 py-3 text-sm",
+                                    "rounded-lg border px-4 py-3 text-sm",
                                     isThisCorrect ? "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-200"
                                       : isThisWrong ? "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-200"
                                       : "border-border bg-muted/20 text-muted-foreground"
                                   )}
                                 >
-                                  <span className="shrink-0 mt-0.5">
-                                    {isThisCorrect ? <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-                                      : isThisWrong ? <XCircle className="w-4 h-4 text-red-500" />
-                                      : <span className="w-4 h-4 block rounded-full border-2 border-muted-foreground/30" />}
-                                  </span>
-                                  <span className="flex-1">{a.text}</span>
-                                  {isThisCorrect && <span className="shrink-0 text-xs font-semibold text-green-700 dark:text-green-300">Correct answer</span>}
-                                  {isThisWrong && <span className="shrink-0 text-xs font-semibold text-red-600 dark:text-red-400">Your answer</span>}
+                                  {a.image_url && (
+                                    <img
+                                      src={a.image_url}
+                                      alt="Answer option"
+                                      className="w-full max-h-36 object-contain rounded-lg border bg-muted/20 mb-2"
+                                    />
+                                  )}
+                                  <div className="flex items-center gap-3">
+                                    <span className="shrink-0">
+                                      {isThisCorrect ? <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                        : isThisWrong ? <XCircle className="w-4 h-4 text-red-500" />
+                                        : <span className="w-4 h-4 block rounded-full border-2 border-muted-foreground/30" />}
+                                    </span>
+                                    {a.text && <span className="flex-1">{a.text}</span>}
+                                    {isThisCorrect && <span className="shrink-0 text-xs font-semibold text-green-700 dark:text-green-300">Correct answer</span>}
+                                    {isThisWrong && <span className="shrink-0 text-xs font-semibold text-red-600 dark:text-red-400">Your answer</span>}
+                                  </div>
                                 </div>
                               );
                             })}
@@ -749,20 +758,30 @@ const Quiz = () => {
                         currentQuestion.answers.map((a) => {
                           const isSelected = selectedAnswerId === a.id;
                           return (
-                            <Button
+                            <button
                               key={a.id}
-                              variant="outline"
                               onClick={() => handleAnswerSelect(a.id)}
                               className={cn(
-                                "w-full justify-start text-left whitespace-normal transition-all",
-                                isSelected ? "border-primary bg-primary/8 dark:bg-primary/15 ring-1 ring-primary text-foreground" : "hover:border-primary/50 hover:bg-muted/60"
+                                "w-full rounded-lg border px-4 py-3 text-left transition-all",
+                                isSelected
+                                  ? "border-primary bg-primary/8 dark:bg-primary/15 ring-1 ring-primary text-foreground"
+                                  : "border-border hover:border-primary/50 hover:bg-muted/60"
                               )}
                             >
-                              <span className={cn("shrink-0 mr-3 w-4 h-4 rounded-full border-2 flex items-center justify-center", isSelected ? "border-primary bg-primary" : "border-muted-foreground/40")}>
-                                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                              </span>
-                              {a.text}
-                            </Button>
+                              {a.image_url && (
+                                <img
+                                  src={a.image_url}
+                                  alt="Answer option"
+                                  className="w-full max-h-40 object-contain rounded-lg border bg-muted/20 mb-2"
+                                />
+                              )}
+                              <div className="flex items-center gap-3">
+                                <span className={cn("shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center", isSelected ? "border-primary bg-primary" : "border-muted-foreground/40")}>
+                                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                </span>
+                                {a.text && <span className="text-sm whitespace-normal">{a.text}</span>}
+                              </div>
+                            </button>
                           );
                         })
                       ) : (
