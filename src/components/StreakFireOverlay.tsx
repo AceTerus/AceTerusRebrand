@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import Lottie from "lottie-react";
 import fireAnimation from "@/assets/fire-animation.json";
 import { Flame } from "lucide-react";
 
