@@ -29,6 +29,7 @@ import type { PerformanceAnalysis } from "@/components/QuizAnalysis";
 import Logo from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
+import { useMascot } from "@/context/MascotContext";
 import { fetchCategories, fetchDecks, fetchQuiz } from "@/lib/quiz-client";
 import type { Category, Deck, Question, QuizPayload } from "@/types/quiz";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ type QuizView = "categories" | "decks" | "taking";
 const Quiz = () => {
   const { user, isLoading: authLoading } = useAuth();
   const { streak, updateStreak } = useStreak();
+  const { pushMessage } = useMascot();
   const navigate = useNavigate();
 
   // Category state
@@ -232,6 +234,29 @@ const Quiz = () => {
       const result = await updateStreak(activeDeck.id);
       if (result?.success && result.newStreak) {
         setFireOverlay({ show: true, newStreak: result.newStreak });
+
+        // Milestone celebrations
+        const milestones = [7, 14, 30, 60, 100];
+        if (milestones.includes(result.newStreak)) {
+          pushMessage(
+            `🎉 ${result.newStreak}-day streak! You're on fire — I'm so proud of you! ⭐`,
+            'high',
+            'celebrating'
+          );
+        } else {
+          pushMessage(
+            `Great job finishing the quiz! Your streak is now ${result.newStreak} days! 🔥`,
+            'normal',
+            'happy'
+          );
+        }
+      } else if (!result?.success) {
+        // Already quizzed today
+        pushMessage(
+          `Nice work! You've already kept your ${streak}-day streak today. Keep it up! ⭐`,
+          'normal',
+          'happy'
+        );
       }
     }
 
@@ -307,6 +332,21 @@ const Quiz = () => {
         }
         const analysis = resData.analysis;
         setAnalysisResult(analysis);
+
+        // Surface AI insight via mascot
+        if (analysis?.weak_areas?.length > 0) {
+          pushMessage(
+            `Ace AI spotted it: you can improve on "${analysis.weak_areas[0]}". Check your analysis below! 🧠`,
+            'normal',
+            'happy'
+          );
+        } else if (analysis?.trend === 'improving') {
+          pushMessage(
+            `AI says you're improving! Keep up this momentum — you're getting sharper every quiz! 📈`,
+            'normal',
+            'happy'
+          );
+        }
 
         // Save analysis back to the most recent result row
         const { data: latestRow } = await supabase

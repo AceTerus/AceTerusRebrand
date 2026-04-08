@@ -29,6 +29,7 @@ const todayISO = (): string => {
 export const useStreak = () => {
   const { user } = useAuth();
   const [streak, setStreak] = useState(0);
+  const [lastQuizDate, setLastQuizDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -64,11 +65,13 @@ export const useStreak = () => {
             .update({ streak: 0 })
             .eq('user_id', user.id);
           setStreak(0);
+          setLastQuizDate(lastDate);
           return;
         }
       }
 
       setStreak(profile.streak ?? 0);
+      setLastQuizDate(lastDate ?? null);
     } catch (error) {
       console.error('Error fetching streak:', error);
     } finally {
@@ -143,5 +146,5 @@ export const useStreak = () => {
     }
   };
 
-  return { streak, isLoading, updateStreak, refreshStreak: fetchStreak };
+  return { streak, lastQuizDate, isLoading, updateStreak, refreshStreak: fetchStreak };
 };

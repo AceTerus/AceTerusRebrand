@@ -17,6 +17,10 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Chat } from "./pages/Chat";
 import { ChatNotificationsProvider } from "./context/ChatNotificationsContext";
+import { NotificationsProvider } from "./context/NotificationsContext";
+import { MascotProvider } from "./context/MascotContext";
+import MascotCompanion from "./components/MascotCompanion";
+import MascotGreeter from "./components/MascotGreeter";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +32,8 @@ const AppContent = () => {
       <div className="flex min-h-screen w-full">
         {user && <AppSidebar />}
         {user && <MobileNav />}
+        {user && <MascotGreeter />}
+        {user && <MascotCompanion />}
         <main className={`flex-1 ${user ? 'lg:pl-64' : ''}`}>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -53,11 +59,15 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <ChatNotificationsProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
-        </TooltipProvider>
+        <NotificationsProvider>
+          <MascotProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <AppContent />
+            </TooltipProvider>
+          </MascotProvider>
+        </NotificationsProvider>
       </ChatNotificationsProvider>
     </AuthProvider>
   </QueryClientProvider>
