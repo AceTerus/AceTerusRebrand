@@ -31,7 +31,10 @@
       "Bash(taskkill /F /IM supabase.exe)",
       "Bash(grep -rn \"CREATE TABLE\\\\|enable row level security\\\\|ENABLE ROW LEVEL SECURITY\" C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/*.sql)",
       "Bash(grep:*)",
-      "Bash(xargs -I {} basename {})"
+      "Bash(xargs -I {} basename {})",
+      "Bash(rm -rf \"C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/functions/openmc-quizzes\")",
+      "Bash(rm \"C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/20260321000000_omc_schema.sql\")",
+      "Bash(rm \"C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/20260321000001_omc_demo_data.sql\")"
     ]
   }
 }
