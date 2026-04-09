@@ -60,9 +60,7 @@ export const UsersList = ({ title, userIds, showAll = false }: UsersListProps) =
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
+        {title && <CardHeader><CardTitle>{title}</CardTitle></CardHeader>}
         <CardContent className="space-y-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="flex items-center space-x-4">
@@ -81,9 +79,7 @@ export const UsersList = ({ title, userIds, showAll = false }: UsersListProps) =
   if (users.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
+        {title && <CardHeader><CardTitle>{title}</CardTitle></CardHeader>}
         <CardContent>
           <p className="text-muted-foreground">No users found.</p>
         </CardContent>
@@ -93,9 +89,7 @@ export const UsersList = ({ title, userIds, showAll = false }: UsersListProps) =
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
+      {title && <CardHeader><CardTitle>{title}</CardTitle></CardHeader>}
       <CardContent className="space-y-4">
         {users.map((user) => (
           <div key={user.id} className="flex items-center justify-between">

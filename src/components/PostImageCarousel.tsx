@@ -10,77 +10,105 @@ interface PostImageCarouselProps {
 
 export const PostImageCarousel = ({ images, className, onImageClick }: PostImageCarouselProps) => {
   const [index, setIndex] = useState(0);
+  // height/width ratio — default 1:1 until first image loads
+  const [aspectRatio, setAspectRatio] = useState<number>(1);
+  const [aspectResolved, setAspectResolved] = useState(false);
 
-  if (!images || images.length === 0) {
-    return null;
-  }
+  if (!images || images.length === 0) return null;
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    // Only derive aspect from the first image
+    if (aspectResolved) return;
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    if (!naturalWidth || !naturalHeight) return;
+    const ratio = naturalHeight / naturalWidth;
+    // Clamp: square (1:1) → portrait (4:5). Landscape images are treated as square.
+    setAspectRatio(Math.min(1.25, Math.max(1, ratio)));
+    setAspectResolved(true);
+  };
 
   const goTo = (direction: "prev" | "next") => {
-    setIndex((prev) => {
-      if (direction === "next") {
-        return prev === images.length - 1 ? 0 : prev + 1;
-      }
-      return prev === 0 ? images.length - 1 : prev - 1;
-    });
+    setIndex((prev) =>
+      direction === "next"
+        ? prev === images.length - 1 ? 0 : prev + 1
+        : prev === 0 ? images.length - 1 : prev - 1
+    );
   };
+
+  const single = images.length === 1;
 
   return (
     <div
-      className={cn(
-        "relative w-full overflow-hidden rounded-2xl border border-border/60 shadow-lg",
-        "aspect-[4/5]",
-        className
-      )}
+      className={cn("relative w-full overflow-hidden bg-black", className)}
+      style={{ paddingTop: `${aspectRatio * 100}%` }}
     >
+      {/* Sliding strip — absolutely fills the padding-top container */}
       <div
-        className="flex h-full transition-transform duration-500 ease-out"
+        className="absolute inset-0 flex transition-transform duration-500 ease-out"
         style={{ transform: `translateX(-${index * 100}%)` }}
       >
         {images.map((src, idx) => (
           <div
             key={`${src}-${idx}`}
-            className="relative w-full h-full flex-shrink-0 cursor-pointer overflow-hidden bg-black"
+            className="relative w-full h-full flex-shrink-0 overflow-hidden"
             onClick={() => onImageClick?.(idx)}
+            style={{ cursor: onImageClick ? "zoom-in" : "default" }}
           >
             <img
               src={src}
               alt={`Post image ${idx + 1}`}
-              className="w-full h-full object-cover"
+              onLoad={idx === 0 ? handleImageLoad : undefined}
+              className="w-full h-full object-cover select-none"
               loading="lazy"
+              draggable={false}
             />
           </div>
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={() => goTo("prev")}
-        className="absolute left-4 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-background/80 p-2 text-foreground shadow-lg backdrop-blur hover:bg-background"
-        aria-label="Previous image"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </button>
-      <button
-        type="button"
-        onClick={() => goTo("next")}
-        className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-background/80 p-2 text-foreground shadow-lg backdrop-blur hover:bg-background"
-        aria-label="Next image"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </button>
+      {/* Prev / Next — only when multi-image */}
+      {!single && (
+        <>
+          <button
+            type="button"
+            onClick={() => goTo("prev")}
+            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center rounded-full bg-black/40 p-1.5 text-white backdrop-blur-sm hover:bg-black/65 transition-colors"
+            aria-label="Previous image"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => goTo("next")}
+            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 flex items-center justify-center rounded-full bg-black/40 p-1.5 text-white backdrop-blur-sm hover:bg-black/65 transition-colors"
+            aria-label="Next image"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </>
+      )}
 
-      <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-2">
-        {images.map((_, dotIdx) => (
-          <span
-            key={dotIdx}
-            className={cn(
-              "h-1.5 w-6 rounded-full bg-white/40",
-              dotIdx === index && "bg-white shadow"
-            )}
-          />
-        ))}
-      </div>
+      {/* Image counter pill (top-right) for multi-image */}
+      {!single && (
+        <div className="absolute top-3 right-3 z-10 rounded-full bg-black/50 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+          {index + 1} / {images.length}
+        </div>
+      )}
+
+      {/* Dot strip */}
+      {!single && (
+        <div className="absolute bottom-3 left-0 right-0 z-10 flex items-center justify-center gap-1.5">
+          {images.map((_, dotIdx) => (
+            <span
+              key={dotIdx}
+              className={cn(
+                "h-1.5 rounded-full bg-white/50 transition-all duration-300",
+                dotIdx === index ? "w-5 bg-white" : "w-1.5"
+              )}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
-

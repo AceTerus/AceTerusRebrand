@@ -6,8 +6,6 @@ import { useStreak } from '@/hooks/useStreak';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -15,10 +13,11 @@ import { Label } from '@/components/ui/label';
 import { PostUpload } from '@/components/PostUpload';
 import { PostImageCarousel } from '@/components/PostImageCarousel';
 import { CommentSection } from '@/components/CommentSection';
+import { LikeButton } from '@/components/LikeButton';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Heart, MessageCircle, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
+import { Calendar, Heart, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
 import { useMutualFollow } from '@/hooks/useMutualFollow';
 import { StreakLeaderboard } from '@/components/StreakLeaderboard';
 
@@ -77,6 +76,8 @@ export const Profile = () => {
   const [isQuizHistoryOpen, setIsQuizHistoryOpen] = useState(false);
   const [quizHistory, setQuizHistory] = useState<any[]>([]);
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false);
+  const [isFollowersOpen, setIsFollowersOpen] = useState(false);
+  const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   
   const [achievements] = useState<Achievement[]>([
     {
@@ -679,11 +680,17 @@ export const Profile = () => {
                 <div className="font-bold text-lg">{posts.length}</div>
                 <div className="text-sm text-muted-foreground">Posts</div>
               </div>
-              <div className="text-center">
+              <div
+                className={`text-center ${isOwnProfile ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
+                onClick={() => isOwnProfile && setIsFollowersOpen(true)}
+              >
                 <div className="font-bold text-lg">{profile?.followers_count || 0}</div>
                 <div className="text-sm text-muted-foreground">Followers</div>
               </div>
-              <div className="text-center">
+              <div
+                className={`text-center ${isOwnProfile ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
+                onClick={() => isOwnProfile && setIsFollowingOpen(true)}
+              >
                 <div className="font-bold text-lg">{profile?.following_count || 0}</div>
                 <div className="text-sm text-muted-foreground">Following</div>
               </div>
@@ -790,15 +797,28 @@ export const Profile = () => {
           </CardContent>
         </Card>
 
-        {/* Content Sections */}
-        <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="posts">Posts</TabsTrigger>
-            <TabsTrigger value="followers">Followers</TabsTrigger>
-            <TabsTrigger value="following">Following</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="posts" className="space-y-6">
+        {/* Followers Dialog */}
+        <Dialog open={isFollowersOpen} onOpenChange={setIsFollowersOpen}>
+          <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Followers</DialogTitle>
+            </DialogHeader>
+            <UsersList title="" userIds={followers} showAll />
+          </DialogContent>
+        </Dialog>
+
+        {/* Following Dialog */}
+        <Dialog open={isFollowingOpen} onOpenChange={setIsFollowingOpen}>
+          <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Following</DialogTitle>
+            </DialogHeader>
+            <UsersList title="" userIds={following} showAll />
+          </DialogContent>
+        </Dialog>
+
+        {/* Posts Section */}
+        <div className="space-y-6">
             {/* Lock posts for non-mutual follows when viewing another user's profile */}
             {!isOwnProfile && !isMutual && !isMutualLoading ? (
               <Card>
@@ -823,131 +843,103 @@ export const Profile = () => {
             <>
             {isOwnProfile && <PostUpload onPostCreated={fetchPosts} />}
             
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5" />
-                  Recent Posts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <p>Loading posts...</p>
-                ) : posts.length === 0 ? (
-                  <p className="text-muted-foreground">No posts yet. Create your first post above!</p>
-                ) : (
-                  <div className="space-y-6">
-                    {posts.map((post) => (
-                      <div key={post.id} className="border-b pb-6 last:border-b-0">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex items-center gap-3">
-                            <Link to={`/profile/${profileUserId}`} className="flex-shrink-0">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={profile?.avatar_url || undefined} />
-                                <AvatarFallback>
-                                  {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                                </AvatarFallback>
-                              </Avatar>
-                            </Link>
-                            <div>
-                              <Link
-                                to={`/profile/${profileUserId}`}
-                                className="font-medium text-sm hover:underline"
-                              >
-                                {profile?.username || user?.email?.split('@')[0] || 'Anonymous'}
-                              </Link>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(post.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          {isOwnProfile && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deletePost(post.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+            {isLoading ? (
+              <Card>
+                <CardContent className="p-6 text-muted-foreground">Loading posts…</CardContent>
+              </Card>
+            ) : posts.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-muted-foreground">No posts yet. Create your first post above!</CardContent>
+              </Card>
+            ) : (
+              <div className="rounded-2xl overflow-hidden border border-border/60 bg-card divide-y divide-border/40">
+                {posts.map((post) => {
+                  const hasGalleryImages = !!(post.images && post.images.length);
+                  const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(
+                    !hasGalleryImages && post.image_url ? [post.image_url] : []
+                  );
+                  return (
+                    <article key={post.id}>
+                      {/* Header */}
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <Avatar className="h-9 w-9 ring-2 ring-primary/15 flex-shrink-0">
+                          <AvatarImage src={profile?.avatar_url || undefined} />
+                          <AvatarFallback className="text-sm font-bold">
+                            {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm leading-tight truncate">
+                            {profile?.username || user?.email?.split('@')[0] || 'Anonymous'}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {new Date(post.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
                         </div>
-                        
-                        <p className="text-sm mb-3">{post.content}</p>
-
-                        {(() => {
-                          const hasGalleryImages = !!(post.images && post.images.length);
-                          const gallery =
-                            (post.images?.map((img) => img.file_url) ?? []).concat(
-                              !hasGalleryImages && post.image_url ? [post.image_url] : []
-                            );
-                          if (gallery.length === 0) return null;
-                          return (
-                            <div className="mb-4">
-                              <PostImageCarousel
-                                images={gallery}
-                                onImageClick={
-                                  hasGalleryImages
-                                    ? (idx) => openLightbox(post.id, idx)
-                                    : undefined
-                                }
-                              />
-                            </div>
-                          );
-                        })()}
-                        
-                        {post.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-3">
-                            {post.tags.map((tag, index) => (
-                              <Badge key={index} variant="secondary" className="text-xs">
-                                #{tag}
-                              </Badge>
-                            ))}
-                          </div>
+                        {isOwnProfile && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deletePost(post.id)}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         )}
-                        
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Heart className="h-4 w-4" />
-                            {post.likes_count}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MessageCircle className="h-4 w-4" />
-                            {post.comments_count}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 pt-3 border-t">
-                          <CommentSection
-                            postId={post.id}
-                            commentsCount={post.comments_count}
-                            onCommentChange={(newCount) =>
-                              setPosts((prevPosts) =>
-                                prevPosts.map((p) =>
-                                  p.id === post.id ? { ...p, comments_count: newCount } : p
-                                )
-                              )
-                            }
-                          />
-                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+
+                      {/* Image — edge-to-edge, natural aspect */}
+                      {gallery.length > 0 && (
+                        <PostImageCarousel
+                          images={gallery}
+                          onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined}
+                        />
+                      )}
+
+                      {/* Action bar */}
+                      <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
+                        <LikeButton
+                          postId={post.id}
+                          likesCount={post.likes_count}
+                          onLikeChange={(newCount) =>
+                            setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, likes_count: newCount } : p))
+                          }
+                        />
+                        <CommentSection
+                          postId={post.id}
+                          commentsCount={post.comments_count}
+                          onCommentChange={(newCount) =>
+                            setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: newCount } : p))
+                          }
+                        />
+                      </div>
+
+                      {/* Caption */}
+                      {post.content && (
+                        <p className="px-4 pb-2 text-sm leading-snug">
+                          <span className="font-semibold mr-1.5">
+                            {profile?.username || 'Anonymous'}
+                          </span>
+                          {post.content}
+                        </p>
+                      )}
+
+                      {/* Tags */}
+                      {post.tags.length > 0 && (
+                        <div className="px-4 pb-3 flex flex-wrap gap-x-2 gap-y-1">
+                          {post.tags.map((tag, i) => (
+                            <span key={i} className="text-xs font-medium text-primary">#{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
             </>
             )}
-          </TabsContent>
-
-          <TabsContent value="followers">
-            <UsersList title="Followers" userIds={followers} />
-          </TabsContent>
-
-          <TabsContent value="following">
-            <UsersList title="Following" userIds={following} />
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
 
       {/* Fullscreen lightbox for this profile's post images */}

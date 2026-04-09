@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Calendar, Search, Users } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Search } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
@@ -13,8 +13,6 @@ import { FollowButton } from "@/components/FollowButton";
 import { LikeButton } from "@/components/LikeButton";
 import { CommentSection } from "@/components/CommentSection";
 import { PostUpload } from "@/components/PostUpload";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PostImageCarousel } from "@/components/PostImageCarousel";
 
 interface Post {
@@ -33,22 +31,6 @@ interface Post {
   images?: { id: string; file_url: string }[];
 }
 
-interface Upload {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
-  file_url: string;
-  file_type: string;
-  download_count: number;
-  rating: number;
-  created_at: string;
-  profiles: {
-    username: string;
-    avatar_url: string;
-  };
-}
-
 interface SearchProfile {
   id: string;
   user_id: string;
@@ -62,7 +44,6 @@ export const Feed = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [uploads, setUploads] = useState<Upload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchProfile[]>([]);
@@ -81,7 +62,6 @@ export const Feed = () => {
 
   const fetchFeed = async () => {
     if (!user) return;
-
     setIsLoading(true);
     try {
       const { data: followedUsers } = await supabase
@@ -96,42 +76,31 @@ export const Feed = () => {
         .select("*")
         .in("user_id", followedIds)
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(30);
 
       if (postsError) throw postsError;
 
       const postsArray = postsData || [];
 
       const postUserIds = [...new Set(postsArray.map((p) => p.user_id))];
-      const { data: postProfilesData } = postUserIds.length
+      const { data: profilesData } = postUserIds.length
         ? await supabase
             .from("profiles")
             .select("user_id, username, avatar_url")
             .in("user_id", postUserIds)
         : { data: [] };
-      const postProfilesMap = new Map(
-        (postProfilesData || []).map((p) => [p.user_id, p])
-      );
+      const profilesMap = new Map((profilesData || []).map((p) => [p.user_id, p]));
 
-      const postsWithProfiles = postsArray.map((post) => ({
-        ...post,
-        profiles: postProfilesMap.get(post.user_id) || { username: "Anonymous", avatar_url: "" },
-      }));
-
-      // Fetch all images for these posts in one query
       const postIds = postsArray.map((p) => p.id);
       let imagesByPost = new Map<string, { id: string; file_url: string }[]>();
 
       if (postIds.length > 0) {
-        const { data: imagesData, error: imagesError } = await supabase
+        const { data: imagesData } = await supabase
           .from("post_images")
           .select("id, post_id, file_url, position")
           .in("post_id", postIds)
           .order("position", { ascending: true });
 
-        if (imagesError) throw imagesError;
-
-        imagesByPost = new Map();
         (imagesData || []).forEach((img: any) => {
           const arr = imagesByPost.get(img.post_id) || [];
           arr.push({ id: img.id, file_url: img.file_url });
@@ -139,49 +108,16 @@ export const Feed = () => {
         });
       }
 
-      const postsWithImages: Post[] = postsWithProfiles.map((post: any) => {
-        const images = imagesByPost.get(post.id) || [];
-        return {
-          ...post,
-          images,
-        };
-      });
-
-      const { data: uploadsData, error: uploadsError } = await supabase
-        .from("uploads")
-        .select("*")
-        .in("user_id", followedIds)
-        .order("created_at", { ascending: false })
-        .limit(20);
-
-      if (uploadsError) throw uploadsError;
-
-      const uploadsArray = uploadsData || [];
-      const uploadUserIds = [...new Set(uploadsArray.map((u) => u.user_id))];
-      const { data: uploadProfilesData } = uploadUserIds.length
-        ? await supabase
-            .from("profiles")
-            .select("user_id, username, avatar_url")
-            .in("user_id", uploadUserIds)
-        : { data: [] };
-      const uploadProfilesMap = new Map(
-        (uploadProfilesData || []).map((p) => [p.user_id, p])
-      );
-
-      const uploadsWithProfiles = uploadsArray.map((upload) => ({
-        ...upload,
-        profiles: uploadProfilesMap.get(upload.user_id) || { username: "Anonymous", avatar_url: "" },
+      const postsWithImages: Post[] = postsArray.map((post: any) => ({
+        ...post,
+        profiles: profilesMap.get(post.user_id) || { username: "Anonymous", avatar_url: "" },
+        images: imagesByPost.get(post.id) || [],
       }));
 
       setPosts(postsWithImages);
-      setUploads(uploadsWithProfiles);
     } catch (error) {
       console.error("Error fetching feed:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load feed",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load feed", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -189,7 +125,6 @@ export const Feed = () => {
 
   const fetchSuggestedUsers = async () => {
     if (!user) return;
-
     try {
       const { data: followedUsers } = await supabase
         .from("follows")
@@ -214,11 +149,7 @@ export const Feed = () => {
   };
 
   const searchUsers = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
+    if (!query.trim()) { setSearchResults([]); return; }
     setIsSearching(true);
     try {
       const { data, error } = await supabase
@@ -226,7 +157,6 @@ export const Feed = () => {
         .select("*")
         .ilike("username", `%${query}%`)
         .limit(5);
-
       if (error) throw error;
       setSearchResults(data || []);
     } catch (error) {
@@ -242,360 +172,287 @@ export const Feed = () => {
     searchUsers(value);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
   const openLightbox = (postId: string, index: number) => {
     setLightboxPostId(postId);
     setLightboxIndex(index);
   };
 
-  const closeLightbox = () => {
-    setLightboxPostId(null);
-  };
+  const closeLightbox = () => setLightboxPostId(null);
 
   const showPrev = () => {
     const post = posts.find((p) => p.id === lightboxPostId);
-    if (!post || !post.images || post.images.length === 0) return;
-    setLightboxIndex((prev) =>
-      prev === 0 ? post.images!.length - 1 : prev - 1
-    );
+    if (!post?.images?.length) return;
+    setLightboxIndex((prev) => (prev === 0 ? post.images!.length - 1 : prev - 1));
   };
 
   const showNext = () => {
     const post = posts.find((p) => p.id === lightboxPostId);
-    if (!post || !post.images || post.images.length === 0) return;
-    setLightboxIndex((prev) =>
-      prev === post.images!.length - 1 ? 0 : prev + 1
-    );
+    if (!post?.images?.length) return;
+    setLightboxIndex((prev) => (prev === post.images!.length - 1 ? 0 : prev + 1));
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
-  };
-
+  const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX);
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX === null) return;
-    const diffX = e.changedTouches[0].clientX - touchStartX;
-    const threshold = 50; // px
-    if (diffX > threshold) {
-      showPrev();
-    } else if (diffX < -threshold) {
-      showNext();
-    }
+    const diff = e.changedTouches[0].clientX - touchStartX;
+    if (diff > 50) showPrev();
+    else if (diff < -50) showNext();
     setTouchStartX(null);
   };
 
-  const renderPost = (post: Post) => (
-    <Card key={post.id} className="shadow-elegant hover:shadow-glow transition-shadow border-l-4 border-l-primary/40">
-      <CardContent className="p-6">
-        <div className="flex items-start space-x-4 mb-4">
-          <Avatar>
-            <AvatarImage src={post.profiles?.avatar_url} />
-            <AvatarFallback>
-              {post.profiles?.username?.[0]?.toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <Link to={`/profile/${post.user_id}`} className="font-semibold hover:underline">
-              {post.profiles?.username || "Anonymous"}
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-            </p>
-          </div>
-        </div>
-
-        <p className="mb-4 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">{post.content}</p>
-
-        {(() => {
-          const hasGalleryImages = !!(post.images && post.images.length);
-          const gallery =
-            (post.images?.map((img) => img.file_url) ?? []).concat(
-              !hasGalleryImages && post.image_url ? [post.image_url] : []
-            );
-          if (gallery.length === 0) return null;
-          return (
-            <div className="mb-4">
-              <PostImageCarousel
-                images={gallery}
-                onImageClick={
-                  hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined
-                }
-              />
-            </div>
-          );
-        })()}
-
-        {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {post.tags.map((tag, i) => (
-              <Badge key={i} variant="secondary" className="text-xs bg-primary/10 text-primary hover:bg-primary/20">
-                #{tag}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        <div className="pt-3 mt-2 border-t border-border/60">
-          <div className="flex items-start gap-6">
-            <LikeButton
-              postId={post.id}
-              likesCount={post.likes_count}
-              onLikeChange={(newCount) => {
-                setPosts(posts.map(p => 
-                  p.id === post.id ? { ...p, likes_count: newCount } : p
-                ));
-              }}
-            />
-            <CommentSection
-              postId={post.id}
-              commentsCount={post.comments_count}
-              onCommentChange={(newCount) => {
-                setPosts(posts.map(p => 
-                  p.id === post.id ? { ...p, comments_count: newCount } : p
-                ));
-              }}
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderUpload = (upload: Upload) => (
-    <Card key={upload.id} className="shadow-elegant hover:shadow-glow transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-start space-x-4 mb-4">
-          <Avatar>
-            <AvatarImage src={upload.profiles?.avatar_url} />
-            <AvatarFallback>
-              {upload.profiles?.username?.[0]?.toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <Link to={`/profile/${upload.user_id}`} className="font-semibold hover:underline">
-              {upload.profiles?.username || "Anonymous"}
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(upload.created_at), { addSuffix: true })}
-            </p>
-          </div>
-        </div>
-
-        <h3 className="font-semibold mb-2 text-lg">{upload.title}</h3>
-        {upload.description && (
-          <p className="text-sm text-muted-foreground mb-4">
-            {upload.description}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between pt-3 border-t">
-          <Badge variant="outline">{upload.file_type}</Badge>
-          <span className="text-sm text-muted-foreground">
-            {upload.download_count} downloads
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
   if (!user) {
     return (
-      <div className="min-h-screen px-4 flex items-center justify-center">
-        <div className="container mx-auto max-w-2xl text-center">
-          <p className="text-muted-foreground">Please sign in to view your feed</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <p className="text-muted-foreground">Please sign in to view your feed</p>
       </div>
     );
   }
 
-  const currentLightboxPost =
-    lightboxPostId && posts.find((p) => p.id === lightboxPostId);
-  const currentLightboxImage =
-    currentLightboxPost &&
-    currentLightboxPost.images &&
-    currentLightboxPost.images[lightboxIndex];
+  const currentLightboxPost = lightboxPostId ? posts.find((p) => p.id === lightboxPostId) : null;
+  const currentLightboxImage = currentLightboxPost?.images?.[lightboxIndex];
 
   return (
-    <div className="min-h-screen px-4 pt-8 pb-20 lg:pb-8 bg-gradient-to-br from-background via-muted/20 to-background">
-        <div className="container mx-auto max-w-5xl">
-          <div className="grid lg:grid-cols-12 gap-6">
-            {/* Main Feed */}
-            <main className="lg:col-span-12 max-w-2xl mx-auto w-full">
-            <h1 className="text-3xl font-bold mb-6">
-              <span className="bg-gradient-primary bg-clip-text text-transparent">
-                Your Feed
-              </span>
-            </h1>
+    <div className="min-h-screen bg-background pb-24 lg:pb-8">
+      <div className="mx-auto w-full max-w-[470px] px-0 sm:px-4 pt-4">
 
-            {/* Search Bar */}
-            <div className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                <Input
-                  type="text"
-                  placeholder="Search for users..."
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  className="pl-10"
-                />
-              </div>
+        {/* Search */}
+        <div className="px-4 sm:px-0 mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Search people..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="pl-9 rounded-full bg-muted/50 border-0 focus-visible:ring-1"
+            />
+          </div>
 
-              {searchQuery && (
-                <Card className="mt-2">
-                  <CardContent className="p-4">
-                    {isSearching ? (
-                      <p className="text-sm text-muted-foreground">Searching...</p>
-                    ) : searchResults.length > 0 ? (
-                      <div className="space-y-3">
-                        {searchResults.map((profile) => (
-                          <div
-                            key={profile.id}
-                            className="flex items-center justify-between"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <Avatar>
-                                <AvatarImage src={profile.avatar_url} />
-                                <AvatarFallback>
-                                  {profile.username?.[0]?.toUpperCase() || "U"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="font-semibold">{profile.username}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {profile.followers_count} followers
-                                </p>
-                              </div>
-                            </div>
-                            <FollowButton targetUserId={profile.user_id} />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No users found</p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Post Creation */}
-            <PostUpload onPostCreated={fetchFeed} />
-
-            {/* Content Tabs */}
-            <Tabs defaultValue="all" className="mb-4">
-              <TabsList className="w-full justify-start">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="posts">Posts</TabsTrigger>
-                <TabsTrigger value="uploads">Resources</TabsTrigger>
-              </TabsList>
-
-              {isLoading ? (
-                <div className="space-y-4 mt-4">
-                  {[1, 2, 3].map((i) => (
-                    <Card key={i}>
-                      <CardContent className="p-6">
-                        <div className="flex items-start space-x-4">
-                          <Skeleton className="w-12 h-12 rounded-full" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-1/4" />
-                            <Skeleton className="h-20 w-full" />
-                          </div>
+          {searchQuery && (
+            <Card className="mt-2 shadow-lg">
+              <CardContent className="p-3 space-y-2">
+                {isSearching ? (
+                  <p className="text-sm text-muted-foreground py-2 text-center">Searching…</p>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((profile) => (
+                    <div key={profile.id} className="flex items-center justify-between gap-3">
+                      <Link to={`/profile/${profile.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                        <Avatar className="h-9 w-9 flex-shrink-0">
+                          <AvatarImage src={profile.avatar_url} />
+                          <AvatarFallback>{profile.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm truncate">{profile.username}</p>
+                          <p className="text-xs text-muted-foreground">{profile.followers_count} followers</p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : posts.length === 0 && uploads.length === 0 ? (
-                <Card className="mt-4">
-                  <CardContent className="p-12 text-center">
-                    <p className="text-muted-foreground">
-                      No posts or uploads yet. Follow some users to see their content here!
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  <TabsContent value="all" className="mt-4 space-y-4">
-                    {posts.map(renderPost)}
-                    {uploads.map(renderUpload)}
-                  </TabsContent>
-
-                  <TabsContent value="posts" className="mt-4 space-y-4">
-                    {posts.length > 0 ? (
-                      posts.map(renderPost)
-                    ) : (
-                      <Card>
-                        <CardContent className="p-12 text-center">
-                          <p className="text-muted-foreground">No posts yet</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="uploads" className="mt-4 space-y-4">
-                    {uploads.length > 0 ? (
-                      uploads.map(renderUpload)
-                    ) : (
-                      <Card>
-                        <CardContent className="p-12 text-center">
-                          <p className="text-muted-foreground">No uploads yet</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </TabsContent>
-                </>
-              )}
-            </Tabs>
-          </main>
-
+                      </Link>
+                      <FollowButton targetUserId={profile.user_id} />
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2 text-center">No users found</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
+
+        {/* Suggested users strip — shown when feed is empty or user has no following */}
+        {!isLoading && suggestedUsers.length > 0 && posts.length === 0 && (
+          <div className="px-4 sm:px-0 mb-6">
+            <p className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Suggested for you</p>
+            <div className="space-y-3">
+              {suggestedUsers.map((u) => (
+                <div key={u.id} className="flex items-center justify-between gap-3">
+                  <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
+                      <AvatarImage src={u.avatar_url} />
+                      <AvatarFallback>{u.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{u.username}</p>
+                      <p className="text-xs text-muted-foreground">{u.followers_count} followers</p>
+                    </div>
+                  </Link>
+                  <FollowButton targetUserId={u.user_id} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Post creation */}
+        <div className="px-4 sm:px-0 mb-4">
+          <PostUpload onPostCreated={fetchFeed} />
+        </div>
+
+        {/* Feed */}
+        {isLoading ? (
+          <div className="space-y-6 px-4 sm:px-0">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-2xl overflow-hidden border border-border/60 bg-card">
+                <div className="flex items-center gap-3 p-4">
+                  <Skeleton className="h-9 w-9 rounded-full flex-shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-2.5 w-16" />
+                  </div>
+                </div>
+                <Skeleton className="w-full aspect-square" />
+                <div className="p-4 space-y-2">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="px-4 sm:px-0 text-center py-16 text-muted-foreground">
+            <p className="text-base">No posts yet.</p>
+            <p className="text-sm mt-1">Follow some users to see their content here.</p>
+          </div>
+        ) : (
+          <div className="space-y-0 divide-y divide-border/40">
+            {posts.map((post) => {
+              const hasGalleryImages = !!(post.images && post.images.length);
+              const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(
+                !hasGalleryImages && post.image_url ? [post.image_url] : []
+              );
+
+              return (
+                <article key={post.id} className="bg-card">
+                  {/* Header */}
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <Link to={`/profile/${post.user_id}`} className="flex-shrink-0">
+                      <Avatar className="h-9 w-9 ring-2 ring-primary/15">
+                        <AvatarImage src={post.profiles?.avatar_url} />
+                        <AvatarFallback className="text-sm font-bold">
+                          {post.profiles?.username?.[0]?.toUpperCase() || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Link>
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        to={`/profile/${post.user_id}`}
+                        className="font-semibold text-sm leading-tight hover:underline block truncate"
+                      >
+                        {post.profiles?.username || "Anonymous"}
+                      </Link>
+                      <p className="text-[11px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Image — edge-to-edge, natural aspect ratio */}
+                  {gallery.length > 0 && (
+                    <PostImageCarousel
+                      images={gallery}
+                      onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined}
+                    />
+                  )}
+
+                  {/* Action bar */}
+                  <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
+                    <LikeButton
+                      postId={post.id}
+                      likesCount={post.likes_count}
+                      onLikeChange={(newCount) =>
+                        setPosts((prev) =>
+                          prev.map((p) => (p.id === post.id ? { ...p, likes_count: newCount } : p))
+                        )
+                      }
+                    />
+                    <CommentSection
+                      postId={post.id}
+                      commentsCount={post.comments_count}
+                      onCommentChange={(newCount) =>
+                        setPosts((prev) =>
+                          prev.map((p) => (p.id === post.id ? { ...p, comments_count: newCount } : p))
+                        )
+                      }
+                    />
+                  </div>
+
+                  {/* Caption — username bolded inline, Instagram-style */}
+                  {post.content && (
+                    <p className="px-4 pb-2 text-sm leading-snug">
+                      <Link
+                        to={`/profile/${post.user_id}`}
+                        className="font-semibold mr-1.5 hover:underline"
+                      >
+                        {post.profiles?.username || "Anonymous"}
+                      </Link>
+                      {post.content}
+                    </p>
+                  )}
+
+                  {/* Tags */}
+                  {post.tags && post.tags.length > 0 && (
+                    <div className="px-4 pb-3 flex flex-wrap gap-x-2 gap-y-1">
+                      {post.tags.map((tag, i) => (
+                        <span key={i} className="text-xs font-medium text-primary">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Fullscreen lightbox for post images */}
+      {/* Fullscreen lightbox */}
       {currentLightboxPost && currentLightboxImage && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           <button
             type="button"
-            className="absolute top-4 right-4 text-white text-xl md:text-2xl"
+            className="absolute top-4 right-4 text-white/80 hover:text-white text-2xl leading-none z-10"
             onClick={closeLightbox}
+            aria-label="Close"
           >
             ✕
           </button>
-
           <button
             type="button"
-            className="absolute left-4 md:left-8 text-white text-3xl md:text-4xl"
+            className="absolute left-4 text-white/80 hover:text-white text-4xl leading-none z-10"
             onClick={showPrev}
+            aria-label="Previous"
           >
             ‹
           </button>
           <button
             type="button"
-            className="absolute right-4 md:right-8 text-white text-3xl md:text-4xl"
+            className="absolute right-4 text-white/80 hover:text-white text-4xl leading-none z-10"
             onClick={showNext}
+            aria-label="Next"
           >
             ›
           </button>
-
-          <div
-            className="max-w-5xl w-full px-4"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            <img
-              src={currentLightboxImage.file_url}
-              alt="Post content"
-              className="w-full max-h-[80vh] object-contain mx-auto"
-            />
-          </div>
+          <img
+            src={currentLightboxImage.file_url}
+            alt="Full size"
+            className="max-w-full max-h-[92vh] object-contain select-none"
+            draggable={false}
+          />
+          {currentLightboxPost.images && currentLightboxPost.images.length > 1 && (
+            <div className="absolute bottom-5 left-0 right-0 flex justify-center gap-1.5">
+              {currentLightboxPost.images.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full bg-white transition-all duration-300 ${
+                    i === lightboxIndex ? "w-5 opacity-100" : "w-1.5 opacity-40"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

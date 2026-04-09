@@ -23,7 +23,15 @@
       "Bash(ls /tmp/lottie*.json)",
       "Bash(ls /tmp/*.json)",
       "Bash(python3:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(wc:*)",
+      "Bash(grep -r \"profiles\\\\|user\" /c/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/*.sql)",
+      "Bash(supabase functions:*)",
+      "Bash(supabase secrets:*)",
+      "Bash(taskkill /F /IM supabase.exe)",
+      "Bash(grep -rn \"CREATE TABLE\\\\|enable row level security\\\\|ENABLE ROW LEVEL SECURITY\" C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/*.sql)",
+      "Bash(grep:*)",
+      "Bash(xargs -I {} basename {})"
     ]
   }
 }
