@@ -10,7 +10,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY_MASCOT") ?? Deno.env.get("GEMINI_API_KEY") ?? "";
 
 const ACE_SYSTEM_PROMPT = `You are Ace, a friendly and energetic star-shaped study buddy mascot for AceTerus — a Malaysian student learning app. Your personality:
 - Warm, encouraging, and playful but focused on helping students learn
