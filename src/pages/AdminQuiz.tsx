@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Plus, Pencil, Trash2, ChevronLeft, Loader2, ShieldAlert,
   ImagePlus, X, Globe, EyeOff, Sparkles, FolderOpen, BookOpen,
+  FileText, CheckSquare, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +32,22 @@ import { TextQuizImporter } from "@/components/TextQuizImporter";
 // ── Blank form shapes ─────────────────────────────────────────────────────────
 
 const blankCategoryForm = () => ({ name: "", description: "" });
-const blankDeckForm = () => ({ name: "", subject: "", description: "" });
+const blankDeckForm = () => ({ name: "", subject: "", description: "", quiz_type: "objective" as "objective" | "subjective" });
 const blankQuestionForm = () => ({
   text: "",
   explanation: "",
   answers: ["", "", "", ""],
   correctIndex: 0,
+  marks: 2,
+  // subjective-specific
+  questionType: "text" as "text" | "checkbox",
+  modelAnswer: "",
+  checkboxOptions: [
+    { text: "", is_correct: false },
+    { text: "", is_correct: false },
+    { text: "", is_correct: false },
+    { text: "", is_correct: false },
+  ] as { text: string; is_correct: boolean }[],
 });
 
 const LABELS = ["A", "B", "C", "D"];
@@ -76,6 +87,9 @@ const AdminQuiz = () => {
   const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
   const [deckForm, setDeckForm] = useState(blankDeckForm());
   const [savingDeck, setSavingDeck] = useState(false);
+
+  // Quiz type picker
+  const [quizTypeDialogOpen, setQuizTypeDialogOpen] = useState(false);
 
   // Question dialog
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
@@ -208,15 +222,18 @@ const AdminQuiz = () => {
 
   // ── Deck dialog helpers ──────────────────────────────────────────────────────
   const openCreateDeck = () => {
+    setQuizTypeDialogOpen(true);
+  };
+
+  const openCreateDeckWithType = (quizType: "objective" | "subjective") => {
     setEditingDeck(null);
-    // Pre-fill subject with the current category
-    setDeckForm({ name: "", subject: selectedCategory?.name ?? "", description: "" });
+    setDeckForm({ name: "", subject: selectedCategory?.name ?? "", description: "", quiz_type: quizType });
     setDeckDialogOpen(true);
   };
 
   const openEditDeck = (deck: Deck) => {
     setEditingDeck(deck);
-    setDeckForm({ name: deck.name, subject: deck.subject ?? "", description: deck.description ?? "" });
+    setDeckForm({ name: deck.name, subject: deck.subject ?? "", description: deck.description ?? "", quiz_type: deck.quiz_type ?? "objective" });
     setDeckDialogOpen(true);
   };
 
@@ -294,11 +311,35 @@ const AdminQuiz = () => {
     const answers = [...q.answers];
     while (answers.length < 4) answers.push({ id: "", question_id: q.id, text: "", is_correct: false });
     const correctIndex = answers.findIndex((a) => a.is_correct);
+
+    // Detect subjective question type from stored answers:
+    // - checkbox: has both correct and wrong options (is_correct mix)
+    // - text: all stored answers are model answers (all is_correct true), or none stored
+    const isSubjectiveDeck = selectedDeck?.quiz_type === "subjective";
+    const hasWrongOptions = q.answers.some((a) => !a.is_correct);
+    const questionType: "text" | "checkbox" =
+      isSubjectiveDeck && hasWrongOptions ? "checkbox" : "text";
+
+    const modelAnswer =
+      isSubjectiveDeck && questionType === "text"
+        ? (q.answers.find((a) => a.is_correct)?.text ?? "")
+        : "";
+
+    let checkboxOptions = blankQuestionForm().checkboxOptions;
+    if (questionType === "checkbox") {
+      checkboxOptions = q.answers.map((a) => ({ text: a.text, is_correct: a.is_correct }));
+      while (checkboxOptions.length < 2) checkboxOptions.push({ text: "", is_correct: false });
+    }
+
     setQuestionForm({
       text: q.text,
       explanation: q.explanation ?? "",
       answers: answers.slice(0, 4).map((a) => a.text),
       correctIndex: correctIndex >= 0 ? correctIndex : 0,
+      marks: q.marks ?? 2,
+      questionType,
+      modelAnswer,
+      checkboxOptions,
     });
     resetImageState();
     setExistingImageUrl(q.image_url ?? null);
@@ -314,36 +355,63 @@ const AdminQuiz = () => {
       toast({ title: "Question text is required", variant: "destructive" });
       return;
     }
-    const filledAnswers = questionForm.answers.filter(
-      (a, idx) => a.trim() || answerImageFiles[idx] || existingAnswerImageUrls[idx]
-    );
-    if (filledAnswers.length < 2) {
-      toast({ title: "At least 2 answer choices are required", variant: "destructive" });
-      return;
+
+    const isSubjective = selectedDeck?.quiz_type === "subjective";
+
+    let answers: { text: string; is_correct: boolean; image_url?: string | null }[] = [];
+    let replaceAnswersOnSave = false;
+
+    if (!isSubjective) {
+      // ── Objective MCQ ───────────────────────────────────────────────────────
+      const filledAnswers = questionForm.answers.filter(
+        (a, idx) => a.trim() || answerImageFiles[idx] || existingAnswerImageUrls[idx]
+      );
+      if (filledAnswers.length < 2) {
+        toast({ title: "At least 2 answer choices are required", variant: "destructive" });
+        return;
+      }
+      const resolvedAnswerImageUrls: (string | null)[] = await Promise.all(
+        questionForm.answers.map(async (_, idx) => {
+          const newFile = answerImageFiles[idx];
+          const existingUrl = existingAnswerImageUrls[idx];
+          if (newFile) {
+            if (existingUrl) await deleteQuizImage(existingUrl).catch(() => {});
+            return uploadQuizImage(newFile);
+          }
+          if (!answerImagePreviews[idx] && !existingUrl) return null;
+          return existingUrl ?? null;
+        })
+      );
+      answers = questionForm.answers
+        .map((text, idx) => ({
+          text: text.trim(),
+          is_correct: idx === questionForm.correctIndex,
+          image_url: resolvedAnswerImageUrls[idx] ?? null,
+        }))
+        .filter((a) => a.text || a.image_url);
+      replaceAnswersOnSave = true;
+    } else if (questionForm.questionType === "text") {
+      // ── Subjective text — save model answer as a single is_correct answer ──
+      if (!questionForm.modelAnswer.trim()) {
+        toast({ title: "Model answer is required", variant: "destructive" });
+        return;
+      }
+      answers = [{ text: questionForm.modelAnswer.trim(), is_correct: true }];
+      replaceAnswersOnSave = true;
+    } else {
+      // ── Subjective checkbox ─────────────────────────────────────────────────
+      const filled = questionForm.checkboxOptions.filter((o) => o.text.trim());
+      if (filled.length < 2) {
+        toast({ title: "At least 2 checkbox options are required", variant: "destructive" });
+        return;
+      }
+      if (!filled.some((o) => o.is_correct)) {
+        toast({ title: "At least one option must be marked as correct", variant: "destructive" });
+        return;
+      }
+      answers = filled.map((o) => ({ text: o.text.trim(), is_correct: o.is_correct }));
+      replaceAnswersOnSave = true;
     }
-
-    // Upload any new answer images, reuse existing URLs otherwise
-    const resolvedAnswerImageUrls: (string | null)[] = await Promise.all(
-      questionForm.answers.map(async (_, idx) => {
-        const newFile = answerImageFiles[idx];
-        const existingUrl = existingAnswerImageUrls[idx];
-        if (newFile) {
-          if (existingUrl) await deleteQuizImage(existingUrl).catch(() => {});
-          return uploadQuizImage(newFile);
-        }
-        // If preview was cleared (null preview + had existing) treat as removed
-        if (!answerImagePreviews[idx] && !existingUrl) return null;
-        return existingUrl ?? null;
-      })
-    );
-
-    const answers = questionForm.answers
-      .map((text, idx) => ({
-        text: text.trim(),
-        is_correct: idx === questionForm.correctIndex,
-        image_url: resolvedAnswerImageUrls[idx] ?? null,
-      }))
-      .filter((a) => a.text || a.image_url);
 
     setSavingQuestion(true);
     try {
@@ -359,18 +427,20 @@ const AdminQuiz = () => {
       if (editingQuestion) {
         await updateQuestion(editingQuestion.id, {
           text: questionForm.text,
-          explanation: questionForm.explanation || undefined,
+          explanation: isSubjective ? undefined : (questionForm.explanation || undefined),
+          marks: isSubjective ? questionForm.marks : undefined,
           ...(finalImageUrl !== undefined ? { image_url: finalImageUrl } : {}),
         });
-        await replaceAnswers(editingQuestion.id, answers);
+        if (replaceAnswersOnSave) await replaceAnswers(editingQuestion.id, answers);
         toast({ title: "Question updated" });
       } else {
         await createQuestion({
           deck_id: selectedDeck!.id,
           text: questionForm.text,
-          explanation: questionForm.explanation || undefined,
+          explanation: isSubjective ? undefined : (questionForm.explanation || undefined),
           image_url: finalImageUrl ?? undefined,
           order: questions.length,
+          marks: isSubjective ? questionForm.marks : undefined,
           answers,
         });
         toast({ title: "Question added" });
@@ -484,6 +554,15 @@ const AdminQuiz = () => {
               >
                 <ChevronLeft className="w-4 h-4" /> Back
               </Button>
+              {selectedDeck && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/quiz?preview=${selectedDeck.id}`)}
+                  className="gap-2"
+                >
+                  <Eye className="w-4 h-4" /> Preview
+                </Button>
+              )}
               <Button variant="outline" onClick={() => setTextImporterOpen(true)} className="gap-2">
                 <Sparkles className="w-4 h-4" /> Import from Text
               </Button>
@@ -612,6 +691,9 @@ const AdminQuiz = () => {
                         >
                           {deck.is_published ? "Published" : "Draft"}
                         </Badge>
+                        <Badge variant="outline" className={`text-xs capitalize ${deck.quiz_type === "subjective" ? "border-blue-400 text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}>
+                          {deck.quiz_type === "subjective" ? <><FileText className="w-3 h-3 inline mr-1" />Subjective</> : <><CheckSquare className="w-3 h-3 inline mr-1" />Objective</>}
+                        </Badge>
                       </div>
                       {deck.description && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{deck.description}</p>
@@ -702,24 +784,33 @@ const AdminQuiz = () => {
                         className="w-full max-h-48 object-contain rounded-lg border bg-muted/20 mb-3"
                       />
                     )}
-                    {q.answers.map((a, i) => (
-                      <div
-                        key={a.id}
-                        className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
-                          a.is_correct
-                            ? "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-300"
-                            : "border-border text-muted-foreground"
-                        }`}
-                      >
-                        <span className="font-semibold shrink-0">{LABELS[i]}.</span>
-                        <span>{a.text}</span>
-                        {a.is_correct && (
-                          <span className="ml-auto text-xs font-semibold text-green-600 dark:text-green-400">
-                            Correct
-                          </span>
-                        )}
+                    {selectedDeck?.quiz_type === "subjective" ? (
+                      <div className="flex items-center gap-3 mt-1">
+                        <Badge variant="outline" className="border-blue-400 text-blue-600 dark:text-blue-400 text-sm font-semibold px-3 py-1">
+                          [ {q.marks ?? 0} mark{(q.marks ?? 0) !== 1 ? "s" : ""} ]
+                        </Badge>
+                        <span className="text-xs text-muted-foreground italic">Open-ended — student writes answer</span>
                       </div>
-                    ))}
+                    ) : (
+                      q.answers.map((a, i) => (
+                        <div
+                          key={a.id}
+                          className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
+                            a.is_correct
+                              ? "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-300"
+                              : "border-border text-muted-foreground"
+                          }`}
+                        >
+                          <span className="font-semibold shrink-0">{LABELS[i]}.</span>
+                          <span>{a.text}</span>
+                          {a.is_correct && (
+                            <span className="ml-auto text-xs font-semibold text-green-600 dark:text-green-400">
+                              Correct
+                            </span>
+                          )}
+                        </div>
+                      ))
+                    )}
                     {q.explanation && (
                       <p className="text-xs text-muted-foreground mt-2 italic">
                         Explanation: {q.explanation}
@@ -750,6 +841,40 @@ const AdminQuiz = () => {
           onSuccess={() => selectedDeck && loadQuestions(selectedDeck)}
         />
       )}
+
+      {/* ── Quiz Type Picker Dialog ── */}
+      <Dialog open={quizTypeDialogOpen} onOpenChange={setQuizTypeDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Choose Quiz Type</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-2">
+            Select the type of quiz you want to create.
+          </p>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <button
+              onClick={() => { setQuizTypeDialogOpen(false); openCreateDeckWithType("objective"); }}
+              className="flex flex-col items-center gap-3 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 p-5 text-center transition-all"
+            >
+              <CheckSquare className="w-9 h-9 text-primary" />
+              <div>
+                <p className="font-semibold text-sm">Objective</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Multiple choice (MCQ)</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { setQuizTypeDialogOpen(false); openCreateDeckWithType("subjective"); }}
+              className="flex flex-col items-center gap-3 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 p-5 text-center transition-all"
+            >
+              <FileText className="w-9 h-9 text-primary" />
+              <div>
+                <p className="font-semibold text-sm">Subjective</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Essay / open-ended (SPM)</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Category Dialog ── */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
@@ -793,6 +918,12 @@ const AdminQuiz = () => {
             <DialogTitle>{editingDeck ? "Edit Quiz" : "New Quiz"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {!editingDeck && (
+              <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium border ${deckForm.quiz_type === "subjective" ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-400" : "bg-muted/40 border-border text-muted-foreground"}`}>
+                {deckForm.quiz_type === "subjective" ? <FileText className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
+                {deckForm.quiz_type === "subjective" ? "Subjective quiz (SPM essay style)" : "Objective quiz (MCQ)"}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Quiz Name *</Label>
               <Input
@@ -860,146 +991,278 @@ const AdminQuiz = () => {
                 rows={3}
               />
             </div>
-            <div className="space-y-3">
-              <Label>Answer Choices (select the correct one)</Label>
-              {questionForm.answers.map((answer, idx) => {
-                const preview = answerImagePreviews[idx];
-                const existing = existingAnswerImageUrls[idx];
-                const hasImage = preview || existing;
-                return (
-                  <div key={idx} className="space-y-1.5">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="correctAnswer"
-                        checked={questionForm.correctIndex === idx}
-                        onChange={() => setQuestionForm((f) => ({ ...f, correctIndex: idx }))}
-                        className="accent-primary w-4 h-4 shrink-0"
-                      />
-                      <span className="font-semibold text-sm w-5 shrink-0">{LABELS[idx]}.</span>
-                      <Input
-                        placeholder={`Answer ${LABELS[idx]}`}
-                        value={answer}
-                        onChange={(e) => {
-                          const answers = [...questionForm.answers];
-                          answers[idx] = e.target.value;
-                          setQuestionForm((f) => ({ ...f, answers }));
-                        }}
-                      />
-                      {/* Hidden file input */}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        ref={(el) => { answerImageInputRefs.current[idx] = el; }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const files = [...answerImageFiles]; files[idx] = file;
-                          const previews = [...answerImagePreviews]; previews[idx] = URL.createObjectURL(file);
-                          setAnswerImageFiles(files);
-                          setAnswerImagePreviews(previews);
-                        }}
-                      />
-                      {/* Image toggle button */}
-                      <button
-                        type="button"
-                        title={hasImage ? "Change image" : "Add image"}
-                        onClick={() => answerImageInputRefs.current[idx]?.click()}
-                        className={`shrink-0 rounded-md border p-1.5 transition-colors ${hasImage ? "border-primary bg-primary/10 text-primary" : "border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary"}`}
-                      >
-                        <ImagePlus className="w-4 h-4" />
+
+            {selectedDeck?.quiz_type === "subjective" ? (
+              /* ── Subjective question form ── */
+              <>
+                {/* Question image */}
+                <div className="space-y-2">
+                  <Label>Question Image (optional)</Label>
+                  {(imagePreview || existingImageUrl) && (
+                    <div className="relative w-full rounded-lg overflow-hidden border bg-muted/20">
+                      <img src={imagePreview ?? existingImageUrl!} alt="Question preview" className="w-full max-h-48 object-contain" />
+                      <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); setExistingImageUrl(null); if (imageInputRef.current) imageInputRef.current.value = ""; }} className="absolute top-2 right-2 rounded-full bg-background/80 border p-1 hover:bg-destructive hover:text-destructive-foreground transition-colors">
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
-
-                    {/* Answer image preview */}
-                    {hasImage && (
-                      <div className="ml-12 relative w-full max-w-[200px] rounded-lg overflow-hidden border bg-muted/20">
-                        <img
-                          src={preview ?? existing!}
-                          alt={`Answer ${LABELS[idx]} image`}
-                          className="w-full max-h-28 object-contain"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const files = [...answerImageFiles]; files[idx] = null;
-                            const previews = [...answerImagePreviews]; previews[idx] = null;
-                            const urls = [...existingAnswerImageUrls]; urls[idx] = null;
-                            setAnswerImageFiles(files);
-                            setAnswerImagePreviews(previews);
-                            setExistingAnswerImageUrls(urls);
-                            const ref = answerImageInputRefs.current[idx];
-                            if (ref) ref.value = "";
-                          }}
-                          className="absolute top-1 right-1 rounded-full bg-background/80 border p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <p className="text-xs text-muted-foreground">
-                Select the radio button next to the correct answer. Use 📷 to add an image to any option.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Explanation (optional)</Label>
-              <Textarea
-                placeholder="Explain why this answer is correct"
-                value={questionForm.explanation}
-                onChange={(e) => setQuestionForm((f) => ({ ...f, explanation: e.target.value }))}
-                rows={2}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Image (optional)</Label>
-              {(imagePreview || existingImageUrl) && (
-                <div className="relative w-full rounded-lg overflow-hidden border bg-muted/20">
-                  <img
-                    src={imagePreview ?? existingImageUrl!}
-                    alt="Question preview"
-                    className="w-full max-h-48 object-contain"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImageFile(null);
-                      setImagePreview(null);
-                      setExistingImageUrl(null);
-                      if (imageInputRef.current) imageInputRef.current.value = "";
-                    }}
-                    className="absolute top-2 right-2 rounded-full bg-background/80 border p-1 hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                  )}
+                  <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setImageFile(file); setImagePreview(URL.createObjectURL(file)); }} />
+                  {!imagePreview && !existingImageUrl && (
+                    <Button type="button" variant="outline" className="w-full gap-2 border-dashed" onClick={() => imageInputRef.current?.click()}>
+                      <ImagePlus className="w-4 h-4" /> Upload image
+                    </Button>
+                  )}
                 </div>
-              )}
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setImageFile(file);
-                  setImagePreview(URL.createObjectURL(file));
-                }}
-              />
-              {!imagePreview && !existingImageUrl && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2 border-dashed"
-                  onClick={() => imageInputRef.current?.click()}
-                >
-                  <ImagePlus className="w-4 h-4" /> Upload image
-                </Button>
-              )}
-            </div>
+
+                {/* Question type selector */}
+                <div className="space-y-2">
+                  <Label>Answer Type</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setQuestionForm((f) => ({ ...f, questionType: "text" }))}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${questionForm.questionType === "text" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
+                    >
+                      Text Answer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuestionForm((f) => ({ ...f, questionType: "checkbox" }))}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${questionForm.questionType === "checkbox" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50"}`}
+                    >
+                      Checkbox Options
+                    </button>
+                  </div>
+                </div>
+
+                {questionForm.questionType === "text" ? (
+                  /* Text answer: model answer + preview */
+                  <>
+                    <div className="space-y-1.5">
+                      <Label>Model Answer *</Label>
+                      <Textarea
+                        placeholder="Enter the expected model answer here"
+                        value={questionForm.modelAnswer}
+                        onChange={(e) => setQuestionForm((f) => ({ ...f, modelAnswer: e.target.value }))}
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground">This is shown to students as a format reference and used by AI for grading.</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5" /> Student view (preview)
+                      </Label>
+                      <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10 p-3">
+                        <Textarea disabled placeholder="Students will type their answer here..." rows={3} className="resize-none opacity-50 cursor-not-allowed bg-transparent" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Checkbox options */
+                  <div className="space-y-2">
+                    <Label>Options <span className="text-muted-foreground font-normal text-xs">(check the correct ones)</span></Label>
+                    {questionForm.checkboxOptions.map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={opt.is_correct}
+                          onChange={(e) => {
+                            const opts = [...questionForm.checkboxOptions];
+                            opts[idx] = { ...opts[idx], is_correct: e.target.checked };
+                            setQuestionForm((f) => ({ ...f, checkboxOptions: opts }));
+                          }}
+                          className="accent-primary w-4 h-4 shrink-0 rounded"
+                        />
+                        <Input
+                          placeholder={`Option ${idx + 1}`}
+                          value={opt.text}
+                          onChange={(e) => {
+                            const opts = [...questionForm.checkboxOptions];
+                            opts[idx] = { ...opts[idx], text: e.target.value };
+                            setQuestionForm((f) => ({ ...f, checkboxOptions: opts }));
+                          }}
+                        />
+                        {questionForm.checkboxOptions.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => setQuestionForm((f) => ({ ...f, checkboxOptions: f.checkboxOptions.filter((_, i) => i !== idx) }))}
+                            className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1.5 border-dashed"
+                      onClick={() => setQuestionForm((f) => ({ ...f, checkboxOptions: [...f.checkboxOptions, { text: "", is_correct: false }] }))}
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add option
+                    </Button>
+                    <p className="text-xs text-muted-foreground">Check the box next to each correct option. Students must select all correct options to earn full marks.</p>
+                  </div>
+                )}
+
+                {/* Marks */}
+                <div className="space-y-1.5">
+                  <Label>Marks for this question</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={questionForm.marks}
+                      onChange={(e) => setQuestionForm((f) => ({ ...f, marks: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">mark{questionForm.marks !== 1 ? "s" : ""}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* ── Objective (MCQ) question form ── */
+              <>
+                <div className="space-y-3">
+                  <Label>Answer Choices (select the correct one)</Label>
+                  {questionForm.answers.map((answer, idx) => {
+                    const preview = answerImagePreviews[idx];
+                    const existing = existingAnswerImageUrls[idx];
+                    const hasImage = preview || existing;
+                    return (
+                      <div key={idx} className="space-y-1.5">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="correctAnswer"
+                            checked={questionForm.correctIndex === idx}
+                            onChange={() => setQuestionForm((f) => ({ ...f, correctIndex: idx }))}
+                            className="accent-primary w-4 h-4 shrink-0"
+                          />
+                          <span className="font-semibold text-sm w-5 shrink-0">{LABELS[idx]}.</span>
+                          <Input
+                            placeholder={`Answer ${LABELS[idx]}`}
+                            value={answer}
+                            onChange={(e) => {
+                              const answers = [...questionForm.answers];
+                              answers[idx] = e.target.value;
+                              setQuestionForm((f) => ({ ...f, answers }));
+                            }}
+                          />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            ref={(el) => { answerImageInputRefs.current[idx] = el; }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const files = [...answerImageFiles]; files[idx] = file;
+                              const previews = [...answerImagePreviews]; previews[idx] = URL.createObjectURL(file);
+                              setAnswerImageFiles(files);
+                              setAnswerImagePreviews(previews);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            title={hasImage ? "Change image" : "Add image"}
+                            onClick={() => answerImageInputRefs.current[idx]?.click()}
+                            className={`shrink-0 rounded-md border p-1.5 transition-colors ${hasImage ? "border-primary bg-primary/10 text-primary" : "border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary"}`}
+                          >
+                            <ImagePlus className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {hasImage && (
+                          <div className="ml-12 relative w-full max-w-[200px] rounded-lg overflow-hidden border bg-muted/20">
+                            <img
+                              src={preview ?? existing!}
+                              alt={`Answer ${LABELS[idx]} image`}
+                              className="w-full max-h-28 object-contain"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const files = [...answerImageFiles]; files[idx] = null;
+                                const previews = [...answerImagePreviews]; previews[idx] = null;
+                                const urls = [...existingAnswerImageUrls]; urls[idx] = null;
+                                setAnswerImageFiles(files);
+                                setAnswerImagePreviews(previews);
+                                setExistingAnswerImageUrls(urls);
+                                const ref = answerImageInputRefs.current[idx];
+                                if (ref) ref.value = "";
+                              }}
+                              className="absolute top-1 right-1 rounded-full bg-background/80 border p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-muted-foreground">
+                    Select the radio button next to the correct answer. Use 📷 to add an image to any option.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Explanation (optional)</Label>
+                  <Textarea
+                    placeholder="Explain why this answer is correct"
+                    value={questionForm.explanation}
+                    onChange={(e) => setQuestionForm((f) => ({ ...f, explanation: e.target.value }))}
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Image (optional)</Label>
+                  {(imagePreview || existingImageUrl) && (
+                    <div className="relative w-full rounded-lg overflow-hidden border bg-muted/20">
+                      <img
+                        src={imagePreview ?? existingImageUrl!}
+                        alt="Question preview"
+                        className="w-full max-h-48 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImageFile(null);
+                          setImagePreview(null);
+                          setExistingImageUrl(null);
+                          if (imageInputRef.current) imageInputRef.current.value = "";
+                        }}
+                        className="absolute top-2 right-2 rounded-full bg-background/80 border p-1 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }}
+                  />
+                  {!imagePreview && !existingImageUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2 border-dashed"
+                      onClick={() => imageInputRef.current?.click()}
+                    >
+                      <ImagePlus className="w-4 h-4" /> Upload image
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setQuestionDialogOpen(false)}>Cancel</Button>

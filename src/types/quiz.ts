@@ -15,6 +15,7 @@ export interface Deck {
   created_at: string;
   question_count: number;
   is_published: boolean;
+  quiz_type: "objective" | "subjective";
 }
 
 export interface Answer {
@@ -32,6 +33,7 @@ export interface Question {
   explanation: string | null;
   image_url: string | null;
   order: number;
+  marks: number | null;
   answers: Answer[];
 }
 

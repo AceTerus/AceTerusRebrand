@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Bookmark,
   BookmarkCheck,
@@ -18,6 +19,7 @@ import {
   GraduationCap,
   Layers,
   Loader2,
+  PenLine,
   Sparkles,
   Target,
   X,
@@ -38,10 +40,12 @@ import { supabase } from "@/integrations/supabase/client";
 type QuizView = "categories" | "decks" | "taking";
 
 const Quiz = () => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isAdmin } = useAuth();
   const { streak, updateStreak } = useStreak();
   const { pushMessage } = useMascot();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const previewDeckId = searchParams.get("preview");
 
   // Category state
   const [categories, setCategories] = useState<Category[]>([]);
@@ -78,9 +82,43 @@ const Quiz = () => {
   const [analysisResult, setAnalysisResult] = useState<PerformanceAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
+  // Subjective quiz state
+  const [subjectiveAnswerMap, setSubjectiveAnswerMap] = useState<Map<number, string>>(new Map());
+  const [checkboxAnswerMap, setCheckboxAnswerMap] = useState<Map<number, Set<string>>>(new Map());
+  const [subjectiveGrading, setSubjectiveGrading] = useState(false);
+  const [subjectiveResults, setSubjectiveResults] = useState<Map<number, { marksEarned: number; maxMarks: number; isCorrect: boolean; feedback: string }>>(new Map());
+
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
   }, [authLoading, user, navigate]);
+
+  // Admin preview: jump straight into the quiz for any deck (published or not)
+  useEffect(() => {
+    if (authLoading || !user || !isAdmin || !previewDeckId) return;
+    let cancelled = false;
+    setQuizLoading(true);
+    setQuizError(null);
+    fetchQuiz(previewDeckId)
+      .then((payload) => {
+        if (cancelled) return;
+        const shuffled = [...payload.questions].sort(() => Math.random() - 0.5);
+        setQuizPayload({ ...payload, questions: shuffled });
+        setActiveDeck(payload.deck);
+        setCurrentIndex(0);
+        setAnsweredMap(new Map());
+        setSessionComplete(false);
+        setSubmitConfirmPending(false);
+        setFlaggedQuestions(new Set());
+        setShowBookmarkPanel(false);
+        setAnalysisResult(null);
+        setAnalysisError(null);
+        setAnalysisLoading(false);
+        setView("taking");
+      })
+      .catch((e: any) => { if (!cancelled) setQuizError(e.message ?? "Failed to load the quiz deck."); })
+      .finally(() => { if (!cancelled) setQuizLoading(false); });
+    return () => { cancelled = true; };
+  }, [authLoading, user, isAdmin, previewDeckId]);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -146,16 +184,40 @@ const Quiz = () => {
   const questions: Question[] = quizPayload?.questions ?? [];
   const currentQuestion = questions[currentIndex];
   const selectedAnswerId = answeredMap.get(currentIndex) ?? null;
-  const answeredCount = answeredMap.size;
+  const isSubjective = quizPayload?.deck.quiz_type === "subjective";
+
+  const answeredCount = isSubjective
+    ? questions.filter((q, idx) => {
+        const isCheckbox = q.answers.some((a) => !a.is_correct);
+        if (isCheckbox) return (checkboxAnswerMap.get(idx)?.size ?? 0) > 0;
+        return (subjectiveAnswerMap.get(idx) ?? "").trim().length > 0;
+      }).length
+    : answeredMap.size;
 
   const correctCount = useMemo(() => {
     if (!sessionComplete) return 0;
+    if (isSubjective) {
+      let count = 0;
+      subjectiveResults.forEach((r) => { if (r.isCorrect) count++; });
+      return count;
+    }
     return questions.reduce((acc, q, idx) => {
       const selected = answeredMap.get(idx);
       const correctAnswer = q.answers.find((a) => a.is_correct);
       return acc + (selected === correctAnswer?.id ? 1 : 0);
     }, 0);
-  }, [sessionComplete, answeredMap, questions]);
+  }, [sessionComplete, isSubjective, answeredMap, subjectiveResults, questions]);
+
+  const totalMaxMarks = useMemo(
+    () => (isSubjective ? questions.reduce((acc, q) => acc + (q.marks ?? 1), 0) : 0),
+    [isSubjective, questions]
+  );
+
+  const totalMarksEarned = useMemo(() => {
+    let total = 0;
+    subjectiveResults.forEach((r) => { total += r.marksEarned; });
+    return total;
+  }, [subjectiveResults]);
 
   const accuracy = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
   const isLastQuestion = currentIndex >= questions.length - 1;
@@ -184,6 +246,10 @@ const Quiz = () => {
     setAnalysisResult(null);
     setAnalysisError(null);
     setAnalysisLoading(false);
+    setSubjectiveAnswerMap(new Map());
+    setCheckboxAnswerMap(new Map());
+    setSubjectiveGrading(false);
+    setSubjectiveResults(new Map());
   };
 
   const handleStartQuiz = async (deck: Deck) => {
@@ -216,6 +282,28 @@ const Quiz = () => {
       return next;
     });
     setSubmitConfirmPending(false);
+  };
+
+  const handleSubjectiveAnswer = (text: string) => {
+    if (sessionComplete) return;
+    setSubjectiveAnswerMap((prev) => {
+      const next = new Map(prev);
+      if (text.trim()) next.set(currentIndex, text);
+      else next.delete(currentIndex);
+      return next;
+    });
+  };
+
+  const handleCheckboxToggle = (answerId: string) => {
+    if (sessionComplete) return;
+    setCheckboxAnswerMap((prev) => {
+      const next = new Map(prev);
+      const selected = new Set(next.get(currentIndex) ?? []);
+      if (selected.has(answerId)) selected.delete(answerId);
+      else selected.add(answerId);
+      next.set(currentIndex, selected);
+      return next;
+    });
   };
 
   const handleNextQuestion = () => { if (!isLastQuestion) setCurrentIndex((prev) => prev + 1); };
@@ -258,6 +346,69 @@ const Quiz = () => {
           'happy'
         );
       }
+    }
+
+    // Subjective quiz: grade and return early (skip MCQ analysis)
+    if (quizPayload?.deck.quiz_type === "subjective") {
+      const snapshotSubjective = new Map(subjectiveAnswerMap);
+      const snapshotCheckbox = new Map(checkboxAnswerMap);
+      const resultsMap = new Map<number, { marksEarned: number; maxMarks: number; isCorrect: boolean; feedback: string }>();
+
+      // Grade checkbox questions deterministically (no AI needed)
+      const textItems: { idx: number; q: typeof snapshotQuestions[0] }[] = [];
+      snapshotQuestions.forEach((q, idx) => {
+        const isCheckbox = q.answers.some((a) => !a.is_correct);
+        if (isCheckbox) {
+          const selected = snapshotCheckbox.get(idx) ?? new Set<string>();
+          const correctIds = new Set(q.answers.filter((a) => a.is_correct).map((a) => a.id));
+          const allCorrectSelected = correctIds.size > 0 && [...correctIds].every((id) => selected.has(id));
+          const noWrongSelected = [...selected].every((id) => correctIds.has(id));
+          const isCorrect = allCorrectSelected && noWrongSelected;
+          const maxMarks = q.marks ?? 1;
+          resultsMap.set(idx, {
+            marksEarned: isCorrect ? maxMarks : 0,
+            maxMarks,
+            isCorrect,
+            feedback: isCorrect
+              ? "All correct options selected."
+              : "Some options were incorrect or missing.",
+          });
+        } else {
+          textItems.push({ idx, q });
+        }
+      });
+
+      // Grade text questions with AI
+      if (textItems.length > 0) {
+        setSubjectiveGrading(true);
+        try {
+          const items = textItems.map(({ idx, q }) => ({
+            question: q.text,
+            userAnswer: snapshotSubjective.get(idx) ?? "",
+            modelAnswers: q.answers.filter((a) => a.is_correct).map((a) => a.text),
+            maxMarks: q.marks ?? 1,
+          }));
+          const { data: gradeData, error: gradeError } = await supabase.functions.invoke(
+            "subjective-quiz-grader",
+            { body: { items } }
+          );
+          if (!gradeError && Array.isArray(gradeData?.results)) {
+            (gradeData.results as any[]).forEach((r: any, i: number) => {
+              const { idx, q } = textItems[i];
+              resultsMap.set(idx, {
+                marksEarned: r.marksEarned ?? 0,
+                maxMarks: q.marks ?? 1,
+                isCorrect: r.isCorrect ?? false,
+                feedback: r.feedback ?? "",
+              });
+            });
+          }
+        } catch { /* grading failure is non-fatal */ }
+        finally { setSubjectiveGrading(false); }
+      }
+
+      setSubjectiveResults(resultsMap);
+      return;
     }
 
     // Build per-question data for analysis
@@ -565,19 +716,41 @@ const Quiz = () => {
                 <div className="rounded-xl border p-8 text-center bg-gradient-to-br from-background to-muted/30">
                   <p className="text-sm uppercase tracking-wider text-muted-foreground mb-2">Quiz submitted</p>
                   <h3 className="text-3xl font-bold text-primary mb-1">{activeDeck?.name}</h3>
-                  <p className="text-5xl font-extrabold mt-4 mb-1 text-primary">
-                    {correctCount} <span className="text-2xl font-semibold text-muted-foreground">/ {questions.length}</span>
-                  </p>
-                  <p className="text-muted-foreground text-sm">questions correct</p>
+                  {isSubjective ? (
+                    subjectiveGrading ? (
+                      <div className="flex flex-col items-center gap-2 mt-4">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-muted-foreground text-sm">AI is grading your answers…</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-5xl font-extrabold mt-4 mb-1 text-primary">
+                          {totalMarksEarned} <span className="text-2xl font-semibold text-muted-foreground">/ {totalMaxMarks}</span>
+                        </p>
+                        <p className="text-muted-foreground text-sm">marks earned</p>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <p className="text-5xl font-extrabold mt-4 mb-1 text-primary">
+                        {correctCount} <span className="text-2xl font-semibold text-muted-foreground">/ {questions.length}</span>
+                      </p>
+                      <p className="text-muted-foreground text-sm">questions correct</p>
+                    </>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {[
+                  {(isSubjective ? [
+                    { label: "Marks", value: `${totalMarksEarned}/${totalMaxMarks}`, className: "text-primary" },
+                    { label: "Answered", value: answeredCount, className: "text-green-600 dark:text-green-400" },
+                    { label: "Skipped", value: questions.length - answeredCount, className: "text-muted-foreground" },
+                  ] : [
                     { label: "Score", value: `${accuracy}%`, className: "text-primary" },
                     { label: "Correct", value: correctCount, className: "text-green-600 dark:text-green-400" },
                     { label: "Wrong", value: answeredCount - correctCount, className: "text-red-500 dark:text-red-400" },
                     { label: "Skipped", value: questions.length - answeredCount, className: "text-muted-foreground" },
-                  ].map((s) => (
+                  ]).map((s) => (
                     <div key={s.label} className="rounded-xl border p-4 text-center">
                       <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
                       <p className={`text-2xl font-bold ${s.className}`}>{s.value}</p>
@@ -596,11 +769,115 @@ const Quiz = () => {
                   <h4 className="text-xl font-bold mb-4">Answer Review</h4>
                   <div className="space-y-6">
                     {questions.map((q, idx) => {
+                      const isBookmarked = flaggedQuestions.has(idx);
+
+                      if (isSubjective) {
+                        const result = subjectiveResults.get(idx);
+                        const isCheckbox = q.answers.some((a) => !a.is_correct);
+                        const userAnswer = subjectiveAnswerMap.get(idx) ?? "";
+                        const selectedIds = checkboxAnswerMap.get(idx) ?? new Set<string>();
+                        const modelAnswers = q.answers.filter((a) => a.is_correct);
+                        const isSkipped = isCheckbox ? selectedIds.size === 0 : !userAnswer.trim();
+                        const borderColor = isSkipped
+                          ? "border-l-muted-foreground/30"
+                          : result?.isCorrect
+                          ? "border-l-green-500"
+                          : "border-l-red-500";
+
+                        return (
+                          <Card key={idx} className={cn("shadow-elegant border-l-4", borderColor)}>
+                            <CardHeader className="pb-3">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <Badge variant="outline" className="shrink-0">Q{idx + 1}</Badge>
+                                {subjectiveGrading ? (
+                                  <Badge variant="outline" className="text-xs gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Grading…</Badge>
+                                ) : isSkipped ? (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground border-muted-foreground/40">Skipped</Badge>
+                                ) : result ? (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn("text-xs", result.isCorrect
+                                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-300 dark:border-green-500/40"
+                                      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-red-300 dark:border-red-500/40")}
+                                  >
+                                    {result.isCorrect
+                                      ? <><CheckCircle2 className="w-3 h-3 mr-1" /> {result.marksEarned}/{result.maxMarks} marks</>
+                                      : <><XCircle className="w-3 h-3 mr-1" /> {result.marksEarned}/{result.maxMarks} marks</>}
+                                  </Badge>
+                                ) : null}
+                                {isBookmarked && (
+                                  <Badge className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-300 dark:border-amber-500/40" variant="outline">
+                                    <BookmarkCheck className="w-3 h-3 mr-1" /> Bookmarked
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-base mt-2">{q.text}</p>
+                            </CardHeader>
+                            <CardContent className="space-y-3 pt-0">
+                              {q.image_url && (
+                                <img src={q.image_url} alt="Question" className="w-full max-h-48 object-contain rounded-xl border bg-muted/20 mb-3" />
+                              )}
+                              {/* Answer display */}
+                              {isCheckbox ? (
+                                <div className="space-y-1.5">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Selections</p>
+                                  {q.answers.map((a) => {
+                                    const wasSelected = selectedIds.has(a.id);
+                                    const isRight = a.is_correct;
+                                    return (
+                                      <div key={a.id} className={cn("rounded-lg border px-3 py-2 text-sm flex items-center gap-3",
+                                        isRight && wasSelected ? "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-200"
+                                          : !isRight && wasSelected ? "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-200"
+                                          : isRight && !wasSelected ? "border-amber-400 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                                          : "border-border bg-muted/20 text-muted-foreground"
+                                      )}>
+                                        <span className="shrink-0">
+                                          {isRight && wasSelected ? <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                            : !isRight && wasSelected ? <XCircle className="w-4 h-4 text-red-500" />
+                                            : isRight ? <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                                            : <span className="w-4 h-4 block rounded border-2 border-muted-foreground/30" />}
+                                        </span>
+                                        <span className="flex-1">{a.text}</span>
+                                        <span className="shrink-0 text-xs font-medium">
+                                          {isRight && wasSelected ? "✓ Correct" : !isRight && wasSelected ? "✗ Wrong" : isRight ? "Missed" : ""}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="rounded-lg border p-3 space-y-1">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your Answer</p>
+                                    <p className="text-sm leading-relaxed">{userAnswer || <span className="italic text-muted-foreground">No answer given</span>}</p>
+                                  </div>
+                                  {modelAnswers.length > 0 && (
+                                    <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500/30 p-3 space-y-1">
+                                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Model Answer</p>
+                                      {modelAnswers.map((a, i) => (
+                                        <p key={i} className="text-sm text-blue-900 dark:text-blue-200 leading-relaxed">{a.text}</p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {/* AI feedback */}
+                              {result?.feedback && (
+                                <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-1">
+                                  <p className="text-xs font-semibold text-primary uppercase tracking-wide">AI Feedback</p>
+                                  <p className="text-sm">{result.feedback}</p>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      }
+
+                      // Objective review
                       const selected = answeredMap.get(idx) ?? null;
                       const correctAnswer = q.answers.find((a) => a.is_correct);
                       const isCorrect = selected === correctAnswer?.id;
                       const isSkipped = selected === null;
-                      const isBookmarked = flaggedQuestions.has(idx);
 
                       return (
                         <Card key={idx} className={cn("shadow-elegant border-l-4", isSkipped ? "border-l-muted-foreground/30" : isCorrect ? "border-l-green-500" : "border-l-red-500")}>
@@ -628,32 +905,20 @@ const Quiz = () => {
                           </CardHeader>
                           <CardContent className="space-y-2 pt-0">
                             {q.image_url && (
-                              <img
-                                src={q.image_url}
-                                alt="Question image"
-                                className="w-full max-h-48 object-contain rounded-xl border bg-muted/20 mb-3"
-                              />
+                              <img src={q.image_url} alt="Question image" className="w-full max-h-48 object-contain rounded-xl border bg-muted/20 mb-3" />
                             )}
                             {q.answers.map((a) => {
                               const isThisCorrect = a.is_correct;
                               const isThisSelected = a.id === selected;
                               const isThisWrong = isThisSelected && !isThisCorrect;
                               return (
-                                <div
-                                  key={a.id}
-                                  className={cn(
-                                    "rounded-lg border px-4 py-3 text-sm",
-                                    isThisCorrect ? "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-200"
-                                      : isThisWrong ? "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-200"
-                                      : "border-border bg-muted/20 text-muted-foreground"
-                                  )}
-                                >
+                                <div key={a.id} className={cn("rounded-lg border px-4 py-3 text-sm",
+                                  isThisCorrect ? "border-green-500 bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-200"
+                                    : isThisWrong ? "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-200"
+                                    : "border-border bg-muted/20 text-muted-foreground"
+                                )}>
                                   {a.image_url && (
-                                    <img
-                                      src={a.image_url}
-                                      alt="Answer option"
-                                      className="w-full max-h-36 object-contain rounded-lg border bg-muted/20 mb-2"
-                                    />
+                                    <img src={a.image_url} alt="Answer option" className="w-full max-h-36 object-contain rounded-lg border bg-muted/20 mb-2" />
                                   )}
                                   <div className="flex items-center gap-3">
                                     <span className="shrink-0">
@@ -753,41 +1018,108 @@ const Quiz = () => {
                       />
                     )}
 
-                    <div className="space-y-3">
-                      {currentQuestion.answers.length ? (
-                        currentQuestion.answers.map((a) => {
-                          const isSelected = selectedAnswerId === a.id;
-                          return (
-                            <button
-                              key={a.id}
-                              onClick={() => handleAnswerSelect(a.id)}
-                              className={cn(
-                                "w-full rounded-lg border px-4 py-3 text-left transition-all",
-                                isSelected
-                                  ? "border-primary bg-primary/8 dark:bg-primary/15 ring-1 ring-primary text-foreground"
-                                  : "border-border hover:border-primary/50 hover:bg-muted/60"
+                    {isSubjective ? (() => {
+                      const isCheckbox = currentQuestion.answers.some((a) => !a.is_correct);
+                      const selectedIds = checkboxAnswerMap.get(currentIndex) ?? new Set<string>();
+                      if (isCheckbox) {
+                        return (
+                          <div className="space-y-3">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Select all correct options
+                            </p>
+                            {currentQuestion.answers.map((a) => {
+                              const checked = selectedIds.has(a.id);
+                              return (
+                                <button
+                                  key={a.id}
+                                  onClick={() => handleCheckboxToggle(a.id)}
+                                  className={cn(
+                                    "w-full rounded-lg border px-4 py-3 text-left transition-all flex items-center gap-3",
+                                    checked
+                                      ? "border-primary bg-primary/8 dark:bg-primary/15 ring-1 ring-primary"
+                                      : "border-border hover:border-primary/50 hover:bg-muted/60"
+                                  )}
+                                >
+                                  <span className={cn("shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors", checked ? "border-primary bg-primary" : "border-muted-foreground/40")}>
+                                    {checked && <span className="w-2 h-2 block bg-white rounded-sm" />}
+                                  </span>
+                                  <span className="text-sm">{a.text}</span>
+                                </button>
+                              );
+                            })}
+                            {currentQuestion.marks != null && (
+                              <p className="text-xs text-muted-foreground">{currentQuestion.marks} mark{currentQuestion.marks !== 1 ? "s" : ""}</p>
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <PenLine className="w-4 h-4" />
+                              <span>Write your answer below</span>
+                            </div>
+                            <Textarea
+                              placeholder="Type your answer here..."
+                              value={subjectiveAnswerMap.get(currentIndex) ?? ""}
+                              onChange={(e) => handleSubjectiveAnswer(e.target.value)}
+                              className="min-h-[140px] text-sm resize-none"
+                              disabled={sessionComplete}
+                            />
+                          </div>
+                          {currentQuestion.answers.filter((a) => a.is_correct).length > 0 && (
+                            <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500/30 p-4 space-y-2">
+                              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Model Answer</p>
+                              {currentQuestion.answers.filter((a) => a.is_correct).map((a, i) => (
+                                <p key={i} className="text-sm text-blue-900 dark:text-blue-200 leading-relaxed">{a.text}</p>
+                              ))}
+                              {currentQuestion.marks != null && (
+                                <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                                  {currentQuestion.marks} mark{currentQuestion.marks !== 1 ? "s" : ""}
+                                </p>
                               )}
-                            >
-                              {a.image_url && (
-                                <img
-                                  src={a.image_url}
-                                  alt="Answer option"
-                                  className="w-full max-h-40 object-contain rounded-lg border bg-muted/20 mb-2"
-                                />
-                              )}
-                              <div className="flex items-center gap-3">
-                                <span className={cn("shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center", isSelected ? "border-primary bg-primary" : "border-muted-foreground/40")}>
-                                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                </span>
-                                {a.text && <span className="text-sm whitespace-normal">{a.text}</span>}
-                              </div>
-                            </button>
-                          );
-                        })
-                      ) : (
-                        <Alert><AlertTitle>No answers found</AlertTitle><AlertDescription>This question has no answer options yet.</AlertDescription></Alert>
-                      )}
-                    </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })() : (
+                      <div className="space-y-3">
+                        {currentQuestion.answers.length ? (
+                          currentQuestion.answers.map((a) => {
+                            const isSelected = selectedAnswerId === a.id;
+                            return (
+                              <button
+                                key={a.id}
+                                onClick={() => handleAnswerSelect(a.id)}
+                                className={cn(
+                                  "w-full rounded-lg border px-4 py-3 text-left transition-all",
+                                  isSelected
+                                    ? "border-primary bg-primary/8 dark:bg-primary/15 ring-1 ring-primary text-foreground"
+                                    : "border-border hover:border-primary/50 hover:bg-muted/60"
+                                )}
+                              >
+                                {a.image_url && (
+                                  <img
+                                    src={a.image_url}
+                                    alt="Answer option"
+                                    className="w-full max-h-40 object-contain rounded-lg border bg-muted/20 mb-2"
+                                  />
+                                )}
+                                <div className="flex items-center gap-3">
+                                  <span className={cn("shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center", isSelected ? "border-primary bg-primary" : "border-muted-foreground/40")}>
+                                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </span>
+                                  {a.text && <span className="text-sm whitespace-normal">{a.text}</span>}
+                                </div>
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <Alert><AlertTitle>No answers found</AlertTitle><AlertDescription>This question has no answer options yet.</AlertDescription></Alert>
+                        )}
+                      </div>
+                    )}
 
                     {submitConfirmPending && (
                       <Alert className="border-orange-300 bg-orange-50 dark:bg-orange-500/10 dark:border-orange-500/40">

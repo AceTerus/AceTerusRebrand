@@ -82,9 +82,19 @@ export const deleteCategory = async (id: string) => {
   if (error) throw new Error(error.message);
 };
 
+const generateId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+};
+
 export const uploadQuizImage = async (file: File): Promise<string> => {
   const ext = file.name.split(".").pop();
-  const path = `${crypto.randomUUID()}.${ext}`;
+  const path = `${generateId()}.${ext}`;
   const { error } = await supabase.storage.from("quiz-images").upload(path, file);
   if (error) throw new Error(error.message);
   const { data } = supabase.storage.from("quiz-images").getPublicUrl(path);
@@ -100,7 +110,7 @@ export const deleteQuizImage = async (url: string) => {
 export const fetchDecks = async (publishedOnly = false): Promise<Deck[]> => {
   let query = supabase
     .from("decks")
-    .select("id, name, description, subject, created_by, created_at, is_published")
+    .select("id, name, description, subject, created_by, created_at, is_published, quiz_type")
     .order("created_at", { ascending: false });
 
   if (publishedOnly) query = query.eq("is_published", true);
@@ -130,13 +140,14 @@ export const fetchDecks = async (publishedOnly = false): Promise<Deck[]> => {
     created_at: deck.created_at,
     question_count: countMap[deck.id] ?? 0,
     is_published: deck.is_published ?? false,
+    quiz_type: (deck.quiz_type ?? "objective") as "objective" | "subjective",
   }));
 };
 
 export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
   const { data: deck, error: deckError } = await supabase
     .from("decks")
-    .select("id, name, description, subject, created_by, created_at, is_published")
+    .select("id, name, description, subject, created_by, created_at, is_published, quiz_type")
     .eq("id", deckId)
     .single();
 
@@ -145,7 +156,7 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
 
   const { data: questionRows, error: qError } = await supabase
     .from("questions")
-    .select("id, deck_id, text, explanation, image_url, order")
+    .select("id, deck_id, text, explanation, image_url, order, marks")
     .eq("deck_id", deckId)
     .order("order", { ascending: true });
 
@@ -176,6 +187,7 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
     explanation: q.explanation ?? null,
     image_url: q.image_url ?? null,
     order: q.order ?? 0,
+    marks: q.marks ?? null,
     answers: (answersByQuestion[q.id] ?? []).sort(() => Math.random() - 0.5).map((a: any) => ({
       id: a.id,
       question_id: a.question_id,
@@ -195,6 +207,7 @@ export const fetchQuiz = async (deckId: string): Promise<QuizPayload> => {
       created_at: (deck as any).created_at,
       question_count: questions.length,
       is_published: (deck as any).is_published ?? false,
+      quiz_type: ((deck as any).quiz_type ?? "objective") as "objective" | "subjective",
     },
     questions,
   };
@@ -206,6 +219,7 @@ export const createDeck = async (deck: {
   name: string;
   description?: string;
   subject?: string;
+  quiz_type?: string;
 }) => {
   const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase
@@ -247,7 +261,7 @@ export const deleteDeck = async (id: string) => {
 export const fetchQuestionsForDeck = async (deckId: string): Promise<Question[]> => {
   const { data: questionRows, error: qError } = await supabase
     .from("questions")
-    .select("id, deck_id, text, explanation, image_url, order")
+    .select("id, deck_id, text, explanation, image_url, order, marks")
     .eq("deck_id", deckId)
     .order("order", { ascending: true });
   if (qError) throw new Error(qError.message);
@@ -277,6 +291,7 @@ export const fetchQuestionsForDeck = async (deckId: string): Promise<Question[]>
     explanation: q.explanation ?? null,
     image_url: q.image_url ?? null,
     order: q.order ?? 0,
+    marks: q.marks ?? null,
     answers: (answersByQuestion[q.id] ?? []).map((a: any) => ({
       id: a.id,
       question_id: a.question_id,
@@ -293,6 +308,7 @@ export const createQuestion = async (question: {
   explanation?: string;
   image_url?: string;
   order?: number;
+  marks?: number;
   answers: { text: string; is_correct: boolean; image_url?: string | null }[];
 }) => {
   const { answers, ...questionData } = question;
@@ -313,7 +329,7 @@ export const createQuestion = async (question: {
 
 export const updateQuestion = async (
   id: string,
-  data: { text?: string; explanation?: string; image_url?: string | null }
+  data: { text?: string; explanation?: string; image_url?: string | null; marks?: number }
 ) => {
   const { error } = await supabase.from("questions").update(data).eq("id", id);
   if (error) throw new Error(error.message);
