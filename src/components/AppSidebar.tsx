@@ -1,11 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, User, Search, LogOut, Compass, FileText, MessageCircle, ShieldCheck } from "lucide-react";
+import { BookOpen, User, Search, LogOut, Compass, FileText, MessageCircle, ShieldCheck, ScanLine } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Logo from "../assets/logo.png";
 import { useChatNotifications } from "@/context/ChatNotificationsContext";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 export const AppSidebar = () => {
   const location = useLocation();
@@ -52,10 +53,27 @@ export const AppSidebar = () => {
           },
           { href: "/quiz", label: "Quiz", icon: BookOpen },
           { href: "/materials", label: "Materials", icon: FileText },
+          { href: "/ar-scanner.html", label: "AR Scanner", icon: ScanLine, external: true },
           { href: "/profile", label: "Profile", icon: User },
           ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: ShieldCheck }] : []),
         ].map((item) => {
           const Icon = item.icon;
+          if (item.external) {
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-4 px-4 py-3 rounded-lg transition-smooth hover:bg-muted/50"
+              >
+                <div className="flex items-center gap-4 w-full">
+                  <Icon className="w-6 h-6" />
+                  <span className="text-base flex-1">{item.label}</span>
+                </div>
+              </a>
+            );
+          }
           return (
             <Link
               key={item.href}
@@ -85,19 +103,22 @@ export const AppSidebar = () => {
       {/* User Section at Bottom */}
       {user && (
         <div className="border-t border-border pt-4 space-y-4">
-          <Link to="/profile" className="flex items-center space-x-3 px-2 py-2 rounded-lg hover:bg-muted/50 transition-smooth">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={user?.user_metadata?.avatar_url} />
-              <AvatarFallback>
-                {user?.email?.[0]?.toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {user?.email?.split("@")[0] || "User"}
-              </p>
-            </div>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/profile" className="flex items-center space-x-3 px-2 py-2 rounded-lg hover:bg-muted/50 transition-smooth flex-1 min-w-0">
+              <Avatar className="h-10 w-10 shrink-0">
+                <AvatarImage src={user?.user_metadata?.avatar_url} />
+                <AvatarFallback>
+                  {user?.email?.[0]?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {user?.email?.split("@")[0] || "User"}
+                </p>
+              </div>
+            </Link>
+            <NotificationsBell />
+          </div>
           <Button
             variant="ghost"
             onClick={handleSignOut}
