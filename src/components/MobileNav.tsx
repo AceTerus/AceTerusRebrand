@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { BookOpen, User, Compass, FileText, MessageCircle, ScanLine } from "lucide-react";
 import { useChatNotifications } from "@/context/ChatNotificationsContext";
-import { NotificationsBell } from "@/components/NotificationsBell";
 
 export const MobileNav = () => {
   const location = useLocation();
@@ -26,10 +25,6 @@ export const MobileNav = () => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border lg:hidden">
       <div className="flex items-center justify-around px-1 pb-safe">
-        <div className="flex flex-col items-center gap-0.5 px-3 py-2 min-w-0 flex-1">
-          <NotificationsBell compact />
-          <span className="text-[10px] font-medium text-muted-foreground">Alerts</span>
-        </div>
         {items.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);

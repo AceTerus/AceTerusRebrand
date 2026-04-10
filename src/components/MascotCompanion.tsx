@@ -44,7 +44,7 @@ const MascotCompanion = () => {
       <button
         onClick={toggleMinimized}
         aria-label="Expand Ace"
-        className="fixed bottom-20 right-4 z-50 lg:bottom-6 lg:right-6 mascot-float relative flex items-center justify-center focus:outline-none"
+        className="fixed bottom-20 right-4 z-50 lg:bottom-6 lg:right-6 mascot-float flex items-center justify-center focus:outline-none"
         style={{ pointerEvents: 'auto' }}
       >
         <span className="text-5xl drop-shadow-lg select-none">⭐</span>

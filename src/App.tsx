@@ -12,6 +12,7 @@ import { Discover } from "./pages/Discover";
 import { Feed } from "./pages/Feed";
 import { Materials } from "./pages/Materials";
 import Quiz from "./pages/Quiz";
+import OmrScanner from "./pages/OmrScanner";
 import AdminQuiz from "./pages/AdminQuiz";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -41,6 +42,7 @@ const AppContent = () => {
             <Route path="/" element={<Index />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/quiz" element={<Quiz />} />
+            <Route path="/omr-scan" element={<OmrScanner />} />
             <Route path="/admin" element={<AdminQuiz />} />
             <Route path="/materials" element={<Materials />} />
             <Route path="/profile" element={<Profile />} />

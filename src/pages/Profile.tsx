@@ -18,6 +18,7 @@ import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, Heart, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
+import { NotificationsBell } from '@/components/NotificationsBell';
 import { useMutualFollow } from '@/hooks/useMutualFollow';
 import { StreakLeaderboard } from '@/components/StreakLeaderboard';
 
@@ -474,6 +475,10 @@ export const Profile = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       <div className="container mx-auto px-4 pt-8 pb-20 lg:pb-8 max-w-4xl">
+        {/* Notifications bell — mobile only (desktop has it in the sidebar) */}
+        <div className="flex justify-end mb-4 lg:hidden">
+          <NotificationsBell />
+        </div>
         {/* Profile Picture and Bio Section */}
         <Card className="mb-8">
           <CardContent className="pt-6">
