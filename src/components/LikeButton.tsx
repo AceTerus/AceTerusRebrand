@@ -82,17 +82,16 @@ export const LikeButton = ({ postId, likesCount, onLikeChange }: LikeButtonProps
   return (
     <Button
       variant="ghost"
-      size="sm"
       onClick={handleLike}
       disabled={isLoading}
-      className="flex items-center space-x-1 hover:text-primary"
+      className="flex items-center space-x-1.5 px-3 py-2 h-auto hover:text-primary rounded-xl"
     >
       <Heart
-        className={`w-4 h-4 transition-colors ${
+        className={`w-5 h-5 transition-colors ${
           isLiked ? "fill-primary text-primary" : ""
         }`}
       />
-      <span className="text-sm">{likesCount}</span>
+      <span className="text-sm font-medium">{likesCount}</span>
     </Button>
   );
 };

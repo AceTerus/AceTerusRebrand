@@ -40,6 +40,20 @@ import { supabase } from "@/integrations/supabase/client";
 
 type QuizView = "categories" | "decks" | "taking";
 
+const getCategoryImage = (name: string): string | null => {
+  const lower = name.toLowerCase();
+  if (lower.includes("biologi"))  return "/quiz-pics/biology.jpg";
+  if (lower.includes("kimia"))    return "/quiz-pics/chemistry.jpg";
+  if (lower.includes("fizik"))    return "/quiz-pics/physics.jpg";
+  if (lower.includes("sejarah"))  return "/quiz-pics/history.jpg";
+  if (lower.includes("history"))  return "/quiz-pics/history.jpg";
+  if (lower.includes("biology"))  return "/quiz-pics/biology.jpg";
+  if (lower.includes("chemistry"))return "/quiz-pics/chemistry.jpg";
+  if (lower.includes("physics"))  return "/quiz-pics/physics.jpg";
+  if (lower.includes("general"))  return "/quiz-pics/general.jpg";
+  return null;
+};
+
 const Quiz = () => {
   const { user, isLoading: authLoading, isAdmin } = useAuth();
   const { streak, updateStreak } = useStreak();
@@ -555,9 +569,8 @@ const Quiz = () => {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <img src={Logo} alt="AceTerus Logo" className="w-16 h-16" />
-            <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">AceTerus</h1>
+          <div className="flex items-center justify-center mb-4">
+            <img src={Logo} alt="AceTerus Logo" className="w-16 h-16 object-contain rounded-2xl" />
           </div>
           <p className="text-muted-foreground">Practice with authentic exam papers and track your progress</p>
         </div>
@@ -628,38 +641,60 @@ const Quiz = () => {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {enrichedCategories.map((cat) => (
-                  <Card key={cat.name} className="shadow-elegant hover:shadow-glow transition-shadow flex flex-col">
-                    <CardHeader className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <BookOpenCheck className="w-5 h-5 text-primary" />
-                        </div>
-                        <CardTitle className="text-xl">{cat.name}</CardTitle>
-                      </div>
-                      {cat.description && (
-                        <p className="text-sm text-muted-foreground">{cat.description}</p>
-                      )}
-                    </CardHeader>
-                    <CardContent className="flex-1 flex flex-col space-y-4">
-                      {cat.decks.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic mt-auto">
-                          Quizzes will be added soon.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" />{cat.decks.length} {cat.decks.length === 1 ? "quiz" : "quizzes"}</span>
-                            <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-primary" />{cat.totalQuestions.toLocaleString()} questions</span>
+                {enrichedCategories.map((cat) => {
+                  const catImage = getCategoryImage(cat.name);
+                  return (
+                    <Card key={cat.name} className="shadow-elegant hover:shadow-glow transition-shadow flex flex-col overflow-hidden">
+                      {/* Subject image banner */}
+                      {catImage ? (
+                        <div className="relative h-40 shrink-0">
+                          <img
+                            src={catImage}
+                            alt={cat.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+                          <div className="absolute bottom-3 left-4 flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center">
+                              <BookOpenCheck className="w-4 h-4 text-white" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white drop-shadow">{cat.name}</h3>
                           </div>
-                          <Button className="w-full bg-gradient-primary shadow-glow mt-auto" onClick={() => { setSelectedCategory(cat.name); setView("decks"); }}>
-                            View Quizzes <ChevronRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        </>
+                        </div>
+                      ) : (
+                        <CardHeader className="pb-2 space-y-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <BookOpenCheck className="w-5 h-5 text-primary" />
+                            </div>
+                            <CardTitle className="text-xl">{cat.name}</CardTitle>
+                          </div>
+                        </CardHeader>
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
+
+                      <CardContent className="flex-1 flex flex-col space-y-4 pt-4">
+                        {cat.description && (
+                          <p className="text-sm text-muted-foreground">{cat.description}</p>
+                        )}
+                        {cat.decks.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic mt-auto">
+                            Quizzes will be added soon.
+                          </p>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" />{cat.decks.length} {cat.decks.length === 1 ? "quiz" : "quizzes"}</span>
+                              <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-primary" />{cat.totalQuestions.toLocaleString()} questions</span>
+                            </div>
+                            <Button className="w-full bg-gradient-primary shadow-glow mt-auto" onClick={() => { setSelectedCategory(cat.name); setView("decks"); }}>
+                              View Quizzes <ChevronRight className="ml-2 h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>

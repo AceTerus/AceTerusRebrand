@@ -174,12 +174,11 @@ export const CommentSection = ({
     <div>
       <Button
         variant="ghost"
-        size="sm"
         onClick={() => setShowComments(!showComments)}
-        className="flex items-center space-x-1 hover:text-primary"
+        className="flex items-center space-x-1.5 px-3 py-2 h-auto hover:text-primary rounded-xl"
       >
-        <MessageCircle className="w-4 h-4" />
-        <span className="text-sm">{commentsCount}</span>
+        <MessageCircle className="w-5 h-5" />
+        <span className="text-sm font-medium">{commentsCount}</span>
       </Button>
 
       {showComments && (

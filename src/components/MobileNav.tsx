@@ -18,7 +18,7 @@ export const MobileNav = () => {
     },
     { href: "/quiz", label: "Quiz", icon: BookOpen },
     { href: "/materials", label: "Materials", icon: FileText },
-    { href: "/ar-scanner.html", label: "AR", icon: ScanLine, external: true },
+    { href: "/ar-scanner", label: "AR", icon: ScanLine },
     { href: "/profile", label: "Profile", icon: User },
   ];
 

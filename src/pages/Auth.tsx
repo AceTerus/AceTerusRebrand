@@ -119,15 +119,12 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold">
+          <Link to="/" className="inline-flex group">
             <img
               src={Logo}
               alt="AceTerus Logo"
-              className="w-8 h-8 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+              className="w-16 h-16 object-contain rounded-2xl group-hover:shadow-glow transition-all duration-300"
             />
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
-              AceTerus
-            </span>
           </Link>
           <p className="text-muted-foreground mt-2">Welcome back to your learning journey</p>
         </div>

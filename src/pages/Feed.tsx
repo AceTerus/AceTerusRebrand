@@ -213,195 +213,251 @@ export const Feed = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8">
-      <div className="mx-auto w-full max-w-[470px] px-0 sm:px-4 pt-4">
+      {/* Two-column layout on desktop */}
+      <div className="mx-auto w-full max-w-5xl px-4 pt-4 lg:grid lg:grid-cols-[1fr_288px] lg:gap-8 lg:items-start">
 
-        {/* Search */}
-        <div className="px-4 sm:px-0 mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              placeholder="Search people..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="pl-9 rounded-full bg-muted/50 border-0 focus-visible:ring-1"
-            />
+        {/* ── Left column: feed ── */}
+        <div className="w-full min-w-0">
+
+          {/* Search */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search people..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="pl-9 rounded-full bg-muted/50 border-0 focus-visible:ring-1 text-sm"
+              />
+            </div>
+
+            {searchQuery && (
+              <Card className="mt-2 shadow-lg">
+                <CardContent className="p-3 space-y-2">
+                  {isSearching ? (
+                    <p className="text-sm text-muted-foreground py-2 text-center">Searching…</p>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((profile) => (
+                      <div key={profile.id} className="flex items-center justify-between gap-3">
+                        <Link to={`/profile/${profile.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                          <Avatar className="h-9 w-9 flex-shrink-0">
+                            <AvatarImage src={profile.avatar_url} />
+                            <AvatarFallback>{profile.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm truncate">{profile.username}</p>
+                            <p className="text-xs text-foreground/55">{profile.followers_count} followers</p>
+                          </div>
+                        </Link>
+                        <FollowButton targetUserId={profile.user_id} />
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-2 text-center">No users found</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {searchQuery && (
-            <Card className="mt-2 shadow-lg">
-              <CardContent className="p-3 space-y-2">
-                {isSearching ? (
-                  <p className="text-sm text-muted-foreground py-2 text-center">Searching…</p>
-                ) : searchResults.length > 0 ? (
-                  searchResults.map((profile) => (
-                    <div key={profile.id} className="flex items-center justify-between gap-3">
-                      <Link to={`/profile/${profile.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                        <Avatar className="h-9 w-9 flex-shrink-0">
-                          <AvatarImage src={profile.avatar_url} />
-                          <AvatarFallback>{profile.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm truncate">{profile.username}</p>
-                          <p className="text-xs text-muted-foreground">{profile.followers_count} followers</p>
-                        </div>
-                      </Link>
-                      <FollowButton targetUserId={profile.user_id} />
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground py-2 text-center">No users found</p>
-                )}
-              </CardContent>
-            </Card>
+          {/* Suggested users strip — shown when feed is empty */}
+          {!isLoading && suggestedUsers.length > 0 && posts.length === 0 && (
+            <div className="mb-6">
+              <p className="text-xs font-semibold text-foreground/50 mb-3 uppercase tracking-widest">Suggested for you</p>
+              <div className="space-y-3">
+                {suggestedUsers.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between gap-3">
+                    <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                      <Avatar className="h-10 w-10 flex-shrink-0">
+                        <AvatarImage src={u.avatar_url} />
+                        <AvatarFallback>{u.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{u.username}</p>
+                        <p className="text-xs text-foreground/55">{u.followers_count} followers</p>
+                      </div>
+                    </Link>
+                    <FollowButton targetUserId={u.user_id} />
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-        </div>
 
-        {/* Suggested users strip — shown when feed is empty or user has no following */}
-        {!isLoading && suggestedUsers.length > 0 && posts.length === 0 && (
-          <div className="px-4 sm:px-0 mb-6">
-            <p className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Suggested for you</p>
-            <div className="space-y-3">
-              {suggestedUsers.map((u) => (
-                <div key={u.id} className="flex items-center justify-between gap-3">
-                  <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar className="h-10 w-10 flex-shrink-0">
-                      <AvatarImage src={u.avatar_url} />
-                      <AvatarFallback>{u.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{u.username}</p>
-                      <p className="text-xs text-muted-foreground">{u.followers_count} followers</p>
+          {/* Post creation */}
+          <div className="mb-5">
+            <PostUpload onPostCreated={fetchFeed} />
+          </div>
+
+          {/* Feed */}
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-2xl overflow-hidden border border-border/60 bg-card shadow-sm">
+                  <div className="flex items-center gap-3 p-4">
+                    <Skeleton className="h-9 w-9 rounded-full flex-shrink-0" />
+                    <div className="space-y-1.5 flex-1">
+                      <Skeleton className="h-3 w-28" />
+                      <Skeleton className="h-2.5 w-16" />
                     </div>
-                  </Link>
-                  <FollowButton targetUserId={u.user_id} />
+                  </div>
+                  <Skeleton className="w-full aspect-square" />
+                  <div className="p-4 space-y-2">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-3/4" />
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : posts.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <p className="text-base">No posts yet.</p>
+              <p className="text-sm mt-1">Follow some users to see their content here.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {posts.map((post) => {
+                const hasGalleryImages = !!(post.images && post.images.length);
+                const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(
+                  !hasGalleryImages && post.image_url ? [post.image_url] : []
+                );
 
-        {/* Post creation */}
-        <div className="px-4 sm:px-0 mb-4">
-          <PostUpload onPostCreated={fetchFeed} />
+                return (
+                  <article key={post.id} className="rounded-2xl overflow-hidden border border-border/60 bg-card shadow-sm">
+                    {/* Header */}
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <Link to={`/profile/${post.user_id}`} className="flex-shrink-0">
+                        <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+                          <AvatarImage src={post.profiles?.avatar_url} />
+                          <AvatarFallback className="text-sm font-bold">
+                            {post.profiles?.username?.[0]?.toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                      </Link>
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          to={`/profile/${post.user_id}`}
+                          className="font-bold text-[15px] leading-tight hover:underline block truncate"
+                        >
+                          {post.profiles?.username || "Anonymous"}
+                        </Link>
+                        <p className="text-xs text-foreground/55 mt-0.5">
+                          {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Image — edge-to-edge */}
+                    {gallery.length > 0 && (
+                      <PostImageCarousel
+                        images={gallery}
+                        onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined}
+                      />
+                    )}
+
+                    {/* Action bar */}
+                    <div className="flex items-center gap-1 px-3 pt-2 pb-1">
+                      <LikeButton
+                        postId={post.id}
+                        likesCount={post.likes_count}
+                        onLikeChange={(newCount) =>
+                          setPosts((prev) =>
+                            prev.map((p) => (p.id === post.id ? { ...p, likes_count: newCount } : p))
+                          )
+                        }
+                      />
+                      <CommentSection
+                        postId={post.id}
+                        commentsCount={post.comments_count}
+                        onCommentChange={(newCount) =>
+                          setPosts((prev) =>
+                            prev.map((p) => (p.id === post.id ? { ...p, comments_count: newCount } : p))
+                          )
+                        }
+                      />
+                    </div>
+
+                    {/* Caption — username bolded inline, Instagram-style */}
+                    {post.content && (
+                      <p className="px-4 pb-2 text-sm leading-relaxed">
+                        <Link
+                          to={`/profile/${post.user_id}`}
+                          className="font-bold mr-1.5 hover:underline"
+                        >
+                          {post.profiles?.username || "Anonymous"}
+                        </Link>
+                        {post.content}
+                      </p>
+                    )}
+
+                    {/* Tags */}
+                    {post.tags && post.tags.length > 0 && (
+                      <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">
+                        {post.tags.map((tag, i) => (
+                          <span key={i} className="text-xs font-medium text-primary">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Feed */}
-        {isLoading ? (
-          <div className="space-y-6 px-4 sm:px-0">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-2xl overflow-hidden border border-border/60 bg-card">
-                <div className="flex items-center gap-3 p-4">
-                  <Skeleton className="h-9 w-9 rounded-full flex-shrink-0" />
-                  <div className="space-y-1.5 flex-1">
-                    <Skeleton className="h-3 w-28" />
-                    <Skeleton className="h-2.5 w-16" />
-                  </div>
-                </div>
-                <Skeleton className="w-full aspect-square" />
-                <div className="p-4 space-y-2">
-                  <Skeleton className="h-3 w-24" />
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-3/4" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="px-4 sm:px-0 text-center py-16 text-muted-foreground">
-            <p className="text-base">No posts yet.</p>
-            <p className="text-sm mt-1">Follow some users to see their content here.</p>
-          </div>
-        ) : (
-          <div className="space-y-0 divide-y divide-border/40">
-            {posts.map((post) => {
-              const hasGalleryImages = !!(post.images && post.images.length);
-              const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(
-                !hasGalleryImages && post.image_url ? [post.image_url] : []
-              );
+        {/* ── Right column: sidebar (desktop only) ── */}
+        <aside className="hidden lg:block sticky top-4 space-y-5">
 
-              return (
-                <article key={post.id} className="bg-card">
-                  {/* Header */}
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <Link to={`/profile/${post.user_id}`} className="flex-shrink-0">
-                      <Avatar className="h-9 w-9 ring-2 ring-primary/15">
-                        <AvatarImage src={post.profiles?.avatar_url} />
-                        <AvatarFallback className="text-sm font-bold">
-                          {post.profiles?.username?.[0]?.toUpperCase() || "U"}
-                        </AvatarFallback>
+          {/* Suggested people */}
+          {suggestedUsers.length > 0 && (
+            <div className="rounded-2xl border border-border/60 bg-card shadow-sm p-5">
+              <p className="text-xs font-semibold text-foreground/50 uppercase tracking-widest mb-4">Suggested for you</p>
+              <div className="space-y-4">
+                {suggestedUsers.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between gap-3">
+                    <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                      <Avatar className="h-9 w-9 flex-shrink-0">
+                        <AvatarImage src={u.avatar_url} />
+                        <AvatarFallback>{u.username?.[0]?.toUpperCase() || "U"}</AvatarFallback>
                       </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{u.username}</p>
+                        <p className="text-xs text-foreground/55">{u.followers_count} followers</p>
+                      </div>
                     </Link>
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        to={`/profile/${post.user_id}`}
-                        className="font-semibold text-sm leading-tight hover:underline block truncate"
-                      >
-                        {post.profiles?.username || "Anonymous"}
-                      </Link>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
+                    <FollowButton targetUserId={u.user_id} />
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  {/* Image — edge-to-edge, natural aspect ratio */}
-                  {gallery.length > 0 && (
-                    <PostImageCarousel
-                      images={gallery}
-                      onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined}
-                    />
-                  )}
-
-                  {/* Action bar */}
-                  <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
-                    <LikeButton
-                      postId={post.id}
-                      likesCount={post.likes_count}
-                      onLikeChange={(newCount) =>
-                        setPosts((prev) =>
-                          prev.map((p) => (p.id === post.id ? { ...p, likes_count: newCount } : p))
-                        )
-                      }
-                    />
-                    <CommentSection
-                      postId={post.id}
-                      commentsCount={post.comments_count}
-                      onCommentChange={(newCount) =>
-                        setPosts((prev) =>
-                          prev.map((p) => (p.id === post.id ? { ...p, comments_count: newCount } : p))
-                        )
-                      }
-                    />
-                  </div>
-
-                  {/* Caption — username bolded inline, Instagram-style */}
-                  {post.content && (
-                    <p className="px-4 pb-2 text-sm leading-snug">
-                      <Link
-                        to={`/profile/${post.user_id}`}
-                        className="font-semibold mr-1.5 hover:underline"
-                      >
-                        {post.profiles?.username || "Anonymous"}
-                      </Link>
-                      {post.content}
-                    </p>
-                  )}
-
-                  {/* Tags */}
-                  {post.tags && post.tags.length > 0 && (
-                    <div className="px-4 pb-3 flex flex-wrap gap-x-2 gap-y-1">
-                      {post.tags.map((tag, i) => (
-                        <span key={i} className="text-xs font-medium text-primary">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
+          {/* Quick links */}
+          <div className="rounded-2xl border border-border/60 bg-card shadow-sm p-5">
+            <p className="text-xs font-semibold text-foreground/50 uppercase tracking-widest mb-3">Explore</p>
+            <div className="space-y-2 text-sm">
+              <Link to="/quiz" className="flex items-center gap-2 text-foreground/70 hover:text-primary transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                Quiz Arena
+              </Link>
+              <Link to="/discover" className="flex items-center gap-2 text-foreground/70 hover:text-primary transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                Discover People
+              </Link>
+              <Link to="/materials" className="flex items-center gap-2 text-foreground/70 hover:text-primary transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                Study Materials
+              </Link>
+              <Link to="/ar-scanner" className="flex items-center gap-2 text-foreground/70 hover:text-primary transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                AR Scanner
+              </Link>
+            </div>
           </div>
-        )}
+        </aside>
       </div>
 
       {/* Fullscreen lightbox */}

@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +14,7 @@ import { Feed } from "./pages/Feed";
 import { Materials } from "./pages/Materials";
 import Quiz from "./pages/Quiz";
 import OmrScanner from "./pages/OmrScanner";
+import ArScanner from "./pages/ArScanner";
 import AdminQuiz from "./pages/AdminQuiz";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -28,21 +30,30 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { user } = useAuth();
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => {
+    return localStorage.getItem("sidebar-collapsed") === "true";
+  });
+
+  const handleSidebarCollapse = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    localStorage.setItem("sidebar-collapsed", String(collapsed));
+  };
 
   return (
     <BrowserRouter>
       <div className="flex min-h-screen w-full">
-        {user && <AppSidebar />}
+        {user && <AppSidebar collapsed={sidebarCollapsed} onCollapseToggle={handleSidebarCollapse} />}
         {user && <MobileNav />}
         {user && <MascotGreeter />}
         {user && <MascotCompanion />}
         {user && <MascotChat />}
-        <main className={`flex-1 ${user ? 'lg:pl-64' : ''}`}>
+        <main className={`flex-1 transition-all duration-300 ${user ? (sidebarCollapsed ? 'lg:pl-[70px]' : 'lg:pl-64') : ''}`}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/quiz" element={<Quiz />} />
             <Route path="/omr-scan" element={<OmrScanner />} />
+            <Route path="/ar-scanner" element={<ArScanner />} />
             <Route path="/admin" element={<AdminQuiz />} />
             <Route path="/materials" element={<Materials />} />
             <Route path="/profile" element={<Profile />} />

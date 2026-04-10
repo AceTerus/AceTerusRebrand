@@ -161,12 +161,11 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
 
   if (!isOpen) {
     return (
-      <Card className="mb-6">
+      <Card className="rounded-2xl border-border/60 shadow-sm">
         <CardContent className="p-4">
-          <Button 
+          <Button
             onClick={() => setIsOpen(true)}
-            variant="outline" 
-            className="w-full"
+            className="w-full bg-gradient-primary text-primary-foreground font-semibold rounded-xl shadow-sm hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4 mr-2" />
             Share a new post
@@ -177,7 +176,7 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
   }
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 rounded-2xl border-border/60 shadow-sm">
       <CardContent className="p-4">
         <div className="space-y-4">
           <Textarea

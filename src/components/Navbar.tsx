@@ -33,61 +33,58 @@ const Navbar = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border shadow-elegant">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border shadow-elegant" style={{ height: "80px" }}>
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 group">
+          <Link to="/" className="group">
             <img
               src={Logo}
               alt="AceTerus Logo"
-              className="w-16 h-16 object-contain rounded-lg group-hover:shadow-glow transition-all duration-300"
+              className="w-12 h-12 object-contain rounded-xl group-hover:shadow-glow transition-all duration-300"
             />
-            <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              AceTerus
-            </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-1">
+          <div className="hidden md:flex items-center gap-2">
             {user && navItems.map((item) => {
               const Icon = item.icon;
+              const active = isActive(item.href);
               return (
                 <Link key={item.href} to={item.href}>
                   <Button
-                    variant={isActive(item.href) ? "default" : "ghost"}
+                    variant={active ? "default" : "ghost"}
                     className={`
-                      flex items-center space-x-2 transition-smooth
-                      ${isActive(item.href) 
-                        ? "bg-gradient-primary text-primary-foreground shadow-glow" 
-                        : "hover:bg-muted"
+                      h-11 px-5 text-[15px] font-semibold flex items-center gap-2 rounded-xl transition-all
+                      ${active
+                        ? "bg-gradient-primary text-primary-foreground shadow-glow scale-[1.03]"
+                        : "hover:bg-muted hover:scale-[1.02]"
                       }
                     `}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-[18px] h-[18px]" />
                     <span>{item.label}</span>
                   </Button>
                 </Link>
               );
             })}
-            
+
             {!isLoading && (
               user ? (
                 <Button
                   variant="ghost"
                   onClick={handleSignOut}
-                  className="flex items-center space-x-2 hover:bg-muted"
+                  className="h-11 px-5 text-[15px] font-semibold flex items-center gap-2 rounded-xl hover:bg-muted hover:scale-[1.02] transition-all"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-[18px] h-[18px]" />
                   <span>Sign Out</span>
                 </Button>
               ) : (
                 <Link to="/auth">
                   <Button
-                    variant="default"
-                    className="flex items-center space-x-2 bg-gradient-primary text-primary-foreground shadow-glow"
+                    className="h-11 px-6 text-[15px] font-semibold flex items-center gap-2 rounded-xl bg-gradient-primary text-primary-foreground shadow-glow hover:scale-[1.02] transition-all"
                   >
-                    <LogIn className="w-4 h-4" />
+                    <LogIn className="w-[18px] h-[18px]" />
                     <span>Sign In</span>
                   </Button>
                 </Link>
@@ -98,8 +95,7 @@ const Navbar = () => {
           {/* Mobile menu button */}
           <Button
             variant="ghost"
-            size="sm"
-            className="md:hidden"
+            className="md:hidden h-11 w-11 rounded-xl"
             onClick={() => setIsOpen(!isOpen)}
           >
             {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -108,49 +104,40 @@ const Navbar = () => {
 
         {/* Mobile Navigation */}
         {isOpen && (
-          <div className="md:hidden pb-4 space-y-2">
+          <div className="md:hidden pb-4 space-y-2 pt-2">
             {user && navItems.map((item) => {
               const Icon = item.icon;
+              const active = isActive(item.href);
               return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={() => setIsOpen(false)}
-                >
+                <Link key={item.href} to={item.href} onClick={() => setIsOpen(false)}>
                   <Button
-                    variant={isActive(item.href) ? "default" : "ghost"}
+                    variant={active ? "default" : "ghost"}
                     className={`
-                      w-full justify-start space-x-2 transition-smooth
-                      ${isActive(item.href) 
-                        ? "bg-gradient-primary text-primary-foreground" 
-                        : ""
-                      }
+                      w-full justify-start gap-3 h-12 text-[15px] font-semibold rounded-xl transition-all
+                      ${active ? "bg-gradient-primary text-primary-foreground" : ""}
                     `}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-5 h-5" />
                     <span>{item.label}</span>
                   </Button>
                 </Link>
               );
             })}
-            
+
             {!isLoading && (
               user ? (
                 <Button
                   variant="ghost"
                   onClick={handleSignOut}
-                  className="w-full justify-start space-x-2"
+                  className="w-full justify-start gap-3 h-12 text-[15px] font-semibold rounded-xl"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-5 h-5" />
                   <span>Sign Out</span>
                 </Button>
               ) : (
                 <Link to="/auth" onClick={() => setIsOpen(false)}>
-                  <Button
-                    variant="default"
-                    className="w-full justify-start space-x-2 bg-gradient-primary text-primary-foreground"
-                  >
-                    <LogIn className="w-4 h-4" />
+                  <Button className="w-full justify-start gap-3 h-12 text-[15px] font-semibold rounded-xl bg-gradient-primary text-primary-foreground">
+                    <LogIn className="w-5 h-5" />
                     <span>Sign In</span>
                   </Button>
                 </Link>
