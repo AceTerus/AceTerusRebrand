@@ -18,18 +18,17 @@ const TROPHY = {
 
 type TrophyKey = keyof typeof TROPHY;
 
-// CSS variable shorthands
 const C = {
-  bg:         "hsl(var(--card))",
-  bgMuted:    "hsl(var(--muted))",
-  bgMutedHalf:"hsl(var(--muted) / 0.6)",
-  border:     "hsl(var(--border))",
-  fg:         "hsl(var(--foreground))",
-  fgMuted:    "hsl(var(--muted-foreground))",
-  primary:    "hsl(var(--primary))",
-  primaryLow: "hsl(var(--primary) / 0.12)",
-  primaryMid: "hsl(var(--primary) / 0.5)",
-  primaryGlow:"hsl(var(--primary) / 0.25)",
+  bg:          "hsl(var(--card))",
+  bgMuted:     "hsl(var(--muted))",
+  bgMutedHalf: "hsl(var(--muted) / 0.6)",
+  border:      "hsl(var(--border))",
+  fg:          "hsl(var(--foreground))",
+  fgMuted:     "hsl(var(--muted-foreground))",
+  primary:     "hsl(var(--primary))",
+  primaryLow:  "hsl(var(--primary) / 0.12)",
+  primaryMid:  "hsl(var(--primary) / 0.5)",
+  primaryGlow: "hsl(var(--primary) / 0.25)",
 };
 
 function PodiumCard({
@@ -46,18 +45,31 @@ function PodiumCard({
   isMe: boolean;
 }) {
   const t = TROPHY[trophy];
-  const sz = center ? 110 : 82;
+
+  // All sizes are fluid: clamp(min, preferred-vw, max)
+  const avatarSz    = center ? "clamp(68px, 21vw, 110px)" : "clamp(52px, 16vw, 82px)";
+  const cardWidth   = center ? "clamp(108px, 32vw, 200px)" : "clamp(84px, 25vw, 155px)";
+  const nameFontSz  = center ? "clamp(12px, 3.6vw, 17px)" : "clamp(10px, 3vw, 13px)";
+  const trophySz    = center ? "clamp(34px, 10vw, 50px)"  : "clamp(26px, 8vw, 38px)";
+  const trophyIcon  = center ? "clamp(16px, 5vw, 24px)"   : "clamp(12px, 4vw, 18px)";
+  const streakFsz   = center ? "clamp(17px, 5vw, 24px)"   : "clamp(13px, 4vw, 18px)";
+  const padBox      = center ? "clamp(10px, 3vw, 18px) clamp(8px, 2vw, 14px)" : "8px 6px";
+  const marginTop   = center ? 0 : "clamp(20px, 7vw, 40px)";
 
   const inner = (
     <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-      flex: center ? "0 0 200px" : "0 0 155px",
-      marginTop: center ? 0 : 40,
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+      flex: `0 0 ${cardWidth}`,
+      width: cardWidth,
+      marginTop,
       cursor: canClick ? "pointer" : "default",
+      minWidth: 0,
     }}>
       {/* Avatar */}
       <div style={{
-        width: sz, height: sz, borderRadius: center ? 16 : 12, overflow: "hidden",
+        width: avatarSz, height: avatarSz,
+        borderRadius: center ? 16 : 12,
+        overflow: "hidden",
         border: `2px solid ${center ? C.primaryMid : C.border}`,
         boxShadow: center ? `0 0 28px ${C.primaryGlow}` : "none",
         flexShrink: 0,
@@ -70,9 +82,13 @@ function PodiumCard({
       </div>
 
       {/* Name */}
-      <div style={{ color: C.fg, fontSize: center ? 17 : 13, fontWeight: 700, textAlign: "center", lineHeight: 1.3 }}>
+      <div style={{
+        color: C.fg, fontSize: nameFontSz, fontWeight: 700,
+        textAlign: "center", lineHeight: 1.3,
+        wordBreak: "break-word", width: "100%",
+      }}>
         {entry.username || "Anonymous"}
-        {isMe && <span style={{ fontSize: 10, color: C.fgMuted, marginLeft: 5 }}>(you)</span>}
+        {isMe && <span style={{ fontSize: "10px", color: C.fgMuted, marginLeft: 4 }}>(you)</span>}
       </div>
 
       {/* Stats box */}
@@ -80,27 +96,30 @@ function PodiumCard({
         width: "100%",
         background: C.bgMuted,
         border: `1px solid ${C.border}`,
-        borderRadius: 14,
-        padding: center ? "18px 14px" : "12px 10px",
+        borderRadius: 12,
+        padding: padBox,
         display: "flex", flexDirection: "column", alignItems: "center",
-        gap: center ? 8 : 6,
+        gap: center ? 6 : 4,
       }}>
         {/* Trophy badge */}
         <div style={{
-          width: center ? 50 : 38, height: center ? 50 : 38, borderRadius: 12,
+          width: trophySz, height: trophySz, borderRadius: 10,
           background: t.bg, boxShadow: t.glow,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: center ? 24 : 18,
+          fontSize: trophyIcon,
         }}>{t.icon}</div>
 
         {/* Streak */}
-        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: center ? 24 : 18, fontWeight: 800, color: C.fg }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 4,
+          fontSize: streakFsz, fontWeight: 800, color: C.fg,
+        }}>
           🔥 {entry.streak}
         </div>
-        <div style={{ color: C.fgMuted, fontSize: 11 }}>day streak</div>
+        <div style={{ color: C.fgMuted, fontSize: "10px" }}>day streak</div>
 
         {!canClick && !isMe && (
-          <div style={{ color: C.fgMuted, fontSize: 10, textAlign: "center", lineHeight: 1.4 }}>
+          <div style={{ color: C.fgMuted, fontSize: "9px", textAlign: "center", lineHeight: 1.4 }}>
             🔒 Follow each other<br />to view profile
           </div>
         )}
@@ -109,7 +128,7 @@ function PodiumCard({
   );
 
   return canClick ? (
-    <Link to={isMe ? "/profile" : `/profile/${entry.user_id}`} style={{ textDecoration: "none" }}>
+    <Link to={isMe ? "/profile" : `/profile/${entry.user_id}`} style={{ textDecoration: "none", minWidth: 0 }}>
       {inner}
     </Link>
   ) : (
@@ -150,7 +169,6 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
   const canClick = (uid: string) => uid === currentUserId || mutualIds.has(uid);
 
   const [gold, silver, bronze] = entries;
-  // Podium display order: silver | gold | bronze
   const podium = [silver, gold, bronze].filter(Boolean) as LeaderboardEntry[];
   const podiumTrophy = (e: LeaderboardEntry): TrophyKey => {
     if (e.user_id === gold?.user_id)   return "gold";
@@ -169,22 +187,30 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
       marginBottom: 32,
       boxShadow: "var(--shadow-elegant)",
     }}>
-      {/* Header bar */}
+      {/* Header */}
       <div style={{
         background: "var(--gradient-primary)",
-        padding: "18px 24px",
-        display: "flex", alignItems: "center", gap: 10,
+        padding: "14px 20px",
+        display: "flex", alignItems: "center", gap: 8,
       }}>
-        <span style={{ fontSize: 22 }}>🔥</span>
-        <span style={{ color: "#fff", fontSize: 20, fontWeight: 700, letterSpacing: 0.4 }}>
+        <span style={{ fontSize: 20 }}>🔥</span>
+        <span style={{ color: "#fff", fontSize: "clamp(15px, 4.5vw, 20px)", fontWeight: 700, letterSpacing: 0.4 }}>
           Streak Leaderboard
         </span>
       </div>
 
-      <div style={{ padding: "24px 16px 28px", maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ padding: "20px 12px 24px", width: "100%", boxSizing: "border-box" }}>
 
-        {/* Podium */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 12, marginBottom: 24 }}>
+        {/* Podium — never overflows, gaps are fluid */}
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-end",
+          gap: "clamp(6px, 2vw, 12px)",
+          marginBottom: 20,
+          width: "100%",
+          overflow: "hidden",
+        }}>
           {podium.map((entry) => (
             <PodiumCard
               key={entry.user_id}
@@ -201,9 +227,9 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
         <div style={{
           background: C.primaryLow,
           border: `1px solid ${C.primaryMid}`,
-          borderRadius: 12, padding: "12px 20px",
-          textAlign: "center", fontSize: 14,
-          color: C.fg, marginBottom: rest.length > 0 ? 24 : 0,
+          borderRadius: 12, padding: "10px 16px",
+          textAlign: "center", fontSize: "clamp(12px, 3.5vw, 14px)",
+          color: C.fg, marginBottom: rest.length > 0 ? 20 : 0,
         }}>
           Your current streak: 🔥{" "}
           <strong style={{ color: C.primary }}>{currentStreak}</strong>{" "}
@@ -214,9 +240,10 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
         {rest.length > 0 && (
           <>
             <div style={{
-              display: "grid", gridTemplateColumns: "52px 1fr 80px",
-              padding: "0 12px 10px",
-              color: C.fgMuted, fontSize: 12, fontWeight: 600,
+              display: "grid",
+              gridTemplateColumns: "40px 1fr 64px",
+              padding: "0 8px 8px",
+              color: C.fgMuted, fontSize: 11, fontWeight: 600,
               borderBottom: `1px solid ${C.border}`,
               textTransform: "uppercase", letterSpacing: 0.5,
             }}>
@@ -225,7 +252,7 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
               ))}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
               {rest.map((entry, i) => {
                 const rank = i + 4;
                 const clickable = canClick(entry.user_id);
@@ -234,8 +261,10 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
                 const row = (
                   <div
                     style={{
-                      display: "grid", gridTemplateColumns: "52px 1fr 80px",
-                      alignItems: "center", padding: "11px 12px",
+                      display: "grid",
+                      gridTemplateColumns: "40px 1fr 64px",
+                      alignItems: "center",
+                      padding: "9px 8px",
                       background: C.bgMutedHalf,
                       border: `1px solid ${C.border}`,
                       borderRadius: 10,
@@ -245,24 +274,36 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
                     onMouseEnter={e => { if (clickable) (e.currentTarget as HTMLDivElement).style.background = C.bgMuted; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = C.bgMutedHalf; }}
                   >
-                    <span style={{ fontWeight: 700, color: C.fgMuted, fontSize: 14 }}>{rank}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontWeight: 700, color: C.fgMuted, fontSize: 13 }}>{rank}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       <img
                         src={entry.avatar_url || "/placeholder.svg"}
                         alt={entry.username || "User"}
-                        style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `1px solid ${C.border}` }}
+                        style={{
+                          width: 32, height: 32, borderRadius: "50%",
+                          objectFit: "cover", flexShrink: 0,
+                          border: `1px solid ${C.border}`,
+                        }}
                       />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: C.fg }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{
+                          fontWeight: 600, fontSize: "clamp(12px, 3.2vw, 14px)",
+                          color: C.fg, overflow: "hidden",
+                          textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
                           {entry.username || "Anonymous"}
-                          {isMe && <span style={{ fontSize: 11, color: C.fgMuted, marginLeft: 5 }}>(you)</span>}
+                          {isMe && <span style={{ fontSize: 10, color: C.fgMuted, marginLeft: 4 }}>(you)</span>}
                         </div>
                         {!clickable && !isMe && (
-                          <div style={{ fontSize: 11, color: C.fgMuted }}>🔒 Follow each other</div>
+                          <div style={{ fontSize: 10, color: C.fgMuted }}>🔒 Follow each other</div>
                         )}
                       </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, fontWeight: 700, color: "#f97316", fontSize: 14 }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      gap: 3, fontWeight: 700, color: "#f97316",
+                      fontSize: "clamp(12px, 3.2vw, 14px)",
+                    }}>
                       🔥 {entry.streak}
                     </div>
                   </div>
