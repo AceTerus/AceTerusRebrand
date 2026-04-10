@@ -56,12 +56,12 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
       `}
     >
       {/* Logo */}
-      <div className="flex items-center justify-center mb-8 mt-6">
+      <div className="flex items-center justify-center mb-4 mt-3">
         <Link to="/feed" className="group">
           <img
             src={Logo}
             alt="AceTerus Logo"
-            className="w-11 h-11 object-contain rounded-xl group-hover:shadow-glow transition-all duration-300"
+            className="w-[10vh] h-[10vh] object-contain rounded-xl group-hover:shadow-glow transition-all duration-300"
           />
         </Link>
       </div>
@@ -78,7 +78,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               title={collapsed ? item.label : undefined}
               className={`
                 relative flex items-center rounded-xl transition-all duration-200 group
-                ${collapsed ? "justify-center px-0 py-3" : "px-4 py-3 space-x-3"}
+                ${collapsed ? "justify-center px-0 py-4" : "px-5 py-4 space-x-4"}
                 ${active
                   ? "bg-primary/10 text-primary font-semibold"
                   : "text-foreground/70 hover:bg-muted/60 hover:text-foreground"
@@ -91,7 +91,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               )}
 
               <div className="relative flex-shrink-0">
-                <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : "stroke-[1.8]"}`} />
+                <Icon className={`w-6 h-6 ${active ? "stroke-[2.5]" : "stroke-[1.8]"}`} />
                 {item.badge && (
                   <span className="absolute -top-1.5 -right-2 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground leading-none py-0.5">
                     {item.badge}
@@ -100,7 +100,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               </div>
 
               {!collapsed && (
-                <span className="text-[15px] flex-1">{item.label}</span>
+                <span className="text-[17px] flex-1">{item.label}</span>
               )}
             </Link>
           );

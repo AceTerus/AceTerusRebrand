@@ -41,7 +41,7 @@ const Navbar = () => {
             <img
               src={Logo}
               alt="AceTerus Logo"
-              className="w-12 h-12 object-contain rounded-xl group-hover:shadow-glow transition-all duration-300"
+              className="w-20 h-20 object-contain rounded-xl group-hover:shadow-glow transition-all duration-300"
             />
           </Link>
 

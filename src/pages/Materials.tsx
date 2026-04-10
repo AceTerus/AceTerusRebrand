@@ -100,6 +100,7 @@ const FileTypeBadge = ({ mimeType }: { mimeType: string }) => {
 
 const InlinePreview = ({ upload, onPreview }: { upload: Upload; onPreview: () => void }) => {
   const { previewType, color, bg, Icon, label } = getFileInfo(upload.file_type);
+  const [pdfFailed, setPdfFailed] = useState(false);
 
   if (previewType === 'image') {
     return (
@@ -115,31 +116,72 @@ const InlinePreview = ({ upload, onPreview }: { upload: Upload; onPreview: () =>
   }
 
   if (previewType === 'pdf') {
+    // Show actual rendered first page via a scaled iframe
+    if (!pdfFailed) {
+      return (
+        <button
+          onClick={onPreview}
+          className="relative w-full overflow-hidden border-b bg-white dark:bg-muted/10 hover:opacity-95 transition-opacity group"
+          style={{ height: '200px' }}
+          aria-label="Preview PDF"
+        >
+          <iframe
+            src={`${upload.file_url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+            title={`Preview of ${upload.title}`}
+            loading="lazy"
+            className="absolute top-0 left-0 border-0 pointer-events-none"
+            style={{
+              width: '150%',
+              height: '150%',
+              transform: 'scale(0.667)',
+              transformOrigin: 'top left',
+            }}
+            onError={() => setPdfFailed(true)}
+          />
+          {/* Click-capture overlay + hover badge */}
+          <div className="absolute inset-0" />
+          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/60 text-white text-[11px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+            <Eye className="w-3 h-3" /> Open preview
+          </div>
+          {/* PDF badge top-left */}
+          <div
+            className="absolute top-2 left-2 flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold shadow-sm"
+            style={{ color, backgroundColor: bg }}
+          >
+            <Icon className="h-3 w-3" style={{ color }} />
+            PDF
+          </div>
+        </button>
+      );
+    }
+
+    // Fallback if iframe fails to render
     return (
       <button
         onClick={onPreview}
         className="w-full flex flex-col items-center justify-center gap-2 py-7 border-b bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer"
       >
-        <div
-          className="flex items-center justify-center rounded-xl w-14 h-14 shadow-sm"
-          style={{ backgroundColor: bg }}
-        >
+        <div className="flex items-center justify-center rounded-xl w-14 h-14 shadow-sm" style={{ backgroundColor: bg }}>
           <Icon className="h-7 w-7" style={{ color }} />
         </div>
-        <span className="text-xs text-muted-foreground font-medium">{label} · click to preview</span>
+        <span className="text-xs text-muted-foreground font-medium">PDF · click to preview</span>
       </button>
     );
   }
 
-  // Non-previewable types: show a muted icon strip
+  // Non-previewable (Word, Excel, PPT etc.) — show a styled banner
   return (
-    <div className="w-full flex items-center justify-center gap-2 py-6 border-b bg-muted/10">
+    <div
+      className="w-full flex flex-col items-center justify-center gap-3 py-8 border-b"
+      style={{ backgroundColor: `${bg}88` }}
+    >
       <div
-        className="flex items-center justify-center rounded-xl w-12 h-12 shadow-sm"
+        className="flex items-center justify-center rounded-2xl w-16 h-16 shadow-sm"
         style={{ backgroundColor: bg }}
       >
-        <Icon className="h-6 w-6" style={{ color }} />
+        <Icon className="h-8 w-8" style={{ color }} />
       </div>
+      <span className="text-xs font-semibold" style={{ color }}>{label} document</span>
     </div>
   );
 };

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Camera, X, Plus } from "lucide-react";
+import { Camera, X, Plus, Film } from "lucide-react";
 
 interface PostUploadProps {
   onPostCreated: () => void;
@@ -20,6 +20,8 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
   const [currentTag, setCurrentTag] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -28,16 +30,19 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const oversized = files.find((file) => file.size > 5 * 1024 * 1024);
+    const oversized = files.find((file) => file.size > 30 * 1024 * 1024);
     if (oversized) {
       toast({
         title: "File too large",
-        description: "Each image must be under 5MB",
+        description: "Each image must be under 30MB",
         variant: "destructive",
       });
       return;
     }
 
+    // Clear any selected video when images are chosen
+    setSelectedVideo(null);
+    setVideoPreview(null);
     setSelectedImages(files);
 
     // Generate previews for all selected images
@@ -51,6 +56,26 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
     );
 
     Promise.all(readers).then((results) => setImagePreviews(results));
+  };
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 300 * 1024 * 1024) {
+      toast({
+        title: "Video too large",
+        description: "Reels must be under 300MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Clear any selected images when a video is chosen
+    setSelectedImages([]);
+    setImagePreviews([]);
+    setSelectedVideo(file);
+    setVideoPreview(URL.createObjectURL(file));
   };
 
   const handleAddTag = () => {
@@ -86,33 +111,37 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
     setIsUploading(true);
 
     try {
-      const imageUrls: string[] = [];
+      const mediaUrls: string[] = [];
 
       // Upload all selected images (if any)
       for (const file of selectedImages) {
-        const fileExt = file.name.split(".").pop();
         const fileName = `${user.id}/${Date.now()}_${file.name}`;
-
         const { error: uploadError } = await supabase.storage
           .from("profile-images")
           .upload(fileName, file);
-
         if (uploadError) throw uploadError;
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("profile-images").getPublicUrl(fileName);
-
-        imageUrls.push(publicUrl);
+        const { data: { publicUrl } } = supabase.storage.from("profile-images").getPublicUrl(fileName);
+        mediaUrls.push(publicUrl);
       }
 
-      // Create post (store first image as legacy image_url for compatibility)
+      // Upload video if selected
+      if (selectedVideo) {
+        const fileName = `${user.id}/${Date.now()}_${selectedVideo.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("profile-images")
+          .upload(fileName, selectedVideo);
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from("profile-images").getPublicUrl(fileName);
+        mediaUrls.push(publicUrl);
+      }
+
+      // Create post (store first media as legacy image_url for compatibility)
       const { data: newPost, error } = await supabase
         .from("posts")
         .insert({
           user_id: user.id,
           content: content.trim(),
-          image_url: imageUrls[0] || null,
+          image_url: mediaUrls[0] || null,
           tags: tags,
         })
         .select("id")
@@ -120,18 +149,14 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
 
       if (error) throw error;
 
-      // Store all images in post_images for multi-image gallery
-      if (newPost && imageUrls.length > 0) {
-        const payload = imageUrls.map((url, index) => ({
+      // Store all media in post_images for gallery/reel display
+      if (newPost && mediaUrls.length > 0) {
+        const payload = mediaUrls.map((url, index) => ({
           post_id: newPost.id,
           file_url: url,
           position: index,
         }));
-
-        const { error: imagesError } = await supabase
-          .from("post_images")
-          .insert(payload);
-
+        const { error: imagesError } = await supabase.from("post_images").insert(payload);
         if (imagesError) throw imagesError;
       }
 
@@ -145,6 +170,8 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
       setTags([]);
       setSelectedImages([]);
       setImagePreviews([]);
+      setSelectedVideo(null);
+      setVideoPreview(null);
       setIsOpen(false);
       onPostCreated();
 
@@ -187,10 +214,10 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
             className="resize-none"
           />
 
-          {/* Image Upload */}
+          {/* Media Upload Buttons */}
           <div className="flex items-center gap-4">
             <label htmlFor="image-upload" className="cursor-pointer">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                 <Camera className="w-4 h-4" />
                 Add Photos
               </div>
@@ -203,6 +230,19 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
                 className="hidden"
               />
             </label>
+            <label htmlFor="video-upload" className="cursor-pointer">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+                <Film className="w-4 h-4" />
+                Add Reel
+              </div>
+              <input
+                id="video-upload"
+                type="file"
+                accept="video/*"
+                onChange={handleVideoSelect}
+                className="hidden"
+              />
+            </label>
           </div>
 
           {/* Image Previews */}
@@ -210,22 +250,33 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
             <div className="relative">
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
                 {imagePreviews.map((src, idx) => (
-                  <img
-                    key={idx}
-                    src={src}
-                    alt={`Preview ${idx + 1}`}
-                    className="h-24 w-full object-cover rounded-lg"
-                  />
+                  <img key={idx} src={src} alt={`Preview ${idx + 1}`} className="h-24 w-full object-cover rounded-lg" />
                 ))}
               </div>
               <Button
                 size="icon"
                 variant="secondary"
                 className="absolute top-2 right-2 h-6 w-6"
-                onClick={() => {
-                  setSelectedImages([]);
-                  setImagePreviews([]);
-                }}
+                onClick={() => { setSelectedImages([]); setImagePreviews([]); }}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          )}
+
+          {/* Video Preview */}
+          {videoPreview && (
+            <div className="relative rounded-lg overflow-hidden bg-black">
+              <video
+                src={videoPreview}
+                controls
+                className="w-full max-h-52 object-contain"
+              />
+              <Button
+                size="icon"
+                variant="secondary"
+                className="absolute top-2 right-2 h-6 w-6"
+                onClick={() => { setSelectedVideo(null); setVideoPreview(null); }}
               >
                 <X className="w-3 h-3" />
               </Button>

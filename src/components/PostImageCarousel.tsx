@@ -8,6 +8,9 @@ interface PostImageCarouselProps {
   onImageClick?: (index: number) => void;
 }
 
+const isVideoUrl = (url: string) =>
+  /\.(mp4|webm|mov|avi|mkv|ogg)(\?.*)?$/i.test(url);
+
 export const PostImageCarousel = ({ images, className, onImageClick }: PostImageCarouselProps) => {
   const [index, setIndex] = useState(0);
   // height/width ratio — default 1:1 until first image loads
@@ -51,17 +54,27 @@ export const PostImageCarousel = ({ images, className, onImageClick }: PostImage
           <div
             key={`${src}-${idx}`}
             className="relative w-full h-full flex-shrink-0 overflow-hidden"
-            onClick={() => onImageClick?.(idx)}
-            style={{ cursor: onImageClick ? "zoom-in" : "default" }}
+            onClick={() => !isVideoUrl(src) && onImageClick?.(idx)}
+            style={{ cursor: !isVideoUrl(src) && onImageClick ? "zoom-in" : "default" }}
           >
-            <img
-              src={src}
-              alt={`Post image ${idx + 1}`}
-              onLoad={idx === 0 ? handleImageLoad : undefined}
-              className="w-full h-full object-cover select-none"
-              loading="lazy"
-              draggable={false}
-            />
+            {isVideoUrl(src) ? (
+              <video
+                src={src}
+                controls
+                playsInline
+                className="w-full h-full object-contain bg-black select-none"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <img
+                src={src}
+                alt={`Post image ${idx + 1}`}
+                onLoad={idx === 0 ? handleImageLoad : undefined}
+                className="w-full h-full object-cover select-none"
+                loading="lazy"
+                draggable={false}
+              />
+            )}
           </div>
         ))}
       </div>
