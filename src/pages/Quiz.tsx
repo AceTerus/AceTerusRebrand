@@ -20,6 +20,7 @@ import {
   Layers,
   Loader2,
   PenLine,
+  ScanLine,
   Sparkles,
   Target,
   X,
@@ -589,6 +590,26 @@ const Quiz = () => {
         {/* View: Categories */}
         {view === "categories" && (
           <div className="mb-10">
+            {/* OMR Scanner banner */}
+            <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                <ScanLine className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-base">OMR Answer Sheet Scanner</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Upload or photograph a filled answer sheet to grade it instantly with optical mark recognition.
+                </p>
+              </div>
+              <Button
+                className="bg-gradient-primary shadow-glow shrink-0"
+                onClick={() => navigate("/omr-scan")}
+              >
+                <ScanLine className="w-4 h-4 mr-2" />
+                Open Scanner
+              </Button>
+            </div>
+
             <h2 className="text-2xl font-bold mb-6">Select a Category</h2>
             {loadingDecks ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

@@ -34,7 +34,14 @@
       "Bash(xargs -I {} basename {})",
       "Bash(rm -rf \"C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/functions/openmc-quizzes\")",
       "Bash(rm \"C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/20260321000000_omc_schema.sql\")",
-      "Bash(rm \"C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/20260321000001_omc_demo_data.sql\")"
+      "Bash(rm \"C:/Users/Dhiren23/Documents/AceTerusRebrand-1/supabase/migrations/20260321000001_omc_demo_data.sql\")",
+      "Bash(python -m pip install -r requirements.txt)",
+      "Bash(python -c \"import psycopg2; psycopg2.connect\\('postgresql://postgres:postgres@localhost:5432/omr_db'\\)\")",
+      "Bash(python -c \"import redis; r=redis.Redis\\(\\); r.ping\\(\\)\")",
+      "Bash(python -c \"from database import Base, engine; from models import models; Base.metadata.create_all\\(bind=engine\\); print\\('DB tables created OK'\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(uvicorn main:socket_app --port 8000 --reload)",
+      "Bash(python -m json.tool)"
     ]
   }
 }
