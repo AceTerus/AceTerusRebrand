@@ -108,7 +108,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
       </nav>
 
       {/* Collapse toggle button */}
-      <div className={`px-3 pb-3 ${collapsed ? "flex justify-center" : ""}`}>
+      <div className={`px-3 pb-2 ${collapsed ? "flex justify-center" : ""}`}>
         <button
           onClick={() => onCollapseToggle(!collapsed)}
           className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"

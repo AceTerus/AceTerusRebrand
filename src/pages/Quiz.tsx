@@ -12,6 +12,7 @@ import {
   BookmarkCheck,
   BookOpen,
   BookOpenCheck,
+  CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +28,7 @@ import {
   XCircle,
 } from "lucide-react";
 import StreakFireOverlay from "@/components/StreakFireOverlay";
+import { GoalSheet } from "@/components/GoalSheet";
 import QuizAnalysis from "@/components/QuizAnalysis";
 import type { PerformanceAnalysis } from "@/components/QuizAnalysis";
 import Logo from "@/assets/logo.png";
@@ -96,6 +98,9 @@ const Quiz = () => {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<PerformanceAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  // Goal sheet
+  const [showGoalSheet, setShowGoalSheet] = useState(false);
 
   // Subjective quiz state
   const [subjectiveAnswerMap, setSubjectiveAnswerMap] = useState<Map<number, string>>(new Map());
@@ -573,6 +578,13 @@ const Quiz = () => {
             <img src={Logo} alt="AceTerus Logo" className="w-16 h-16 object-contain rounded-2xl" />
           </div>
           <p className="text-muted-foreground">Practice with authentic exam papers and track your progress</p>
+          <button
+            onClick={() => setShowGoalSheet(true)}
+            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-primary text-primary-foreground text-sm font-semibold shadow-glow hover:opacity-90 hover:scale-[1.02] transition-all"
+          >
+            <CalendarDays className="w-4 h-4" />
+            My Goals
+          </button>
         </div>
 
         {/* Stats */}
@@ -821,6 +833,15 @@ const Quiz = () => {
                   error={analysisError}
                 />
 
+                {/* Set Goals CTA */}
+                <Button
+                  onClick={() => setShowGoalSheet(true)}
+                  className="w-full h-12 bg-gradient-primary text-primary-foreground rounded-2xl text-[15px] font-semibold shadow-glow flex items-center gap-2"
+                >
+                  <CalendarDays className="w-5 h-5" />
+                  Set Goals — Plan your study sprint
+                </Button>
+
                 <div>
                   <h4 className="text-xl font-bold mb-4">Answer Review</h4>
                   <div className="space-y-6">
@@ -1035,6 +1056,24 @@ const Quiz = () => {
                   <Button variant="outline" disabled={!activeDeck} onClick={() => activeDeck && handleStartQuiz(activeDeck)}>Load fresh order</Button>
                   <Button variant="outline" onClick={() => { resetSessionState(); setView("decks"); }}>Back to category</Button>
                 </div>
+
+                {/* Goal Sheet */}
+                <GoalSheet
+                  open={showGoalSheet}
+                  onClose={() => setShowGoalSheet(false)}
+                  deckName={activeDeck?.name ?? ""}
+                  subject={activeDeck?.subject ?? null}
+                  accuracy={accuracy}
+                  wrongQuestions={
+                    questions
+                      .filter((q, idx) => {
+                        const correct = q.answers.find((a) => a.is_correct);
+                        return answeredMap.get(idx) !== correct?.id;
+                      })
+                      .map((q) => q.text)
+                      .slice(0, 3)
+                  }
+                />
               </div>
 
             ) : (
@@ -1256,6 +1295,14 @@ const Quiz = () => {
             <Badge className="bg-white text-amber-600 text-xs px-1.5 py-0 ml-0.5 font-bold">{flaggedQuestions.size}</Badge>
           </Button>
         </div>
+      )}
+
+      {/* Standalone Goal Sheet — opened from header button before/between quizzes */}
+      {!sessionComplete && (
+        <GoalSheet
+          open={showGoalSheet}
+          onClose={() => setShowGoalSheet(false)}
+        />
       )}
     </div>
   );

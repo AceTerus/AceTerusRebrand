@@ -17,7 +17,7 @@ import { LikeButton } from '@/components/LikeButton';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Heart, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
+import { Calendar, Camera, Heart, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
 import { NotificationsBell } from '@/components/NotificationsBell';
 import { useMutualFollow } from '@/hooks/useMutualFollow';
 import { StreakLeaderboard } from '@/components/StreakLeaderboard';
@@ -39,6 +39,7 @@ interface Profile {
   user_id: string;
   username: string | null;
   avatar_url: string | null;
+  cover_url: string | null;
   bio: string | null;
   followers_count: number;
   following_count: number;
@@ -70,7 +71,9 @@ export const Profile = () => {
   const [editUsername, setEditUsername] = useState('');
   const [editBio, setEditBio] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isCoverUploading, setIsCoverUploading] = useState(false);
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -204,6 +207,35 @@ export const Profile = () => {
         avatarUrl = urlData.publicUrl;
       }
 
+      let coverUrl = profile.cover_url;
+
+      // Upload cover if a new file is selected
+      if (coverFile) {
+        const fileExt = coverFile.name.split('.').pop();
+        const filePath = `${user.id}/cover-${Date.now()}.${fileExt}`;
+
+        const { error: coverUploadError } = await supabase.storage
+          .from('profile-images')
+          .upload(filePath, coverFile, { upsert: true });
+
+        if (coverUploadError) {
+          console.error('Error uploading cover:', coverUploadError);
+          toast({
+            title: 'Error',
+            description: 'Failed to upload cover photo',
+            variant: 'destructive',
+          });
+          setIsUpdating(false);
+          return;
+        }
+
+        const { data: coverUrlData } = supabase.storage
+          .from('profile-images')
+          .getPublicUrl(filePath);
+
+        coverUrl = coverUrlData.publicUrl;
+      }
+
       // Update profile
       const { error: updateError } = await supabase
         .from('profiles')
@@ -211,6 +243,7 @@ export const Profile = () => {
           username: editUsername,
           bio: editBio,
           avatar_url: avatarUrl,
+          cover_url: coverUrl,
         })
         .eq('user_id', user.id);
 
@@ -232,6 +265,7 @@ export const Profile = () => {
 
       setIsEditDialogOpen(false);
       setAvatarFile(null);
+      setCoverFile(null);
       fetchProfile();
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -447,6 +481,26 @@ export const Profile = () => {
   };
 
 
+  const handleCoverUpload = async (file: File) => {
+    if (!user) return;
+    setIsCoverUploading(true);
+    try {
+      const fileName = `${user.id}/cover_${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('profile-images').getPublicUrl(fileName);
+      await supabase.from('profiles').update({ cover_url: publicUrl }).eq('user_id', user.id);
+      setProfile((prev) => prev ? { ...prev, cover_url: publicUrl } : prev);
+      toast({ title: 'Cover photo updated!' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to upload cover photo', variant: 'destructive' });
+    } finally {
+      setIsCoverUploading(false);
+    }
+  };
+
   const fetchQuizHistory = async () => {
     if (!user) return;
     setQuizHistoryLoading(true);
@@ -479,23 +533,56 @@ export const Profile = () => {
         <div className="flex justify-end mb-4 lg:hidden">
           <NotificationsBell />
         </div>
-        {/* Profile Picture and Bio Section */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-6">
-              <Avatar className="h-32 w-32 border-4 border-primary/20">
-                <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
-                <AvatarFallback className="text-4xl">
-                  {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-center w-full max-w-md">
-                <h1 className="text-3xl font-bold mb-2">
+        {/* Profile Header — backdrop + overlapping avatar */}
+        <Card className="mb-8 overflow-hidden">
+          {/* ── Cover photo ── */}
+          <div className="relative h-[220px] w-full bg-gradient-to-br from-primary/40 via-primary/20 to-secondary/30">
+            {profile?.cover_url && (
+              <img
+                src={profile.cover_url}
+                alt="Cover"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+            {/* Bottom gradient so avatar/badge text stays readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+
+
+            {/* Streak badge — overlapping cover, top-right */}
+            {streak > 0 && (
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm">
+                <Flame className="w-4 h-4 text-orange-400" />
+                <span className="text-white text-xs font-bold">{streak} day streak</span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Avatar overlapping the cover bottom edge ── */}
+          <div className="relative z-10 px-6 pb-6">
+            {/* Avatar sits -48px above this section so it crosses the cover border */}
+            <div className="flex flex-col items-center -mt-16">
+              <div className="relative">
+                <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-primary/30 shadow-xl">
+                  <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
+                  <AvatarFallback className="text-4xl">
+                    {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                {/* "Student" badge below avatar */}
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold shadow">
+                  Student
+                </div>
+              </div>
+
+              {/* Name + bio */}
+              <div className="text-center mt-6 w-full max-w-md">
+                <h1 className="text-3xl font-bold mb-1">
                   {profile?.username || user?.email?.split('@')[0] || 'Anonymous User'}
                 </h1>
-                <p className="text-muted-foreground mb-6">
+                <p className="text-muted-foreground mb-6 text-sm">
                   {profile?.bio || 'No bio yet. Click edit to add one.'}
                 </p>
+
                 {isOwnProfile && (
                   <div className="flex flex-col items-center gap-3 w-full">
                   <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -544,7 +631,26 @@ export const Profile = () => {
                             )}
                           </div>
                         </div>
-                        <Button 
+                        <div className="space-y-2">
+                          <Label htmlFor="cover">Cover Photo</Label>
+                          <div className="flex items-center gap-4">
+                            <Input
+                              id="cover"
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                            />
+                            {coverFile && (
+                              <span className="text-sm text-muted-foreground">
+                                {coverFile.name}
+                              </span>
+                            )}
+                          </div>
+                          {profile?.cover_url && !coverFile && (
+                            <p className="text-xs text-muted-foreground">Current cover photo set. Upload a new one to replace it.</p>
+                          )}
+                        </div>
+                        <Button
                           onClick={handleUpdateProfile} 
                           disabled={isUpdating}
                           className="w-full"
@@ -674,7 +780,7 @@ export const Profile = () => {
                 )}
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         {/* Profile Stats */}
