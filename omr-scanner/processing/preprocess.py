@@ -1,10 +1,13 @@
 """Image loading and preprocessing: grayscale → CLAHE → blur → threshold → warp."""
 
+import logging
 from pathlib import Path
 from typing import Optional
 
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +156,9 @@ def _align_image(
         src_pts = np.float32([tl, tr, bl, br])
         M, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
         if M is not None:
+            logger.info("Warp succeeded — %d marks found, using homography", len(marks))
             return cv2.warpPerspective(gray, M, (canonical_w, canonical_h))
 
     # Fallback: resize without warp
+    logger.warning("Warp FAILED — only %d marks found, falling back to plain resize", len(marks))
     return cv2.resize(gray, (canonical_w, canonical_h))

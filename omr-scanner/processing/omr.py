@@ -3,10 +3,13 @@ Bubble detection: for each question/option crop the circular ROI,
 measure fill ratio, determine the selected answer and confidence.
 """
 
+import logging
 from typing import Any, Dict, Tuple
 
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 FILL_THRESHOLD   = 0.35   # ratio above which a bubble counts as filled
 CONFIDENCE_LIMIT = 0.45   # below this confidence the question is flagged
@@ -92,6 +95,9 @@ def detect_bubbles(
 
         for opt, (cx, cy, radius) in options.items():
             fill_ratios[opt] = _measure_fill(warped_thresh, cx, cy, radius)
+
+        logger.info("Q%d fill_ratios: %s", q_num,
+                    {k: f"{v:.3f}" for k, v in fill_ratios.items()})
 
         selected = [opt for opt, ratio in fill_ratios.items() if ratio > FILL_THRESHOLD]
 
