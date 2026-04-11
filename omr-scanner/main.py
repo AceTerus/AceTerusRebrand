@@ -2,7 +2,7 @@
 OMR Scanner — FastAPI + Socket.IO entry point.
 
 Run with:
-    uvicorn main:socket_app --reload --port 8000
+    uvicorn main:socket_app --reload --port 8080
 
 No Redis or Celery required — processing runs as an async background task
 in the same process.  For high-throughput production use, swap the

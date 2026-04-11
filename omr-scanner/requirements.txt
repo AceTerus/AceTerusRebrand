@@ -3,26 +3,19 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
 
-# Database
+# Database (SQLite by default; set DATABASE_URL env var for Postgres + add psycopg2-binary)
 sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.9
-alembic>=1.13.0
-
-# Job queue
-celery>=5.3.6
-redis>=5.0.4
 
 # WebSocket / Socket.IO
 python-socketio>=5.11.0
-aioredis>=2.0.1      # AsyncRedisManager back-end
 
 # Image processing
 opencv-python-headless>=4.9.0.80
 Pillow>=10.3.0
 pytesseract>=0.3.10
 
-# PDF support
-pdf2image>=1.17.0    # requires poppler on the system
+# PDF support (requires poppler system package)
+pdf2image>=1.17.0
 
 # Misc
 pydantic>=2.7.0
