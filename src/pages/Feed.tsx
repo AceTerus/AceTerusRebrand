@@ -212,7 +212,7 @@ export const Feed = () => {
   const currentLightboxImage = currentLightboxPost?.images?.[lightboxIndex];
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-8">
+    <div className="min-h-screen bg-transparent pb-24 lg:pb-8">
       {/* Two-column layout on desktop */}
       <div className="mx-auto w-full max-w-5xl px-4 pt-4 lg:grid lg:grid-cols-[1fr_288px] lg:gap-8 lg:items-start">
 
@@ -357,7 +357,7 @@ export const Feed = () => {
                     )}
 
                     {/* Action bar */}
-                    <div className="flex items-center gap-1 px-3 pt-2 pb-1">
+                    <div className="flex items-start gap-1 px-3 pt-2 pb-1">
                       <LikeButton
                         postId={post.id}
                         likesCount={post.likes_count}

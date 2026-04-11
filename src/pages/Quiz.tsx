@@ -569,7 +569,7 @@ const Quiz = () => {
   const unansweredCount = questions.length - answeredCount;
 
   return (
-    <div className="min-h-screen pb-20 lg:pb-12 bg-gradient-to-br from-background via-muted/20 to-background">
+    <div className="min-h-screen pb-20 lg:pb-12 bg-transparent">
       <div className="container mx-auto px-4 max-w-6xl pt-8">
 
         {/* Header */}

@@ -515,7 +515,7 @@ const AdminQuiz = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background p-6 max-w-5xl mx-auto">
+    <div className="min-h-screen bg-transparent p-6 max-w-5xl mx-auto">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-8">

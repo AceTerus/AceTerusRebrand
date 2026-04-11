@@ -491,7 +491,7 @@ export default function OmrScanner() {
   // ════════════════════════════════════════════════════════════════════════
   if (!isAdmin) {
     return (
-      <div className="min-h-screen pb-24 bg-gradient-to-br from-background via-muted/20 to-background">
+      <div className="min-h-screen pb-24 bg-transparent">
         <div className="container mx-auto px-4 max-w-lg pt-8">
           {pageHeader}
           {offlineBanner}
@@ -509,7 +509,7 @@ export default function OmrScanner() {
   // ADMIN VIEW — setup / scan / review tabs
   // ════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen pb-24 bg-gradient-to-br from-background via-muted/20 to-background">
+    <div className="min-h-screen pb-24 bg-transparent">
       <div className="container mx-auto px-4 max-w-3xl pt-8">
         {pageHeader}
         {offlineBanner}

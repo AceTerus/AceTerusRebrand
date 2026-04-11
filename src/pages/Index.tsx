@@ -40,7 +40,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-background text-foreground">
+    <div className="min-h-screen overflow-hidden bg-transparent text-foreground">
       <Navbar />
       <main>
         <section className="relative min-h-[95vh] flex items-center overflow-hidden">

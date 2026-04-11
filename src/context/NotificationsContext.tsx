@@ -21,7 +21,8 @@ export interface Notification {
     | "material_comment"
     | "quiz_published"
     | "streak_milestone"
-    | "streak_broken";
+    | "streak_broken"
+    | "goal_reminder";
   post_id: string | null;
   upload_id: string | null;
   quiz_category_id: string | null;

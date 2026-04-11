@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Bell, Heart, MessageCircle, UserPlus, X, BookOpen, Flame, AlertTriangle } from "lucide-react";
+import { Bell, Heart, MessageCircle, UserPlus, X, BookOpen, Flame, AlertTriangle, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,6 +36,7 @@ const NotifIcon = ({ type }: { type: Notification["type"] }) => {
   if (type === "quiz_published") return <BookOpen className="w-3.5 h-3.5 text-violet-500" />;
   if (type === "streak_milestone") return <Flame className="w-3.5 h-3.5 text-orange-500" />;
   if (type === "streak_broken") return <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />;
+  if (type === "goal_reminder") return <Target className="w-3.5 h-3.5 text-primary" />;
   return <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />;
 };
 
@@ -52,6 +53,10 @@ const notifText = (notif: Notification): string => {
       return `You reached a ${notif.metadata?.streak}-day streak! 🔥`;
     case "streak_broken":
       return `Your ${notif.metadata?.old_streak}-day streak was broken`;
+    case "goal_reminder": {
+      const text = notif.metadata?.text ?? "a goal";
+      return `Reminder: "${text.length > 50 ? text.slice(0, 50) + "…" : text}"`;
+    }
     default: return "";
   }
 };
@@ -64,11 +69,12 @@ const notifLink = (notif: Notification): string => {
   return "/feed";
 };
 
-/** Self-notifications (streak, quiz_published for recipient) have actor_id === user_id */
+/** Self-notifications (streak, quiz_published, goal_reminder) have actor_id === user_id */
 const isSelfNotif = (notif: Notification) =>
   notif.type === "streak_milestone" ||
   notif.type === "streak_broken" ||
-  notif.type === "quiz_published";
+  notif.type === "quiz_published" ||
+  notif.type === "goal_reminder";
 
 interface NotificationItemProps {
   notif: Notification;

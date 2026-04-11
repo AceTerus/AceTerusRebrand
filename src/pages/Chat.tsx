@@ -389,7 +389,7 @@ export const Chat = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] lg:h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-[calc(100vh-4rem)] lg:h-screen w-full overflow-hidden bg-transparent">
       {/* ── Left panel: contacts ── */}
       <div className={`${showContactsList ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 flex-shrink-0 flex-col border-r bg-muted/20`}>
         {/* Panel header */}

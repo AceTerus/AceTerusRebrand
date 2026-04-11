@@ -25,11 +25,13 @@ import { MascotProvider } from "./context/MascotContext";
 import MascotCompanion from "./components/MascotCompanion";
 import MascotGreeter from "./components/MascotGreeter";
 import MascotChat from "./components/MascotChat";
+import { useGoalReminders } from "./hooks/useGoalReminders";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { user } = useAuth();
+  useGoalReminders();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => {
     return localStorage.getItem("sidebar-collapsed") === "true";
   });

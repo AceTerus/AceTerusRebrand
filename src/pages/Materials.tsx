@@ -383,7 +383,7 @@ export const Materials = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
+      <div className="min-h-screen bg-transparent flex items-center justify-center">
         <Card className="p-8">
           <CardContent>
             <p className="text-center text-muted-foreground">Please sign in to view materials.</p>
@@ -394,7 +394,7 @@ export const Materials = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+    <div className="min-h-screen bg-transparent">
       <div className="container mx-auto px-4 pt-8 pb-20 lg:pb-8 max-w-5xl">
 
         {/* Page header */}

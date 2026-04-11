@@ -50,7 +50,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
   return (
     <aside
       className={`
-        hidden lg:flex lg:flex-col fixed left-0 top-0 h-screen border-r border-border bg-background z-50
+        hidden lg:flex lg:flex-col fixed left-0 top-0 h-screen border-r border-border bg-white z-50
         transition-all duration-300
         ${collapsed ? "w-[70px]" : "w-64"}
       `}
