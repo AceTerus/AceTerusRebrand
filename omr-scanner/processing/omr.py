@@ -96,8 +96,7 @@ def detect_bubbles(
         for opt, (cx, cy, radius) in options.items():
             fill_ratios[opt] = _measure_fill(warped_thresh, cx, cy, radius)
 
-        logger.info("Q%d fill_ratios: %s", q_num,
-                    {k: f"{v:.3f}" for k, v in fill_ratios.items()})
+        print(f"[OMR] Q{q_num} fill_ratios: { {k: round(v,3) for k,v in fill_ratios.items()} }", flush=True)
 
         selected = [opt for opt, ratio in fill_ratios.items() if ratio > FILL_THRESHOLD]
 
