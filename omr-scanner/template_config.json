@@ -1,42 +1,32 @@
 {
-  "_comment": "Canonical image size after warp: 800 × 1100 px. All coordinates are in that space.",
+  "_comment": "Matches answer-sheet.html. Page: 794×1123 px. All coordinates in that canonical space.",
 
-  "canonical_width":  800,
-  "canonical_height": 1100,
+  "canonical_width":  794,
+  "canonical_height": 1123,
 
   "registration_marks": {
-    "top_left":     { "x":  20, "y":   20, "size": 15 },
-    "top_right":    { "x": 765, "y":   20, "size": 15 },
-    "bottom_left":  { "x":  20, "y": 1065, "size": 15 },
-    "bottom_right": { "x": 765, "y": 1065, "size": 15 }
+    "top_left":     { "x":  25, "y":   25, "size": 20 },
+    "top_right":    { "x": 769, "y":   25, "size": 20 },
+    "bottom_left":  { "x":  25, "y": 1098, "size": 20 },
+    "bottom_right": { "x": 769, "y": 1098, "size": 20 }
   },
 
-  "student_id_region": { "x": 220, "y": 70, "w": 360, "h": 55 },
+  "student_id_region": { "x": 300, "y": 5, "w": 200, "h": 18 },
 
   "questions": {
-    "total":   40,
-    "options": ["A", "B", "C", "D", "E"],
+    "total":   6,
+    "options": ["A", "B", "C", "D"],
 
     "columns": [
       {
-        "col_index":       0,
-        "question_range":  [1, 20],
-        "col_label_x":     55,
-        "bubble_start_x":  110,
-        "bubble_spacing_x": 50,
-        "row_start_y":     200,
-        "row_spacing_y":    42,
-        "bubble_radius":    10
-      },
-      {
-        "col_index":       1,
-        "question_range":  [21, 40],
-        "col_label_x":     415,
-        "bubble_start_x":  470,
-        "bubble_spacing_x": 50,
-        "row_start_y":     200,
-        "row_spacing_y":    42,
-        "bubble_radius":    10
+        "col_index":        0,
+        "question_range":   [1, 6],
+        "col_label_x":      100,
+        "bubble_start_x":   606,
+        "bubble_spacing_x": 38,
+        "row_start_y":      203,
+        "row_spacing_y":    84,
+        "bubble_radius":    14
       }
     ]
   }

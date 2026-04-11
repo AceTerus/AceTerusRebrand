@@ -90,18 +90,28 @@ def preprocess(img: np.ndarray, template_config: dict) -> np.ndarray:
 
 def _find_registration_marks(thresh: np.ndarray) -> list:
     """
-    Find candidate registration mark centres (filled black squares ~15×15 px).
+    Find candidate registration mark centres (filled black squares).
+    Size filters are relative to image width so this works at any resolution
+    (phone photos, scans, or canonical-size images).
     Returns a list of (cx, cy) tuples.
     """
+    img_h, img_w = thresh.shape
+    scale = img_w / 794  # 794 = canonical page width
+
+    min_side = max(4, int(8  * scale))
+    max_side = int(60 * scale)
+    min_area = int(min_side * min_side * 0.5)
+    max_area = int(max_side * max_side * 1.5)
+
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     marks = []
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if area < 80 or area > 600:
+        if area < min_area or area > max_area:
             continue
         x, y, w, h = cv2.boundingRect(cnt)
         aspect = w / h if h > 0 else 0
-        if 0.65 < aspect < 1.40 and 8 < w < 35 and 8 < h < 35:
+        if 0.65 < aspect < 1.40 and min_side < w < max_side and min_side < h < max_side:
             marks.append((x + w // 2, y + h // 2))
     return marks
 
