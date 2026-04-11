@@ -28,11 +28,9 @@ def grade(
 
     for q_num, result in sorted(detected.items()):
         ak = key_map.get(q_num)
-        if ak is None:
-            continue
 
         detected_answer = result["answer"]
-        is_correct      = bool(detected_answer and detected_answer == ak.correct_answer)
+        is_correct      = bool(ak and detected_answer and detected_answer == ak.correct_answer)
 
         if is_correct:
             raw_score += ak.points
@@ -40,7 +38,7 @@ def grade(
         questions.append({
             "question_number": q_num,
             "detected_answer": detected_answer,
-            "correct_answer":  ak.correct_answer,
+            "correct_answer":  ak.correct_answer if ak else None,
             "is_correct":      is_correct,
             "confidence":      result["confidence"],
             "flagged":         result["flagged"],
