@@ -1,14 +1,14 @@
 {
-  "_comment": "Matches answer-sheet.html. Page: 794×1123 px. All coordinates in that canonical space.",
+  "_comment": "Matches answer-sheet.html v2. Page 794×1123 px. All coords in canonical space.",
 
   "canonical_width":  794,
   "canonical_height": 1123,
 
   "registration_marks": {
-    "top_left":     { "x":  25, "y":   25, "size": 20 },
-    "top_right":    { "x": 769, "y":   25, "size": 20 },
-    "bottom_left":  { "x":  25, "y": 1098, "size": 20 },
-    "bottom_right": { "x": 769, "y": 1098, "size": 20 }
+    "top_left":     { "x":  29, "y":   29, "size": 22 },
+    "top_right":    { "x": 765, "y":   29, "size": 22 },
+    "bottom_left":  { "x":  29, "y": 1094, "size": 22 },
+    "bottom_right": { "x": 765, "y": 1094, "size": 22 }
   },
 
   "student_id_region": { "x": 300, "y": 5, "w": 200, "h": 18 },
@@ -22,11 +22,11 @@
         "col_index":        0,
         "question_range":   [1, 6],
         "col_label_x":      100,
-        "bubble_start_x":   606,
-        "bubble_spacing_x": 38,
-        "row_start_y":      203,
-        "row_spacing_y":    84,
-        "bubble_radius":    14
+        "bubble_start_x":   539,
+        "bubble_spacing_x": 52,
+        "row_start_y":      213,
+        "row_spacing_y":    96,
+        "bubble_radius":    19
       }
     ]
   }

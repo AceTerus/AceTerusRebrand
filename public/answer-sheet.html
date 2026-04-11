@@ -2,15 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Objective Assessment</title>
+<title>Objective Assessment – OMR Ready</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: #e8e8e8;
+    background: #d0d0d0;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -19,122 +18,115 @@
     font-family: 'DM Sans', sans-serif;
   }
 
+  /* ── A4 PAGE ── */
   .page {
     width: 794px;
     min-height: 1123px;
     background: #fff;
     position: relative;
-    padding: 60px 60px 60px 60px;
+    /* Inner content padding — kept away from reg marks */
+    padding: 70px 70px 70px 70px;
   }
 
-  /* ── REGISTRATION MARKS ── */
-  .reg-mark {
+  /* ── REGISTRATION MARKS (solid 22×22 squares, exactly at corners) ── */
+  .reg {
     position: absolute;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     background: #000;
-    z-index: 10;
+    z-index: 20;
   }
-  .reg-mark.tl { top: 15px;  left: 15px; }
-  .reg-mark.tr { top: 15px;  right: 15px; }
-  .reg-mark.bl { bottom: 15px; left: 15px; }
-  .reg-mark.br { bottom: 15px; right: 15px; }
+  .reg.tl { top: 18px;  left: 18px; }
+  .reg.tr { top: 18px;  right: 18px; }
+  .reg.bl { bottom: 18px; left: 18px; }
+  .reg.br { bottom: 18px; right: 18px; }
 
-  /* ── SCAN BORDER ── */
+  /* ── SCAN BOUNDARY BORDER ── */
   .scan-border {
     position: absolute;
-    top: 15px; left: 15px;
-    right: 15px; bottom: 15px;
+    top: 18px; left: 18px;
+    right: 18px; bottom: 18px;
     border: 2px solid #000;
     pointer-events: none;
-    z-index: 5;
+    z-index: 10;
   }
 
   /* ── HEADER ── */
   .header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
     padding-bottom: 14px;
     border-bottom: 3px solid #000;
   }
-
   .header h1 {
     font-family: 'DM Serif Display', serif;
-    font-size: 26px;
+    font-size: 25px;
     letter-spacing: 6px;
     text-transform: uppercase;
-    color: #000;
     margin-bottom: 6px;
   }
-
-  .header p {
-    font-size: 12px;
-    color: #333;
-  }
-
+  .header p { font-size: 11.5px; color: #333; }
   .header p strong { font-weight: 700; }
 
-  /* ── QUESTION BLOCK ── */
+  /* ── QUESTION ROW ── */
   .question-block {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    /* Fixed height keeps bubble Y positions consistent for the scanner */
-    height: 84px;
+    /* Fixed height locks bubble Y positions for the scanner */
+    height: 96px;
     overflow: hidden;
-    border-bottom: 1.5px dashed #ccc;
+    border-bottom: 1.5px dashed #bbb;
   }
 
-  .question-text { flex: 1; padding-right: 24px; }
-
-  .question-text .q-title {
-    font-size: 13px;
+  .question-text { flex: 1; padding-right: 30px; }
+  .q-title {
+    font-size: 12.5px;
     font-weight: 700;
+    margin-bottom: 6px;
     color: #000;
-    margin-bottom: 5px;
   }
-
-  .question-text .choices {
+  .choices {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1px 10px;
+    gap: 2px 12px;
     font-size: 11.5px;
     color: #444;
   }
 
-  /* ── BUBBLE ROW ── */
+  /* ── BUBBLE AREA ── */
   .bubbles {
     display: flex;
-    gap: 10px;
+    gap: 14px;
     flex-shrink: 0;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
   }
 
   .bubble-wrap {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
   }
 
+  /* Label ABOVE the bubble */
   .bubble-label {
-    font-size: 9px;
-    font-weight: 700;
-    color: #555;
-    letter-spacing: 0.5px;
-  }
-
-  .bubble {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: 2px solid #000;
-    background: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: #000;
+    letter-spacing: 0.5px;
+    line-height: 1;
+  }
+
+  /* Empty circle — no text, no fill, just a clean ring */
+  .bubble {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 2.5px solid #000;
+    background: #fff;
   }
 
   @media print {
@@ -146,11 +138,11 @@
 <body>
 <div class="page">
 
-  <!-- Registration Marks (solid squares at each corner) -->
-  <div class="reg-mark tl"></div>
-  <div class="reg-mark tr"></div>
-  <div class="reg-mark bl"></div>
-  <div class="reg-mark br"></div>
+  <!-- Registration Marks -->
+  <div class="reg tl"></div>
+  <div class="reg tr"></div>
+  <div class="reg bl"></div>
+  <div class="reg br"></div>
 
   <!-- Scan Border -->
   <div class="scan-border"></div>
@@ -171,10 +163,10 @@
       </div>
     </div>
     <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble">A</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble">B</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble">C</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble">D</div></div>
+      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
     </div>
   </div>
 
@@ -188,10 +180,10 @@
       </div>
     </div>
     <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble">A</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble">B</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble">C</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble">D</div></div>
+      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
     </div>
   </div>
 
@@ -205,10 +197,10 @@
       </div>
     </div>
     <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble">A</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble">B</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble">C</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble">D</div></div>
+      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
     </div>
   </div>
 
@@ -222,10 +214,10 @@
       </div>
     </div>
     <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble">A</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble">B</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble">C</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble">D</div></div>
+      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
     </div>
   </div>
 
@@ -239,10 +231,10 @@
       </div>
     </div>
     <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble">A</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble">B</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble">C</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble">D</div></div>
+      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
     </div>
   </div>
 
@@ -256,10 +248,10 @@
       </div>
     </div>
     <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble">A</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble">B</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble">C</div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble">D</div></div>
+      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
+      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
     </div>
   </div>
 
