@@ -8,8 +8,8 @@ from typing import Any, Dict, Tuple
 import cv2
 import numpy as np
 
-FILL_THRESHOLD   = 0.50   # ratio above which a bubble counts as filled
-CONFIDENCE_LIMIT = 0.60   # below this confidence the question is flagged
+FILL_THRESHOLD   = 0.35   # ratio above which a bubble counts as filled
+CONFIDENCE_LIMIT = 0.45   # below this confidence the question is flagged
 
 
 # ---------------------------------------------------------------------------

@@ -41,12 +41,14 @@
   .reg.bl { bottom: 18px; left: 18px; }
   .reg.br { bottom: 18px; right: 18px; }
 
-  /* ── SCAN BOUNDARY BORDER ── */
+  /* ── SCAN BOUNDARY BORDER ──
+     Dashed light grey so adaptive-threshold does NOT detect it as a mark.
+     The solid black reg-mark squares are the only things the scanner looks for. */
   .scan-border {
     position: absolute;
     top: 18px; left: 18px;
     right: 18px; bottom: 18px;
-    border: 2px solid #000;
+    border: 2px dashed #bbb;
     pointer-events: none;
     z-index: 10;
   }
