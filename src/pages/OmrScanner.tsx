@@ -16,7 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 
-const OMR_API = "http://localhost:8000";
+const OMR_API = import.meta.env.VITE_OMR_API ?? "http://localhost:8080";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -101,17 +101,17 @@ export default function OmrScanner() {
   const [expandedData,  setExpandedData]  = useState<ScanJob | null>(null);
 
   // ── Initialise ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`${OMR_API}/api/exams`, { signal: AbortSignal.timeout(5000) });
-        setExams(await res.json());
-        setApiOnline(true);
-      } catch {
-        setApiOnline(false);
-      }
-    })();
-  }, []);
+  const checkApi = async () => {
+    try {
+      const res = await fetch(`${OMR_API}/api/exams`, { signal: AbortSignal.timeout(5000) });
+      setExams(await res.json());
+      setApiOnline(true);
+    } catch {
+      setApiOnline(false);
+    }
+  };
+
+  useEffect(() => { checkApi(); }, []);
 
   // Auto-open camera for non-admins once API status is known
   useEffect(() => {
@@ -322,11 +322,23 @@ export default function OmrScanner() {
   const offlineBanner = !apiOnline && (
     <Alert variant="destructive" className="mb-4">
       <AlertCircle className="h-4 w-4" />
-      <AlertDescription>
-        OMR API is not reachable at <code>localhost:8000</code>. Start it with:
-        <code className="block text-xs mt-1">
-          cd omr-scanner &amp;&amp; uvicorn main:socket_app --port 8000
-        </code>
+      <AlertDescription className="flex flex-col gap-2">
+        <span>
+          OMR API is not reachable at <code>{OMR_API}</code>.
+          {!import.meta.env.VITE_OMR_API && (
+            <>
+              {" "}Run it locally with:
+              <code className="block text-xs mt-1">npm run omr-api</code>
+              or deploy it and set <code className="text-xs">VITE_OMR_API</code> in your environment.
+            </>
+          )}
+        </span>
+        <button
+          onClick={checkApi}
+          className="self-start text-xs underline underline-offset-2 hover:opacity-80 transition-opacity font-medium"
+        >
+          Retry connection
+        </button>
       </AlertDescription>
     </Alert>
   );
