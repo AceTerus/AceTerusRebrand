@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OMR Answer Sheet</title>
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+
+    .print-btn {
+      margin-bottom: 16px;
+      padding: 10px 28px;
+      background: #1d4ed8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .print-btn:hover { background: #1e40af; }
+
+    .sheet-wrapper {
+      background: white;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
+
+    svg {
+      width: 210mm;
+      height: 288.75mm;
+      display: block;
+    }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .print-btn { display: none; }
+      .sheet-wrapper { box-shadow: none; }
+      svg { width: 210mm; height: 288.75mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <button class="print-btn" onclick="window.print()">Print Answer Sheet</button>
+
+  <div class="sheet-wrapper">
+    <svg id="sheet" viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg"
+         font-family="Arial, sans-serif">
+
+      <!-- ── Registration marks (filled black squares, 15×15, centred at config coords) ── -->
+      <rect x="12.5" y="12.5"   width="15" height="15" fill="black"/>
+      <rect x="757.5" y="12.5"  width="15" height="15" fill="black"/>
+      <rect x="12.5" y="1057.5" width="15" height="15" fill="black"/>
+      <rect x="757.5" y="1057.5" width="15" height="15" fill="black"/>
+
+      <!-- ── Header ── -->
+      <text x="400" y="48" text-anchor="middle" font-size="22" font-weight="bold" fill="#111">
+        OMR ANSWER SHEET
+      </text>
+
+      <!-- ── Student ID box (matches template: x:220, y:70, w:360, h:55) ── -->
+      <text x="55" y="102" font-size="13" fill="#111">Student ID:</text>
+      <rect x="220" y="70" width="360" height="55" fill="none" stroke="#111" stroke-width="1.5" rx="3"/>
+
+      <!-- ── Exam / Date fields ── -->
+      <text x="50"  y="145" font-size="12" fill="#111">Exam: _________________________________</text>
+      <text x="530" y="145" font-size="12" fill="#111">Date: ____________</text>
+
+      <!-- ── Instructions ── -->
+      <text x="400" y="168" text-anchor="middle" font-size="10.5" fill="#444">
+        Use a dark pen or pencil · Fill bubbles completely · Erase cleanly if correcting
+      </text>
+
+      <!-- ── Centre divider ── -->
+      <line x1="395" y1="178" x2="395" y2="1048" stroke="#bbb" stroke-width="1"/>
+
+      <!-- Column headers injected by JS -->
+      <!-- Question rows injected by JS -->
+
+    </svg>
+  </div>
+
+  <script>
+    (function () {
+      const svg = document.getElementById('sheet');
+      const NS  = 'http://www.w3.org/2000/svg';
+
+      function el(tag, attrs) {
+        const e = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+        return e;
+      }
+
+      function text(x, y, content, attrs = {}) {
+        const t = el('text', { x, y, 'text-anchor': 'middle', 'font-size': '12', fill: '#111', ...attrs });
+        t.textContent = content;
+        return t;
+      }
+
+      // ── Column definitions (must match template_config.json exactly) ──
+      const columns = [
+        { start: 1,  end: 20, labelX: 55,  bubbleStartX: 110 },
+        { start: 21, end: 40, labelX: 415, bubbleStartX: 470 },
+      ];
+
+      const OPTIONS       = ['A', 'B', 'C', 'D', 'E'];
+      const SPACING_X     = 50;
+      const ROW_START_Y   = 200;
+      const ROW_SPACING_Y = 42;
+      const RADIUS        = 10;
+
+      columns.forEach(col => {
+        // Column header row
+        svg.appendChild(text(col.labelX,            190, 'No.',  { 'font-weight': 'bold', 'font-size': '11' }));
+        OPTIONS.forEach((opt, j) => {
+          svg.appendChild(text(col.bubbleStartX + j * SPACING_X, 190, opt, { 'font-weight': 'bold', 'font-size': '11' }));
+        });
+
+        // Question rows
+        for (let q = col.start; q <= col.end; q++) {
+          const i = q - col.start;
+          const y = ROW_START_Y + i * ROW_SPACING_Y;
+
+          // Alternating row tint
+          if (i % 2 === 0) {
+            svg.appendChild(el('rect', {
+              x: col.labelX - 30, y: y - RADIUS - 4,
+              width: OPTIONS.length * SPACING_X + 70,
+              height: ROW_SPACING_Y - 4,
+              fill: '#f7f7f7', rx: '3',
+            }));
+          }
+
+          // Question number
+          svg.appendChild(text(col.labelX, y + 5, q, { 'font-size': '12', fill: '#333' }));
+
+          // Bubbles
+          OPTIONS.forEach((_, j) => {
+            const cx = col.bubbleStartX + j * SPACING_X;
+            svg.appendChild(el('circle', {
+              cx, cy: y, r: RADIUS,
+              fill: 'white', stroke: '#333', 'stroke-width': '1.5',
+            }));
+          });
+        }
+      });
+    })();
+  </script>
+
+</body>
+</html>
