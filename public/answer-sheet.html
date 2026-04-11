@@ -258,5 +258,62 @@
   </div>
 
 </div>
+
+<!-- ── DEBUG OVERLAY (hidden when printing) ── -->
+<div id="debug-panel" style="
+  position:fixed; bottom:20px; right:20px; background:#111; color:#0f0;
+  font:12px monospace; padding:14px 18px; border-radius:8px; z-index:9999;
+  max-height:80vh; overflow-y:auto; display:none;">
+  <div style="color:#fff;font-weight:bold;margin-bottom:8px;">
+    Actual bubble centres (relative to page top-left)
+    <button onclick="document.getElementById('debug-panel').style.display='none'"
+      style="float:right;background:none;border:none;color:#f66;cursor:pointer;font-size:14px;">✕</button>
+  </div>
+  <pre id="debug-output"></pre>
+</div>
+<button onclick="measureBubbles()" style="
+  position:fixed;bottom:20px;left:20px;padding:8px 16px;background:#1d4ed8;
+  color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;
+  z-index:9999;">
+  Measure Bubble Positions
+</button>
+
+<script>
+function measureBubbles() {
+  const page   = document.querySelector('.page');
+  const pageR  = page.getBoundingClientRect();
+  const bubbles = document.querySelectorAll('.bubble');
+  const OPTIONS = ['A','B','C','D'];
+
+  let out = '';
+  let qNum = 1;
+  for (let i = 0; i < bubbles.length; i += 4) {
+    for (let j = 0; j < 4; j++) {
+      const r  = bubbles[i + j].getBoundingClientRect();
+      const cx = Math.round(r.left + r.width / 2  - pageR.left);
+      const cy = Math.round(r.top  + r.height / 2 - pageR.top);
+      out += `Q${qNum} ${OPTIONS[j]}: cx=${cx}  cy=${cy}\n`;
+    }
+    qNum++;
+  }
+
+  // Also derive config values
+  const firstQ = document.querySelectorAll('.bubble')[0].getBoundingClientRect();
+  const secondRowFirst = document.querySelectorAll('.bubble')[4].getBoundingClientRect();
+  const rowSpacing = Math.round(secondRowFirst.top - firstQ.top);
+
+  out += `\n--- Suggested template_config.json values ---\n`;
+  const b0 = document.querySelectorAll('.bubble')[0].getBoundingClientRect();
+  out += `bubble_start_x:   ${Math.round(b0.left + b0.width/2 - pageR.left)}\n`;
+  out += `bubble_spacing_x: ${Math.round(document.querySelectorAll('.bubble')[1].getBoundingClientRect().left - b0.left)}\n`;
+  out += `row_start_y:      ${Math.round(b0.top + b0.height/2 - pageR.top)}\n`;
+  out += `row_spacing_y:    ${rowSpacing}\n`;
+  out += `bubble_radius:    ${Math.round(b0.width / 2)}\n`;
+
+  document.getElementById('debug-output').textContent = out;
+  document.getElementById('debug-panel').style.display = 'block';
+}
+</script>
+
 </body>
 </html>
