@@ -11,7 +11,8 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-FILL_THRESHOLD   = 0.35   # ratio above which a bubble counts as filled
+FILL_THRESHOLD   = 0.10   # absolute minimum — filters out true background noise
+RELATIVE_RATIO   = 1.8    # selected bubble must be >= this × mean of remaining bubbles
 CONFIDENCE_LIMIT = 0.45   # below this confidence the question is flagged
 
 
@@ -98,23 +99,22 @@ def detect_bubbles(
 
         print(f"[OMR] Q{q_num} fill_ratios: { {k: round(v,3) for k,v in fill_ratios.items()} }", flush=True)
 
-        selected = [opt for opt, ratio in fill_ratios.items() if ratio > FILL_THRESHOLD]
+        best_opt   = max(fill_ratios, key=fill_ratios.__getitem__)
+        best_ratio = fill_ratios[best_opt]
+        others     = [v for k, v in fill_ratios.items() if k != best_opt]
+        mean_other = sum(others) / len(others) if others else 0.0
 
-        if len(selected) == 1:
-            answer     = selected[0]
-            confidence = min(abs(fill_ratios[answer] - 0.5) * 2, 1.0)
+        # A bubble is "filled" if it clears the absolute floor AND stands out
+        # clearly above the background noise of the remaining bubbles.
+        if best_ratio >= FILL_THRESHOLD and best_ratio >= mean_other * RELATIVE_RATIO:
+            answer     = best_opt
+            # Confidence: how far above the noise floor (capped at 1.0)
+            confidence = min((best_ratio - mean_other) / max(best_ratio, 0.001), 1.0)
             flagged    = confidence < CONFIDENCE_LIMIT
-
-        elif len(selected) == 0:
-            # No bubble filled — ambiguous
+        else:
+            # Nothing clearly filled
             answer     = None
             confidence = 0.0
-            flagged    = True
-
-        else:
-            # Multiple bubbles filled — pick highest, always flag
-            answer     = max(fill_ratios, key=fill_ratios.__getitem__)
-            confidence = min(abs(fill_ratios[answer] - 0.5) * 2, 1.0)
             flagged    = True
 
         results[q_num] = {
