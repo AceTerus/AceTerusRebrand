@@ -93,29 +93,50 @@ def preprocess(img: np.ndarray, template_config: dict) -> np.ndarray:
 
 def _find_registration_marks(thresh: np.ndarray) -> list:
     """
-    Find candidate registration mark centres (filled black squares).
-    Size filters are relative to image width so this works at any resolution
-    (phone photos, scans, or canonical-size images).
-    Returns a list of (cx, cy) tuples.
+    Find one registration mark per corner by searching each corner region
+    independently. This is scale-independent and works at any resolution.
+    Returns a list of up to 4 (cx, cy) tuples.
     """
     img_h, img_w = thresh.shape
-    scale = img_w / 794  # 794 = canonical page width
+    # Search the inner 20% of each corner
+    rh = int(img_h * 0.20)
+    rw = int(img_w * 0.20)
 
-    min_side = max(4, int(8  * scale))
-    max_side = int(60 * scale)
-    min_area = int(min_side * min_side * 0.5)
-    max_area = int(max_side * max_side * 1.5)
+    # (row_slice, col_slice, global_x_offset, global_y_offset)
+    regions = [
+        (slice(0, rh),        slice(0, rw),        0,           0),
+        (slice(0, rh),        slice(img_w-rw, None), img_w-rw,  0),
+        (slice(img_h-rh, None), slice(0, rw),       0,           img_h-rh),
+        (slice(img_h-rh, None), slice(img_w-rw, None), img_w-rw, img_h-rh),
+    ]
 
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     marks = []
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area < min_area or area > max_area:
-            continue
-        x, y, w, h = cv2.boundingRect(cnt)
-        aspect = w / h if h > 0 else 0
-        if 0.65 < aspect < 1.40 and min_side < w < max_side and min_side < h < max_side:
-            marks.append((x + w // 2, y + h // 2))
+    for (rs, cs, ox, oy) in regions:
+        region = thresh[rs, cs]
+        contours, _ = cv2.findContours(region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        best_mark  = None
+        best_score = 0
+
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < 20:
+                continue
+            x, y, cw, ch = cv2.boundingRect(cnt)
+            if cw == 0 or ch == 0:
+                continue
+            aspect = cw / ch
+            if not (0.4 < aspect < 2.5):
+                continue
+            # Prefer larger, more square contours
+            squareness = 1.0 - abs(1.0 - aspect) / 2.0
+            score = area * squareness
+            if score > best_score:
+                best_score = score
+                best_mark  = (ox + x + cw // 2, oy + y + ch // 2)
+
+        if best_mark:
+            marks.append(best_mark)
     return marks
 
 
