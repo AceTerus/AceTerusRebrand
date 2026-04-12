@@ -92,6 +92,22 @@ export default function PerformanceTracker({ category, currentScore, history }: 
       </CardHeader>
 
       <CardContent className="space-y-5">
+        {/* Improvement message */}
+        {diff !== null && diff !== 0 && (
+          <div className={`rounded-xl border p-4 flex items-center gap-3 ${diff > 0 ? "bg-green-50 border-green-200 dark:bg-green-500/10 dark:border-green-500/30" : "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/30"}`}>
+            {diff > 0 ? (
+              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+            ) : (
+              <TrendingDown className="w-5 h-5 text-red-500 shrink-0" />
+            )}
+            <p className={`text-sm font-semibold ${diff > 0 ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+              {diff > 0
+                ? `You have improved ${diff}% from your last attempt!`
+                : `You have dropped ${Math.abs(diff)}% from your last attempt.`}
+            </p>
+          </div>
+        )}
+
         {/* Stat row */}
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border p-3 text-center">
