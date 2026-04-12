@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import matplotlib
+matplotlib.use("Agg")  # headless backend — must be set before any OMRChecker import
+
 import cv2
 
 # Add OMRChecker to path so its src package resolves
