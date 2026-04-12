@@ -31,6 +31,8 @@ import StreakFireOverlay from "@/components/StreakFireOverlay";
 import { GoalSheet } from "@/components/GoalSheet";
 import QuizAnalysis from "@/components/QuizAnalysis";
 import type { PerformanceAnalysis } from "@/components/QuizAnalysis";
+import PerformanceTracker from "@/components/PerformanceTracker";
+import type { SubjectAttempt } from "@/components/PerformanceTracker";
 import Logo from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
@@ -98,6 +100,11 @@ const Quiz = () => {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<PerformanceAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  // Performance tracker — subject-specific history
+  const [subjectHistory, setSubjectHistory] = useState<SubjectAttempt[]>([]);
+  const [currentQuizScore, setCurrentQuizScore] = useState<number | null>(null);
+  const [currentQuizCategory, setCurrentQuizCategory] = useState<string | null>(null);
 
   // Goal sheet
   const [showGoalSheet, setShowGoalSheet] = useState(false);
@@ -462,6 +469,22 @@ const Quiz = () => {
         total_count: snapshotTotal,
         questions_data: questionsData,
       });
+    }
+
+    // Fetch subject-specific history for the performance tracker (exclude current attempt)
+    if (session && activeDeck) {
+      const { data: subjectRows } = await supabase
+        .from("quiz_performance_results" as any)
+        .select("score, completed_at, deck_name")
+        .eq("user_id", session.user.id)
+        .eq("category", deckCategory)
+        .order("completed_at", { ascending: false })
+        .limit(10);
+      // The just-inserted row is the newest; drop it so it's not double-counted
+      const pastRows = (subjectRows ?? []).slice(1);
+      setSubjectHistory(pastRows as SubjectAttempt[]);
+      setCurrentQuizScore(snapshotScore);
+      setCurrentQuizCategory(deckCategory);
     }
 
     // Call AI analysis
@@ -832,6 +855,15 @@ const Quiz = () => {
                   loading={analysisLoading}
                   error={analysisError}
                 />
+
+                {/* Subject Performance Tracker */}
+                {currentQuizScore !== null && currentQuizCategory && (
+                  <PerformanceTracker
+                    category={currentQuizCategory}
+                    currentScore={currentQuizScore}
+                    history={subjectHistory}
+                  />
+                )}
 
                 {/* Set Goals CTA */}
                 <Button
