@@ -3,8 +3,9 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
 
-# Database (SQLite by default; set DATABASE_URL env var for Postgres + add psycopg2-binary)
+# Database
 sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
 
 # WebSocket / Socket.IO
 python-socketio>=5.11.0
