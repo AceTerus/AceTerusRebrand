@@ -3,7 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "/bin/sh -c 'uvicorn main:socket_app --host 0.0.0.0 --port ${PORT:-8080}'"
 healthcheckPath = "/api/exams"
 healthcheckTimeout = 120
 restartPolicyType = "on_failure"
