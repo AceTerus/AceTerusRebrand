@@ -1,0 +1,14 @@
+# Exclude nested git repo — Dockerfile clones a fresh copy at build time
+OMRChecker/
+
+# Runtime artifacts
+omr.db
+omr.db-shm
+omr.db-wal
+uploads/
+__pycache__/
+processing/__pycache__/
+*.pyc
+
+# Dev files
+.env
