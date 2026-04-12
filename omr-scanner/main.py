@@ -22,7 +22,11 @@ from socket_manager import sio
 # ---------------------------------------------------------------------------
 # DB bootstrap (creates tables if they don't exist)
 # ---------------------------------------------------------------------------
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).warning(f"DB init warning: {e}")
 
 # ---------------------------------------------------------------------------
 # Socket.IO events
