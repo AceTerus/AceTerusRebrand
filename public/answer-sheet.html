@@ -21,14 +21,13 @@
   /* ── A4 PAGE ── */
   .page {
     width: 794px;
-    min-height: 1123px;
+    height: 1123px;
     background: #fff;
     position: relative;
-    /* Inner content padding — kept away from reg marks */
-    padding: 70px 70px 70px 70px;
+    overflow: hidden;
   }
 
-  /* ── REGISTRATION MARKS (solid 22×22 squares, exactly at corners) ── */
+  /* ── REGISTRATION MARKS (solid 22×22 squares) ── */
   .reg {
     position: absolute;
     width: 22px;
@@ -36,18 +35,15 @@
     background: #000;
     z-index: 20;
   }
-  .reg.tl { top: 18px;  left: 18px; }
-  .reg.tr { top: 18px;  right: 18px; }
+  .reg.tl { top: 18px;    left: 18px; }
+  .reg.tr { top: 18px;    right: 18px; }
   .reg.bl { bottom: 18px; left: 18px; }
   .reg.br { bottom: 18px; right: 18px; }
 
-  /* ── SCAN BOUNDARY BORDER ──
-     Dashed light grey so adaptive-threshold does NOT detect it as a mark.
-     The solid black reg-mark squares are the only things the scanner looks for. */
+  /* ── SCAN BORDER (dashed — invisible to adaptive threshold) ── */
   .scan-border {
     position: absolute;
-    top: 18px; left: 18px;
-    right: 18px; bottom: 18px;
+    top: 18px; left: 18px; right: 18px; bottom: 18px;
     border: 2px dashed #bbb;
     pointer-events: none;
     z-index: 10;
@@ -55,33 +51,45 @@
 
   /* ── HEADER ── */
   .header {
+    position: absolute;
+    top: 52px;
+    left: 70px;
+    right: 70px;
     text-align: center;
-    margin-bottom: 18px;
     padding-bottom: 14px;
     border-bottom: 3px solid #000;
   }
   .header h1 {
     font-family: 'DM Serif Display', serif;
-    font-size: 25px;
-    letter-spacing: 6px;
+    font-size: 24px;
+    letter-spacing: 5px;
     text-transform: uppercase;
     margin-bottom: 6px;
   }
-  .header p { font-size: 11.5px; color: #333; }
+  .header p { font-size: 11px; color: #333; }
   .header p strong { font-weight: 700; }
 
-  /* ── QUESTION ROW ── */
-  .question-block {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    /* Fixed height locks bubble Y positions for the scanner */
-    height: 96px;
-    overflow: hidden;
-    border-bottom: 1.5px dashed #bbb;
+  /* ── ROW DIVIDERS ──
+     Placed at bottom of each 96-px row (center_y + 48).
+     Q1 divider: 214+48=262, Q2: 310+48=358 … Q6: 694+48=742  */
+  .divider {
+    position: absolute;
+    left: 70px; right: 70px;
+    height: 1px;
+    background: #ddd;
   }
 
-  .question-text { flex: 1; padding-right: 30px; }
+  /* ── QUESTION TEXT (absolute, left column) ── */
+  .q-block {
+    position: absolute;
+    left: 70px;
+    width: 440px;
+    height: 96px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-right: 16px;
+  }
   .q-title {
     font-size: 12.5px;
     font-weight: 700;
@@ -96,34 +104,20 @@
     color: #444;
   }
 
-  /* ── BUBBLE AREA ── */
-  .bubbles {
-    display: flex;
-    gap: 14px;
-    flex-shrink: 0;
-    background: #fff;
-    padding: 6px 10px;
-    border-radius: 6px;
-  }
-
-  .bubble-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-
-  /* Label ABOVE the bubble */
-  .bubble-label {
+  /* ── OPTION LABEL above each bubble ── */
+  .blabel {
+    position: absolute;
+    width: 38px;
+    text-align: center;
     font-size: 10px;
     font-weight: 700;
     color: #000;
     letter-spacing: 0.5px;
-    line-height: 1;
   }
 
-  /* Empty circle — no text, no fill, just a clean ring */
+  /* ── BUBBLE (empty circle — fill to mark) ── */
   .bubble {
+    position: absolute;
     width: 38px;
     height: 38px;
     border-radius: 50%;
@@ -133,7 +127,7 @@
 
   @media print {
     body { background: #fff; padding: 0; }
-    .page { box-shadow: none; }
+    #debug-panel, #measure-btn { display: none !important; }
   }
 </style>
 </head>
@@ -149,115 +143,144 @@
   <!-- Scan Border -->
   <div class="scan-border"></div>
 
-  <!-- Header -->
+  <!-- Header (top: 52px keeps it clear of reg marks; sits above Q1 row top=166) -->
   <div class="header">
     <h1>Objective Assessment</h1>
     <p><strong>Instructions:</strong> Use a dark pen or pencil to completely fill the circle corresponding to your answer.</p>
   </div>
 
-  <!-- Q1 -->
-  <div class="question-block">
-    <div class="question-text">
-      <div class="q-title">1. Which planet is known as the Red Planet?</div>
-      <div class="choices">
-        <span>A. Venus</span><span>B. Mars</span>
-        <span>C. Jupiter</span><span>D. Saturn</span>
-      </div>
-    </div>
-    <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
+  <!--
+    ═══════════════════════════════════════════════════════════════════
+    BUBBLE COORDINATE TABLE  (matches omr_template.json exactly)
+    ─────────────────────────────────────────────────────────────────
+    bubble center X:  A=539  B=591  C=643  D=695
+    bubble top-left X (center − 19):  A=520  B=572  C=624  D=676
+    label top-left X (same):          A=520  B=572  C=624  D=676
+
+    Row  center_y  bubble_top  label_top  divider_top
+     Q1    214       195         181         262
+     Q2    310       291         277         358
+     Q3    406       387         373         454
+     Q4    502       483         469         550
+     Q5    598       579         565         646
+     Q6    694       675         661         742
+    ═══════════════════════════════════════════════════════════════════
+  -->
+
+  <!-- ── ROW DIVIDERS ── -->
+  <div class="divider" style="top:262px"></div>
+  <div class="divider" style="top:358px"></div>
+  <div class="divider" style="top:454px"></div>
+  <div class="divider" style="top:550px"></div>
+  <div class="divider" style="top:646px"></div>
+  <div class="divider" style="top:742px"></div>
+
+  <!-- ══════════════ Q1 ══════════════ -->
+  <!-- text block: top = 214 − 48 = 166 -->
+  <div class="q-block" style="top:166px">
+    <div class="q-title">1. What is the capital of France?</div>
+    <div class="choices">
+      <span>A. London</span><span>B. Berlin</span>
+      <span>C. Paris</span><span>D. Rome</span>
     </div>
   </div>
+  <!-- labels: top = 195 − 14 = 181 -->
+  <div class="blabel" style="top:181px; left:520px">A</div>
+  <div class="blabel" style="top:181px; left:572px">B</div>
+  <div class="blabel" style="top:181px; left:624px">C</div>
+  <div class="blabel" style="top:181px; left:676px">D</div>
+  <!-- bubbles: top=195, left = center_x − 19 -->
+  <div class="bubble" style="top:195px; left:520px"></div>
+  <div class="bubble" style="top:195px; left:572px"></div>
+  <div class="bubble" style="top:195px; left:624px"></div>
+  <div class="bubble" style="top:195px; left:676px"></div>
 
-  <!-- Q2 -->
-  <div class="question-block">
-    <div class="question-text">
-      <div class="q-title">2. What is the largest ocean on Earth?</div>
-      <div class="choices">
-        <span>A. Atlantic Ocean</span><span>B. Indian Ocean</span>
-        <span>C. Arctic Ocean</span><span>D. Pacific Ocean</span>
-      </div>
-    </div>
-    <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
+  <!-- ══════════════ Q2 ══════════════ -->
+  <div class="q-block" style="top:262px">
+    <div class="q-title">2. How many sides does a hexagon have?</div>
+    <div class="choices">
+      <span>A. 4</span><span>B. 5</span>
+      <span>C. 6</span><span>D. 8</span>
     </div>
   </div>
+  <div class="blabel" style="top:277px; left:520px">A</div>
+  <div class="blabel" style="top:277px; left:572px">B</div>
+  <div class="blabel" style="top:277px; left:624px">C</div>
+  <div class="blabel" style="top:277px; left:676px">D</div>
+  <div class="bubble" style="top:291px; left:520px"></div>
+  <div class="bubble" style="top:291px; left:572px"></div>
+  <div class="bubble" style="top:291px; left:624px"></div>
+  <div class="bubble" style="top:291px; left:676px"></div>
 
-  <!-- Q3 -->
-  <div class="question-block">
-    <div class="question-text">
-      <div class="q-title">3. Who developed the theory of relativity?</div>
-      <div class="choices">
-        <span>A. Isaac Newton</span><span>B. Albert Einstein</span>
-        <span>C. Galileo Galilei</span><span>D. Nikola Tesla</span>
-      </div>
-    </div>
-    <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
+  <!-- ══════════════ Q3 ══════════════ -->
+  <div class="q-block" style="top:358px">
+    <div class="q-title">3. Which planet is closest to the Sun?</div>
+    <div class="choices">
+      <span>A. Venus</span><span>B. Earth</span>
+      <span>C. Mercury</span><span>D. Mars</span>
     </div>
   </div>
+  <div class="blabel" style="top:373px; left:520px">A</div>
+  <div class="blabel" style="top:373px; left:572px">B</div>
+  <div class="blabel" style="top:373px; left:624px">C</div>
+  <div class="blabel" style="top:373px; left:676px">D</div>
+  <div class="bubble" style="top:387px; left:520px"></div>
+  <div class="bubble" style="top:387px; left:572px"></div>
+  <div class="bubble" style="top:387px; left:624px"></div>
+  <div class="bubble" style="top:387px; left:676px"></div>
 
-  <!-- Q4 -->
-  <div class="question-block">
-    <div class="question-text">
-      <div class="q-title">4. What is the chemical symbol for gold?</div>
-      <div class="choices">
-        <span>A. Ag</span><span>B. Au</span>
-        <span>C. Gd</span><span>D. Go</span>
-      </div>
-    </div>
-    <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
+  <!-- ══════════════ Q4 ══════════════ -->
+  <div class="q-block" style="top:454px">
+    <div class="q-title">4. What is 15% of 200?</div>
+    <div class="choices">
+      <span>A. 25</span><span>B. 30</span>
+      <span>C. 35</span><span>D. 40</span>
     </div>
   </div>
+  <div class="blabel" style="top:469px; left:520px">A</div>
+  <div class="blabel" style="top:469px; left:572px">B</div>
+  <div class="blabel" style="top:469px; left:624px">C</div>
+  <div class="blabel" style="top:469px; left:676px">D</div>
+  <div class="bubble" style="top:483px; left:520px"></div>
+  <div class="bubble" style="top:483px; left:572px"></div>
+  <div class="bubble" style="top:483px; left:624px"></div>
+  <div class="bubble" style="top:483px; left:676px"></div>
 
-  <!-- Q5 -->
-  <div class="question-block">
-    <div class="question-text">
-      <div class="q-title">5. Which country is famous for the Great Wall?</div>
-      <div class="choices">
-        <span>A. Japan</span><span>B. India</span>
-        <span>C. China</span><span>D. Korea</span>
-      </div>
-    </div>
-    <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
+  <!-- ══════════════ Q5 ══════════════ -->
+  <div class="q-block" style="top:550px">
+    <div class="q-title">5. Who wrote <em>Romeo and Juliet</em>?</div>
+    <div class="choices">
+      <span>A. Charles Dickens</span><span>B. William Shakespeare</span>
+      <span>C. Jane Austen</span><span>D. Mark Twain</span>
     </div>
   </div>
+  <div class="blabel" style="top:565px; left:520px">A</div>
+  <div class="blabel" style="top:565px; left:572px">B</div>
+  <div class="blabel" style="top:565px; left:624px">C</div>
+  <div class="blabel" style="top:565px; left:676px">D</div>
+  <div class="bubble" style="top:579px; left:520px"></div>
+  <div class="bubble" style="top:579px; left:572px"></div>
+  <div class="bubble" style="top:579px; left:624px"></div>
+  <div class="bubble" style="top:579px; left:676px"></div>
 
-  <!-- Q6 -->
-  <div class="question-block">
-    <div class="question-text">
-      <div class="q-title">6. What is the main gas found in the air we breathe?</div>
-      <div class="choices">
-        <span>A. Oxygen</span><span>B. Carbon Dioxide</span>
-        <span>C. Nitrogen</span><span>D. Hydrogen</span>
-      </div>
-    </div>
-    <div class="bubbles">
-      <div class="bubble-wrap"><span class="bubble-label">A</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">B</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">C</span><div class="bubble"></div></div>
-      <div class="bubble-wrap"><span class="bubble-label">D</span><div class="bubble"></div></div>
+  <!-- ══════════════ Q6 ══════════════ -->
+  <div class="q-block" style="top:646px">
+    <div class="q-title">6. What is the boiling point of water in Celsius?</div>
+    <div class="choices">
+      <span>A. 90°C</span><span>B. 95°C</span>
+      <span>C. 100°C</span><span>D. 110°C</span>
     </div>
   </div>
+  <div class="blabel" style="top:661px; left:520px">A</div>
+  <div class="blabel" style="top:661px; left:572px">B</div>
+  <div class="blabel" style="top:661px; left:624px">C</div>
+  <div class="blabel" style="top:661px; left:676px">D</div>
+  <div class="bubble" style="top:675px; left:520px"></div>
+  <div class="bubble" style="top:675px; left:572px"></div>
+  <div class="bubble" style="top:675px; left:624px"></div>
+  <div class="bubble" style="top:675px; left:676px"></div>
 
-</div>
+</div><!-- /.page -->
 
 <!-- ── DEBUG OVERLAY (hidden when printing) ── -->
 <div id="debug-panel" style="
@@ -271,7 +294,7 @@
   </div>
   <pre id="debug-output"></pre>
 </div>
-<button onclick="measureBubbles()" style="
+<button id="measure-btn" onclick="measureBubbles()" style="
   position:fixed;bottom:20px;left:20px;padding:8px 16px;background:#1d4ed8;
   color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;
   z-index:9999;">
@@ -280,35 +303,27 @@
 
 <script>
 function measureBubbles() {
-  const page   = document.querySelector('.page');
-  const pageR  = page.getBoundingClientRect();
+  const page    = document.querySelector('.page');
+  const pageR   = page.getBoundingClientRect();
   const bubbles = document.querySelectorAll('.bubble');
   const OPTIONS = ['A','B','C','D'];
+
+  const EXPECTED_X = [539, 591, 643, 695];
+  const EXPECTED_Y = [214, 310, 406, 502, 598, 694];
 
   let out = '';
   let qNum = 1;
   for (let i = 0; i < bubbles.length; i += 4) {
     for (let j = 0; j < 4; j++) {
       const r  = bubbles[i + j].getBoundingClientRect();
-      const cx = Math.round(r.left + r.width / 2  - pageR.left);
+      const cx = Math.round(r.left + r.width  / 2 - pageR.left);
       const cy = Math.round(r.top  + r.height / 2 - pageR.top);
-      out += `Q${qNum} ${OPTIONS[j]}: cx=${cx}  cy=${cy}\n`;
+      const okX = cx === EXPECTED_X[j] ? '✓' : `✗(want ${EXPECTED_X[j]})`;
+      const okY = cy === EXPECTED_Y[qNum-1] ? '✓' : `✗(want ${EXPECTED_Y[qNum-1]})`;
+      out += `Q${qNum} ${OPTIONS[j]}: cx=${cx} ${okX}  cy=${cy} ${okY}\n`;
     }
     qNum++;
   }
-
-  // Also derive config values
-  const firstQ = document.querySelectorAll('.bubble')[0].getBoundingClientRect();
-  const secondRowFirst = document.querySelectorAll('.bubble')[4].getBoundingClientRect();
-  const rowSpacing = Math.round(secondRowFirst.top - firstQ.top);
-
-  out += `\n--- Suggested template_config.json values ---\n`;
-  const b0 = document.querySelectorAll('.bubble')[0].getBoundingClientRect();
-  out += `bubble_start_x:   ${Math.round(b0.left + b0.width/2 - pageR.left)}\n`;
-  out += `bubble_spacing_x: ${Math.round(document.querySelectorAll('.bubble')[1].getBoundingClientRect().left - b0.left)}\n`;
-  out += `row_start_y:      ${Math.round(b0.top + b0.height/2 - pageR.top)}\n`;
-  out += `row_spacing_y:    ${rowSpacing}\n`;
-  out += `bubble_radius:    ${Math.round(b0.width / 2)}\n`;
 
   document.getElementById('debug-output').textContent = out;
   document.getElementById('debug-panel').style.display = 'block';
