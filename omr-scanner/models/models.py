@@ -69,6 +69,7 @@ class ScanJob(Base):
     status             = Column(Enum(JobStatus, native_enum=False), nullable=False, default=JobStatus.pending)
     overall_confidence = Column(Float, nullable=True)
     error_message      = Column(Text, nullable=True)
+    is_fallback        = Column(Boolean, default=False)
     scanned_at         = Column(DateTime, server_default=func.now())
 
     exam        = relationship("Exam",    back_populates="scan_jobs")

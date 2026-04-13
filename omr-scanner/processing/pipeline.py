@@ -55,17 +55,16 @@ def _build_detected(omr_response: dict, output_columns: list) -> Dict[int, Dict[
     return detected
 
 
-def _random_fallback(answer_keys: list) -> Dict[str, Any]:
+def _random_fallback(answer_keys: list, error: Exception) -> Dict[str, Any]:
     """
     Return a fully-graded result with randomly chosen answers.
     Used when image processing fails so scans always complete.
     """
-    # Read bubble options from the template JSON directly (no OpenCV needed)
+    import traceback as _tb
     template_data = json.loads(_OMR_TEMPLATE_PATH.read_text())
     num_questions = len(answer_keys)
 
-    # Collect all bubble values defined in the template
-    bubble_values: list = ["A", "B", "C", "D"]  # safe default
+    bubble_values: list = ["A", "B", "C", "D"]
     for block in template_data.get("fieldBlocks", {}).values():
         bv = block.get("bubbleValues")
         if bv:
@@ -91,6 +90,8 @@ def _random_fallback(answer_keys: list) -> Dict[str, Any]:
         "detected":           detected,
         "grade_result":       grade_result,
         "overall_confidence": overall_confidence,
+        "is_fallback":        True,
+        "fallback_error":     f"{type(error).__name__}: {error}\n\n{_tb.format_exc()}",
     }
 
 
@@ -162,8 +163,10 @@ def run_pipeline(
             "detected":           detected,
             "grade_result":       grade_result,
             "overall_confidence": overall_confidence,
+            "is_fallback":        False,
+            "fallback_error":     None,
         }
 
     except Exception as exc:
         logger.warning("[OMR] Processing failed (%s) — using random fallback", exc)
-        return _random_fallback(answer_keys)
+        return _random_fallback(answer_keys, exc)

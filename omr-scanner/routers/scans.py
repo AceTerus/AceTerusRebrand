@@ -88,6 +88,8 @@ async def _process_scan(job_id: str, image_path: str, exam_id: str) -> None:
         # 7. Mark done
         job.status             = JobStatus.done
         job.overall_confidence = result["overall_confidence"]
+        job.is_fallback        = result.get("is_fallback", False)
+        job.error_message      = result.get("fallback_error")  # real error stored for admin
         db.commit()
 
         # 8. Notify frontend
@@ -191,6 +193,7 @@ def get_scan(job_id: str, db: Session = Depends(get_db)):
         "student_id":         job.student_id,
         "status":             job.status.value,
         "overall_confidence": job.overall_confidence,
+        "is_fallback":        bool(job.is_fallback),
         "error_message":      job.error_message,
         "scanned_at":         job.scanned_at.isoformat() if job.scanned_at else None,
         "omr_results":        omr_rows,

@@ -70,14 +70,16 @@ def exam_results(exam_id: str, db: Session = Depends(get_db)):
         sc            = job.score
         flagged_count = sum(1 for r in job.omr_results if r.is_flagged)
         rows.append({
-            "job_id":       str(job.id),
-            "student_code": job.student.student_code if job.student else None,
-            "status":       job.status.value,
-            "raw_score":    sc.raw_score    if sc else None,
-            "max_score":    sc.max_score    if sc else None,
-            "percentage":   sc.percentage   if sc else None,
+            "job_id":        str(job.id),
+            "student_code":  job.student.student_code if job.student else None,
+            "status":        job.status.value,
+            "raw_score":     sc.raw_score    if sc else None,
+            "max_score":     sc.max_score    if sc else None,
+            "percentage":    sc.percentage   if sc else None,
             "flagged_count": flagged_count,
-            "is_finalized": sc.is_finalized if sc else False,
-            "scanned_at":   job.scanned_at.isoformat() if job.scanned_at else None,
+            "is_finalized":  sc.is_finalized if sc else False,
+            "is_fallback":   bool(job.is_fallback),
+            "error_message": job.error_message,
+            "scanned_at":    job.scanned_at.isoformat() if job.scanned_at else None,
         })
     return rows
