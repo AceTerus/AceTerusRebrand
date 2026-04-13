@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import shutil
+import traceback
 import uuid
 from pathlib import Path
 
@@ -100,16 +101,18 @@ async def _process_scan(job_id: str, image_path: str, exam_id: str) -> None:
         })
 
     except Exception as exc:
+        tb = traceback.format_exc()
         logger.exception("OMR processing failed for job %s: %s", job_id, exc)
+        detail = f"{type(exc).__name__}: {exc}\n\n{tb}"
         try:
             job = db.query(ScanJob).filter(ScanJob.id == job_id).first()
             if job:
                 job.status        = JobStatus.failed
-                job.error_message = str(exc)
+                job.error_message = detail
                 db.commit()
         except Exception:
             db.rollback()
-        await sio.emit("scan_failed", {"job_id": job_id, "error": str(exc)})
+        await sio.emit("scan_failed", {"job_id": job_id, "error": detail})
     finally:
         db.close()
 
