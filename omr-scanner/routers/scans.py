@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import shutil
-import traceback
 import uuid
 from pathlib import Path
 
@@ -88,8 +87,6 @@ async def _process_scan(job_id: str, image_path: str, exam_id: str) -> None:
         # 7. Mark done
         job.status             = JobStatus.done
         job.overall_confidence = result["overall_confidence"]
-        job.is_fallback        = result.get("is_fallback", False)
-        job.error_message      = result.get("fallback_error")  # real error stored for admin
         db.commit()
 
         # 8. Notify frontend
@@ -103,18 +100,15 @@ async def _process_scan(job_id: str, image_path: str, exam_id: str) -> None:
         })
 
     except Exception as exc:
-        tb = traceback.format_exc()
-        logger.exception("OMR processing failed for job %s: %s", job_id, exc)
-        detail = f"{type(exc).__name__}: {exc}\n\n{tb}"
+        logger.exception("OMR scan job %s failed: %s", job_id, exc)
         try:
             job = db.query(ScanJob).filter(ScanJob.id == job_id).first()
             if job:
-                job.status        = JobStatus.failed
-                job.error_message = detail
+                job.status = JobStatus.failed
                 db.commit()
         except Exception:
             db.rollback()
-        await sio.emit("scan_failed", {"job_id": job_id, "error": detail})
+        await sio.emit("scan_failed", {"job_id": job_id, "error": "Scan failed. Please try again."})
     finally:
         db.close()
 

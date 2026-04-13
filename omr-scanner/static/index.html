@@ -439,7 +439,6 @@
     <button class="nav-btn"        onclick="showPanel('scan')">Scan</button>
     <button class="nav-btn"        onclick="showPanel('review')">Review</button>
   </nav>
-  <button id="admin-toggle-btn" class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 10px;" onclick="toggleAdminMode()">&#x1F512; Admin</button>
 </header>
 
 <main>
@@ -614,43 +613,12 @@
 /* ========================================================================
    State
    ======================================================================== */
-const ADMIN_PIN = '1234';
-
 const state = {
   exams:        [],
-  currentFile:  null,     // File | Blob
+  currentFile:  null,
   cameraStream: null,
-  activeJobs:   new Map(), // job_id -> {status, card el}
-  isAdmin:      sessionStorage.getItem('omr_admin') === '1',
+  activeJobs:   new Map(),
 };
-
-function toggleAdminMode() {
-  if (state.isAdmin) {
-    state.isAdmin = false;
-    sessionStorage.removeItem('omr_admin');
-    document.getElementById('admin-toggle-btn').textContent = '🔒 Admin';
-    document.getElementById('admin-toggle-btn').style.color = '';
-    return;
-  }
-  const pin = prompt('Enter admin PIN:');
-  if (pin === ADMIN_PIN) {
-    state.isAdmin = true;
-    sessionStorage.setItem('omr_admin', '1');
-    document.getElementById('admin-toggle-btn').textContent = '🔓 Admin ON';
-    document.getElementById('admin-toggle-btn').style.color = '#16a34a';
-    alert('Admin mode enabled.');
-  } else {
-    alert('Incorrect PIN.');
-  }
-}
-
-// Reflect admin state on load
-window.addEventListener('DOMContentLoaded', () => {
-  if (state.isAdmin) {
-    document.getElementById('admin-toggle-btn').textContent = '🔓 Admin ON';
-    document.getElementById('admin-toggle-btn').style.color = '#16a34a';
-  }
-});
 
 /* ========================================================================
    Socket.IO
@@ -957,10 +925,7 @@ function jobCardHTML({ job_id, status, score, max_score, percentage, flagged_cou
       body += '</div>';
     }
   } else if (status === 'failed') {
-    body = `<div class="alert alert-error mt-8">
-      <strong>&#x274C; Scan failed</strong>
-      <pre style="margin-top:8px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:220px;overflow-y:auto;background:rgba(0,0,0,.08);padding:8px;border-radius:4px;">${escHtml(error || 'Unknown error')}</pre>
-    </div>`;
+    body = `<div class="alert alert-error mt-8">&#x274C; Scan failed. Please try again.</div>`;
   }
 
   return `
@@ -974,13 +939,9 @@ function jobCardHTML({ job_id, status, score, max_score, percentage, flagged_cou
 async function fetchJobDetails(jobId) {
   try {
     const res = await fetch(`/api/scan/${jobId}`);
-    if (!res.ok) {
-      if (state.isAdmin) console.error(`[Admin] GET /api/scan/${jobId} → HTTP ${res.status}`, await res.text().catch(()=>''));
-      return null;
-    }
+    if (!res.ok) return null;
     return await res.json();
-  } catch (e) {
-    if (state.isAdmin) console.error(`[Admin] fetchJobDetails failed:`, e);
+  } catch {
     return null;
   }
 }
@@ -1045,12 +1006,7 @@ async function loadResults() {
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(buildResultRow(row)));
   } catch (e) {
-    const detail = state.isAdmin
-      ? `<pre style="text-align:left;white-space:pre-wrap;font-size:11px;margin-top:6px;">${escHtml(e.stack || e.message)}</pre>`
-      : '';
-    tbody.innerHTML = `<tr><td colspan="6" class="text-danger" style="text-align:center;padding:20px;">
-      <strong>Failed to load results: ${escHtml(e.message)}</strong>${detail}
-    </td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-danger" style="text-align:center;padding:20px;">Failed to load results. Please try again.</td></tr>`;
   }
 }
 
@@ -1091,16 +1047,7 @@ async function toggleDetail(jobId, btn) {
   btn.disabled    = false;
   btn.textContent = 'Close';
 
-  if (!j) {
-    const errTr = document.createElement('tr');
-    errTr.id = `detail-${jobId}`;
-    errTr.innerHTML = `<td colspan="6" style="padding:10px;color:#dc2626;">
-      Failed to load details — ${state.isAdmin ? 'check browser console (F12) for the exact error.' : 'please try again.'}
-    </td>`;
-    const parentRow = document.querySelector(`[data-job-id="${jobId}"]`);
-    parentRow?.insertAdjacentElement('afterend', errTr);
-    return;
-  }
+  if (!j) { btn.textContent = 'Details'; return; }
 
   const examId = document.getElementById('review-exam-select').value;
 
@@ -1131,21 +1078,8 @@ async function toggleDetail(jobId, btn) {
     </div>`;
   }).join('');
 
-  const adminBanner = state.isAdmin ? (() => {
-    if (j.is_fallback) {
-      return `<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;">
-        <strong>&#x26A0;&#xFE0F; ADMIN: Scan could NOT be read — random answers were used.</strong>
-        <pre style="margin-top:6px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:180px;overflow-y:auto;background:rgba(0,0,0,.06);padding:8px;border-radius:4px;">${escHtml(j.error_message || '')}</pre>
-      </div>`;
-    }
-    return `<div style="background:#dcfce7;border:1px solid #16a34a;border-radius:6px;padding:8px 14px;margin-bottom:12px;font-size:12px;">
-      <strong>&#x2705; ADMIN: Real scan — OMR image was read successfully.</strong>
-    </div>`;
-  })() : '';
-
   detailTr.innerHTML = `<td colspan="6" style="padding:0;">
     <div class="q-detail">
-      ${adminBanner}
       <p class="text-muted" style="font-size:12px;margin-bottom:10px;">
         Confidence: ${j.overall_confidence != null ? Math.round(j.overall_confidence * 100) : '—'}% overall
         &nbsp;|&nbsp; Score: ${j.score?.raw_score ?? '—'} / ${j.score?.max_score ?? '—'}
