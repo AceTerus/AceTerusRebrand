@@ -20,13 +20,32 @@ from routers import exams, scans, students
 from socket_manager import sio
 
 # ---------------------------------------------------------------------------
-# DB bootstrap (creates tables if they don't exist)
+# DB bootstrap (creates tables if they don't exist, then migrate new columns)
 # ---------------------------------------------------------------------------
 try:
     Base.metadata.create_all(bind=engine)
 except Exception as e:
     import logging
     logging.getLogger(__name__).warning(f"DB init warning: {e}")
+
+# Additive migrations — safe to run every startup
+def _run_migrations():
+    import logging
+    _log = logging.getLogger(__name__)
+    with engine.connect() as conn:
+        migrations = [
+            # Add is_fallback column if missing (added 2026-04-13)
+            "ALTER TABLE scan_jobs ADD COLUMN is_fallback BOOLEAN DEFAULT 0",
+        ]
+        for sql in migrations:
+            try:
+                conn.execute(__import__('sqlalchemy').text(sql))
+                conn.commit()
+                _log.info(f"Migration applied: {sql}")
+            except Exception:
+                pass  # Column already exists — ignore
+
+_run_migrations()
 
 # ---------------------------------------------------------------------------
 # Socket.IO events

@@ -974,9 +974,15 @@ function jobCardHTML({ job_id, status, score, max_score, percentage, flagged_cou
 async function fetchJobDetails(jobId) {
   try {
     const res = await fetch(`/api/scan/${jobId}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (state.isAdmin) console.error(`[Admin] GET /api/scan/${jobId} → HTTP ${res.status}`, await res.text().catch(()=>''));
+      return null;
+    }
     return await res.json();
-  } catch { return null; }
+  } catch (e) {
+    if (state.isAdmin) console.error(`[Admin] fetchJobDetails failed:`, e);
+    return null;
+  }
 }
 
 async function pollJobStatus(jobId, interval) {
@@ -1039,7 +1045,12 @@ async function loadResults() {
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(buildResultRow(row)));
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-danger" style="text-align:center;padding:20px;">${escHtml(e.message)}</td></tr>`;
+    const detail = state.isAdmin
+      ? `<pre style="text-align:left;white-space:pre-wrap;font-size:11px;margin-top:6px;">${escHtml(e.stack || e.message)}</pre>`
+      : '';
+    tbody.innerHTML = `<tr><td colspan="6" class="text-danger" style="text-align:center;padding:20px;">
+      <strong>Failed to load results: ${escHtml(e.message)}</strong>${detail}
+    </td></tr>`;
   }
 }
 
@@ -1080,7 +1091,16 @@ async function toggleDetail(jobId, btn) {
   btn.disabled    = false;
   btn.textContent = 'Close';
 
-  if (!j) return;
+  if (!j) {
+    const errTr = document.createElement('tr');
+    errTr.id = `detail-${jobId}`;
+    errTr.innerHTML = `<td colspan="6" style="padding:10px;color:#dc2626;">
+      Failed to load details — ${state.isAdmin ? 'check browser console (F12) for the exact error.' : 'please try again.'}
+    </td>`;
+    const parentRow = document.querySelector(`[data-job-id="${jobId}"]`);
+    parentRow?.insertAdjacentElement('afterend', errTr);
+    return;
+  }
 
   const examId = document.getElementById('review-exam-select').value;
 
