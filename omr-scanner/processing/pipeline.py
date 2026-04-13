@@ -15,15 +15,6 @@ matplotlib.use("Agg")  # headless backend — must be set before any OMRChecker 
 
 import cv2
 
-# Add OMRChecker to path so its src package resolves
-_OMRCHECKER_DIR = Path(__file__).parent.parent / "OMRChecker"
-if str(_OMRCHECKER_DIR) not in sys.path:
-    sys.path.insert(0, str(_OMRCHECKER_DIR))
-
-from src.template import Template
-from src.defaults.config import CONFIG_DEFAULTS
-from src.utils.parsing import get_concatenated_response
-
 from processing.grader import grade
 from processing.ocr import extract_student_id
 from processing.preprocess import load_image
@@ -31,12 +22,18 @@ from processing.preprocess import load_image
 logger = logging.getLogger(__name__)
 
 _OMR_TEMPLATE_PATH = Path(__file__).parent.parent / "omr_template.json"
+_OMRCHECKER_DIR    = Path(__file__).parent.parent / "OMRChecker"
 
 # Student-ID OCR crop region (canonical 794×1123 space)
 _STUDENT_ID_REGION = {"x": 300, "y": 5, "w": 200, "h": 18}
 
 
-def _load_omr_template() -> Template:
+def _load_omr_template():
+    # Lazy import — keeps OMRChecker crash contained inside run_pipeline's try/except
+    if str(_OMRCHECKER_DIR) not in sys.path:
+        sys.path.insert(0, str(_OMRCHECKER_DIR))
+    from src.template import Template          # noqa: PLC0415
+    from src.defaults.config import CONFIG_DEFAULTS  # noqa: PLC0415
     return Template(_OMR_TEMPLATE_PATH, CONFIG_DEFAULTS)
 
 
@@ -144,6 +141,7 @@ def run_pipeline(
             omr_template, image=processed, name=Path(image_path).name, save_dir=None
         )
 
+        from src.utils.parsing import get_concatenated_response  # noqa: PLC0415
         omr_response = get_concatenated_response(response_dict, omr_template)
         print(f"[OMR] OMRChecker response: {omr_response}", flush=True)
 
