@@ -50,8 +50,8 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
   return (
     <aside
       className={`
-        hidden lg:flex lg:flex-col fixed left-0 top-0 h-screen border-r border-border bg-white z-50
-        transition-all duration-300
+        hidden lg:flex lg:flex-col fixed left-0 top-0 h-screen border-r-2 border-[#0F172A]/10 bg-white z-50
+        transition-all duration-300 font-['Nunito']
         ${collapsed ? "w-[70px]" : "w-64"}
       `}
     >
@@ -61,7 +61,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
           <img
             src={Logo}
             alt="AceTerus Logo"
-            className="w-[10vh] h-[10vh] object-contain rounded-xl group-hover:shadow-glow transition-all duration-300"
+            className="w-[10vh] h-[10vh] object-contain rounded-xl border-2 border-[#0F172A]/15 shadow-[3px_3px_0_0_rgba(15,23,42,0.1)] group-hover:-translate-y-0.5 group-hover:shadow-[5px_5px_0_0_rgba(15,23,42,0.12)] transition-all duration-200"
           />
         </Link>
       </div>
@@ -77,18 +77,16 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               to={item.href}
               title={collapsed ? item.label : undefined}
               className={`
-                relative flex items-center rounded-xl transition-all duration-200 group
+                relative flex items-center rounded-xl transition-all duration-150 group
                 ${collapsed ? "justify-center px-0 py-4" : "px-5 py-4 space-x-4"}
                 ${active
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-foreground/70 hover:bg-muted/60 hover:text-foreground"
+                  ? "bg-primary text-white font-bold shadow-[3px_3px_0_0_#0F172A] border-2 border-[#0F172A] -translate-y-0.5"
+                  : "text-foreground/70 hover:bg-muted/60 hover:text-foreground hover:-translate-y-0.5"
                 }
               `}
             >
               {/* Active indicator bar */}
-              {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-primary" />
-              )}
+              {/* active indicator hidden — full card is now highlighted */}
 
               <div className="relative flex-shrink-0">
                 <Icon className={`w-6 h-6 ${active ? "stroke-[2.5]" : "stroke-[1.8]"}`} />

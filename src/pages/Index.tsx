@@ -2,7 +2,7 @@ import React from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
   ArrowRight, Rocket, Eye, Zap, Sparkles, Star, Flame, CheckCircle2, Trophy,
-  Brain, Users, FileText, Play,
+  Brain, Users, FileText, Play, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import Logo from "../assets/logo.png";
@@ -50,6 +50,59 @@ function IconBlob({ bg, children }: { bg: string; children: React.ReactNode }) {
       />
       {children}
     </div>
+  );
+}
+
+/* ── Curator.io Instagram feed ───────────────────────────────────────────── */
+// 1. Sign up free at curator.io
+// 2. Add Instagram @aceterus as a source → create & publish a feed
+// 3. From the embed code, copy your feed ID (looks like: abc12345-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+// 4. Replace "YOUR_FEED_ID" below with that ID
+const CURATOR_FEED_ID = "fc3ca777-fd52-4b62-b798-ec7325cb1eb9";
+
+function CuratorFeed({ feedId }: { feedId: string }) {
+  React.useEffect(() => {
+    if (feedId === "YOUR_FEED_ID") return;
+    if (document.getElementById("curator-script")) return;
+    const s = document.createElement("script");
+    s.id = "curator-script";
+    s.src = `https://cdn.curator.io/published/${feedId}.js`;
+    s.async = true;
+    document.body.appendChild(s);
+  }, [feedId]);
+
+  if (feedId === "YOUR_FEED_ID") {
+    return (
+      <div className="rounded-[28px] border-[3px] border-dashed border-[#0F172A]/25 bg-white/70 p-12 text-center flex flex-col items-center gap-4">
+        <div className="w-14 h-14 rounded-[18px] border-[3px] border-[#0F172A] shadow-[4px_4px_0_0_#0F172A] flex items-center justify-center"
+          style={{ background: "linear-gradient(45deg,#f09433,#dc2743,#bc1888)" }}>
+          <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        </div>
+        <div>
+          <p className={`${DISPLAY} font-extrabold text-xl`}>Connect @aceterus on Curator.io</p>
+          <p className="font-medium text-slate-500 mt-1 max-w-xs mx-auto text-sm leading-relaxed">
+            Sign up free at <a href="https://curator.io" target="_blank" rel="noopener noreferrer" className="text-[#2F7CFF] underline font-bold">curator.io</a>, add Instagram as a source, publish a feed, then paste your Feed ID into <code className="bg-slate-100 px-1.5 py-0.5 rounded-lg text-xs font-mono">CURATOR_FEED_ID</code> in Index.tsx.
+          </p>
+        </div>
+        <a href="https://curator.io" target="_blank" rel="noopener noreferrer"
+          className={`${BTN} text-white !py-2 !px-5 !text-sm`} style={{ background: C.indigo }}>
+          Set up Curator.io <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <style>{`
+        #curator-feed-default-feed-layout .crt-post { border-radius: 22px !important; border: 3px solid #0F172A !important; box-shadow: 5px 5px 0 0 #0F172A !important; overflow: hidden !important; transition: transform 0.2s ease, box-shadow 0.2s ease !important; }
+        #curator-feed-default-feed-layout .crt-post:hover { transform: translateY(-6px) !important; box-shadow: 8px 10px 0 0 #0F172A !important; }
+        #curator-feed-default-feed-layout .crt-logo { font-family: 'Nunito', sans-serif !important; font-weight: 700 !important; }
+      `}</style>
+      <div id="curator-feed-default-feed-layout">
+        <a href="https://curator.io" target="_blank" rel="noopener noreferrer" className="crt-logo crt-tag">Powered by Curator.io</a>
+      </div>
+    </>
   );
 }
 
@@ -426,6 +479,43 @@ const Index = () => {
               <div className="font-bold text-sm mt-1">{s.l}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── INSTAGRAM ────────────────────────────────────────────────────── */}
+      <section className="px-5 py-24 border-y-[3px] border-[#0F172A]" style={{ background: C.skySoft }}>
+        <div className="max-w-6xl mx-auto">
+          {/* header row */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-10">
+            <div className="flex items-center gap-4">
+              {/* Instagram gradient blob */}
+              <div
+                className="w-14 h-14 rounded-[18px] border-[3px] border-[#0F172A] shadow-[4px_4px_0_0_#0F172A] flex items-center justify-center shrink-0"
+                style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }}
+              >
+                <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                </svg>
+              </div>
+              <div>
+                <div className={`${DISPLAY} font-extrabold text-2xl leading-none`}>@aceterus</div>
+                <div className="font-medium text-slate-500 mt-1">Study tips, wins & good vibes ✨</div>
+              </div>
+            </div>
+            <a href="https://instagram.com/aceterus" target="_blank" rel="noopener noreferrer">
+              <button className={`${BTN} text-white`} style={{ background: "linear-gradient(135deg,#dc2743,#bc1888)" }}>
+                Follow us <ExternalLink className="w-4 h-4" />
+              </button>
+            </a>
+          </div>
+
+          <CuratorFeed feedId={CURATOR_FEED_ID} />
+
+          <p className="text-center font-bold text-slate-500 mt-8">
+            Follow us for daily study tips, student wins, and behind-the-scenes updates →{" "}
+            <a href="https://instagram.com/aceterus" target="_blank" rel="noopener noreferrer"
+              className="text-[#bc1888] hover:underline">@aceterus</a>
+          </p>
         </div>
       </section>
 
