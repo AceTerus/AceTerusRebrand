@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; padding:0; background: #fff; }
+  body { padding: 24px; display:flex; gap: 14px; flex-wrap:wrap; align-items:center; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family: var(--font-sans); font-weight:500; font-size:14px; border-radius: 6px; padding: 0 16px; height: 40px; cursor:pointer; border: 1px solid transparent; transition: var(--transition-smooth); }
+  .primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+  .primary:hover { background: hsl(220 70% 45%); }
+  .secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+  .outline { background:#fff; border-color: hsl(var(--input)); color: hsl(var(--foreground)); }
+  .outline:hover { background: hsl(var(--accent) / .1); }
+  .ghost { background: transparent; color: hsl(var(--foreground)); }
+  .ghost:hover { background: hsl(var(--muted)); }
+  .grad { background: var(--gradient-hero); color: white; box-shadow: var(--shadow-glow); }
+  .lg { height: 48px; padding: 0 28px; font-size: 16px; }
+  svg { width: 16px; height: 16px; }
+</style></head>
+<body>
+  <button class="btn primary">Sign In</button>
+  <button class="btn grad lg">Start Learning →</button>
+  <button class="btn secondary">Secondary</button>
+  <button class="btn outline">Sign Up — it's free!</button>
+  <button class="btn ghost">Ghost</button>
+</body></html>

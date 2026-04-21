@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; padding:0; background: #fff; }
+  body { font-family: var(--font-sans); padding: 24px; display:flex; gap: 18px; align-items:stretch; }
+  .grad { flex:1; border-radius: 20px; height: 110px; position: relative; box-shadow: var(--shadow-elegant); color: #fff; padding: 14px 16px; display:flex; flex-direction:column; justify-content:space-between; }
+  .grad .label { font-weight: 700; font-size: 14px; }
+  .grad .code { font-family: var(--font-mono); font-size: 10px; opacity: .9; }
+  .g1 { background: var(--gradient-primary); }
+  .g2 { background: var(--gradient-hero); }
+  .g3 { background: var(--gradient-brand); }
+</style></head>
+<body>
+  <div class="grad g1"><div class="label">Primary</div><div class="code">135°, primary → primary-glow</div></div>
+  <div class="grad g2"><div class="label">Hero</div><div class="code">135°, primary → secondary</div></div>
+  <div class="grad g3"><div class="label">Brand</div><div class="code">120°, cyan → blue → indigo</div></div>
+</body></html>

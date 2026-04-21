@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; padding:0; background: #FFF7EC; }
+  body { font-family: var(--font-sans); padding: 24px; }
+  .row { display:flex; gap:14px; align-items:stretch; flex-wrap:wrap; }
+  .sw { width: 150px; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 20px -10px rgba(255,180,90,.35); border: 1px solid rgba(0,0,0,.05); }
+  .sw .chip { height: 70px; position: relative; }
+  .sw .chip::after { content:''; position:absolute; inset:0; background: radial-gradient(120% 70% at 20% 20%, rgba(255,255,255,.35), transparent 55%); }
+  .sw .meta { padding: 8px 10px; background:#fff; }
+  .sw .name { font-size:12px; font-weight:700; color: #2B2340; }
+  .sw .hex  { font-family: var(--font-mono); font-size:10px; color: #8C7C9C; margin-top:2px; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="sw"><div class="chip" style="background: #FFF7EC;"></div><div class="meta"><div class="name">Cream</div><div class="hex">#FFF7EC · bg</div></div></div>
+    <div class="sw"><div class="chip" style="background: #FFE08A;"></div><div class="meta"><div class="name">Lemon</div><div class="hex">#FFE08A · highlight</div></div></div>
+    <div class="sw"><div class="chip" style="background: #FF8A5C;"></div><div class="meta"><div class="name">Coral</div><div class="hex">#FF8A5C · accent</div></div></div>
+    <div class="sw"><div class="chip" style="background: #7ED7C1;"></div><div class="meta"><div class="name">Mint</div><div class="hex">#7ED7C1 · success</div></div></div>
+    <div class="sw"><div class="chip" style="background: #C8B6FF;"></div><div class="meta"><div class="name">Lilac</div><div class="hex">#C8B6FF · soft</div></div></div>
+    <div class="sw"><div class="chip" style="background: #2B2340;"></div><div class="meta"><div class="name">Ink</div><div class="hex">#2B2340 · text</div></div></div>
+  </div>
+</body></html>

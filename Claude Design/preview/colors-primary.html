@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; padding:0; background: #fff; }
+  body { font-family: var(--font-sans); padding: 24px; }
+  .row { display:flex; gap:14px; align-items:stretch; flex-wrap:wrap; }
+  .sw { width: 150px; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-elegant); border: 1px solid hsl(var(--border)); }
+  .sw .chip { height: 70px; }
+  .sw .meta { padding: 8px 10px; background:#fff; }
+  .sw .name { font-size:12px; font-weight:700; color: hsl(var(--foreground)); }
+  .sw .hex  { font-family: var(--font-mono); font-size:10px; color: hsl(var(--muted-foreground)); margin-top:2px; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="sw"><div class="chip" style="background: hsl(220 70% 50%)"></div><div class="meta"><div class="name">Primary</div><div class="hex">hsl(220 70% 50%)</div></div></div>
+    <div class="sw"><div class="chip" style="background: hsl(220 70% 60%)"></div><div class="meta"><div class="name">Primary Glow</div><div class="hex">hsl(220 70% 60%)</div></div></div>
+    <div class="sw"><div class="chip" style="background: hsl(200 95% 55%)"></div><div class="meta"><div class="name">Secondary</div><div class="hex">hsl(200 95% 55%)</div></div></div>
+    <div class="sw"><div class="chip" style="background: #2E2BE5"></div><div class="meta"><div class="name">Brand Indigo</div><div class="hex">#2E2BE5</div></div></div>
+  </div>
+</body></html>

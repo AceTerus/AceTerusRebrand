@@ -1,0 +1,216 @@
+/* ============================================================
+   AceTerus Design System — Colors & Typography
+   Source of truth: src/index.css + tailwind.config.ts in the
+   AceTerusWebpage repo. Colors are HSL-based and mirror the
+   :root tokens used by shadcn/ui.
+   ============================================================ */
+
+/* ---------- Fonts ----------
+   The live product ships with the browser default sans-serif
+   stack (no custom @font-face in index.css). The logo uses a
+   cursive brush "Ace" wordmark and a techy outlined "terus" —
+   those are baked into the raster logo, not a loadable family.
+   We use Inter (UI body) and Space Grotesk (display) as sensible,
+   on-brand stand-ins for prototyping. FLAG: confirm with brand
+   owner whether a specific family should be used.
+------------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Baloo+2:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ── Brand palette (from logo gradient) ──────────────────── */
+  --brand-cyan:   #3BD6F5;   /* left stroke of the "Ace" swoosh */
+  --brand-blue:   #2F7CFF;   /* mid-gradient */
+  --brand-indigo: #2E2BE5;   /* right terminal of "ce" arrow    */
+  --brand-ink:    #0F172A;   /* deep navy used in "terus" type  */
+
+  /* ── Core semantic tokens (HSL triplets, shadcn convention) ─ */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+
+  --primary: 220 70% 50%;          /* AceTerus blue            */
+  --primary-foreground: 210 40% 98%;
+  --primary-glow: 220 70% 60%;     /* lighter for glow/halo    */
+
+  --secondary: 200 95% 55%;        /* cyan accent              */
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --accent: 200 95% 55%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input:  214.3 31.8% 91.4%;
+  --ring:   222.2 84% 4.9%;
+
+  /* ── Sidebar tokens ─────────────────────────────────────── */
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-primary: 240 5.9% 10%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+
+  /* ── Gradients (signature look) ─────────────────────────── */
+  --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+  --gradient-hero:    linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+  --gradient-card:    linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+  --gradient-brand:   linear-gradient(120deg, var(--brand-cyan) 0%, var(--brand-blue) 55%, var(--brand-indigo) 100%);
+
+  /* ── Shadows ────────────────────────────────────────────── */
+  --shadow-sm:      0 1px 2px hsl(var(--primary) / 0.06);
+  --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.10);
+  --shadow-glow:    0 0 40px hsl(var(--primary-glow) / 0.15);
+  --shadow-xl:      0 25px 50px -12px hsl(var(--primary) / 0.18);
+
+  /* ── Motion ─────────────────────────────────────────────── */
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce:       cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Radius scale ───────────────────────────────────────── */
+  --radius: 0.5rem;           /* base            8px           */
+  --radius-sm:  calc(var(--radius) - 4px);   /* 4px   pills    */
+  --radius-md:  calc(var(--radius) - 2px);   /* 6px   inputs   */
+  --radius-lg:  var(--radius);               /* 8px   buttons  */
+  --radius-xl:  1rem;                        /* 16px  cards    */
+  --radius-2xl: 1.5rem;                      /* 24px  feature  */
+  --radius-3xl: 2rem;                        /* 32px  hero     */
+  --radius-full: 9999px;
+
+  /* ── Spacing (Tailwind-ish rhythm) ──────────────────────── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-sans:    'Nunito', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Baloo 2', 'Nunito', var(--font-sans);
+  --font-mono:    'JetBrains Mono', ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-xs:  0.75rem;   /* 12 */
+  --text-sm:  0.875rem;  /* 14 */
+  --text-base:1rem;      /* 16 */
+  --text-lg:  1.125rem;  /* 18 */
+  --text-xl:  1.25rem;   /* 20 */
+  --text-2xl: 1.5rem;    /* 24 */
+  --text-3xl: 1.875rem;  /* 30 */
+  --text-4xl: 2.25rem;   /* 36 */
+  --text-5xl: 3rem;      /* 48 */
+  --text-6xl: 3.75rem;   /* 60 */
+  --text-7xl: 4.5rem;    /* 72 */
+  --text-8xl: 6rem;      /* 96 */
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 220 70% 60%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --primary-glow: 220 70% 70%;
+  --secondary: 200 95% 60%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 200 95% 60%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+}
+
+/* ============================================================
+   Semantic element styles — use these in prototypes so tone
+   stays consistent even when designers skip component classes.
+   ============================================================ */
+html { font-family: var(--font-sans); color: hsl(var(--foreground)); }
+
+h1, .h1 {
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-5xl), 6vw, var(--text-8xl));
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+}
+h2, .h2 {
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-4xl), 4vw, var(--text-6xl));
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+h3, .h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+h4, .h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: 1.2;
+}
+p, .body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: 400;
+  line-height: 1.6;
+  color: hsl(var(--foreground));
+}
+.lead {
+  font-size: var(--text-xl);
+  line-height: 1.55;
+  color: hsl(var(--muted-foreground));
+}
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: hsl(var(--primary));
+}
+.caption {
+  font-size: var(--text-xs);
+  color: hsl(var(--muted-foreground));
+}
+code, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+/* Signature gradient text helper */
+.text-gradient-brand {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

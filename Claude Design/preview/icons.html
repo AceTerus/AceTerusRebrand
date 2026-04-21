@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  html,body{margin:0;padding:0;background:#FFF7EC;}
+  body{padding:24px;display:flex;gap:22px;flex-wrap:wrap;}
+  .ic{display:flex;flex-direction:column;align-items:center;gap:8px;width:76px;}
+  .bubble{
+    width:58px;height:58px;border-radius:20px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow: 0 8px 0 rgba(0,0,0,.06), 0 10px 24px -8px rgba(255,140,90,.35);
+    transform: rotate(-3deg);
+    border: 2.5px solid #2B2340;
+    position: relative;
+  }
+  .bubble::after{ /* soft sheen */
+    content:''; position:absolute; top:6px; left:8px; width:16px; height:10px;
+    background: rgba(255,255,255,.7); border-radius: 10px; transform: rotate(-18deg);
+  }
+  .bubble i{width:28px;height:28px;color:#2B2340;stroke-width:2.5;}
+  .b1{background:#FFE08A;}
+  .b2{background:#FF8A5C;}
+  .b3{background:#7ED7C1;}
+  .b4{background:#C8B6FF;}
+  .b5{background:#8EDCFF;}
+  .b6{background:#FFB4D8;}
+  .ic:nth-child(even) .bubble{transform: rotate(3deg);}
+  .ic:nth-child(3n) .bubble{transform: rotate(-6deg);}
+  .l{font-family:var(--font-sans);font-size:11px;font-weight:600;color:#2B2340;}
+</style></head>
+<body>
+  <div class="ic"><div class="bubble b1"><i data-lucide="brain"></i></div><span class="l">Brain</span></div>
+  <div class="ic"><div class="bubble b2"><i data-lucide="book-open"></i></div><span class="l">Study</span></div>
+  <div class="ic"><div class="bubble b3"><i data-lucide="sparkles"></i></div><span class="l">Sparkle</span></div>
+  <div class="ic"><div class="bubble b4"><i data-lucide="zap"></i></div><span class="l">Zap</span></div>
+  <div class="ic"><div class="bubble b5"><i data-lucide="compass"></i></div><span class="l">Explore</span></div>
+  <div class="ic"><div class="bubble b6"><i data-lucide="heart"></i></div><span class="l">Love</span></div>
+  <div class="ic"><div class="bubble b1"><i data-lucide="trophy"></i></div><span class="l">Win</span></div>
+  <div class="ic"><div class="bubble b2"><i data-lucide="flame"></i></div><span class="l">Streak</span></div>
+  <div class="ic"><div class="bubble b3"><i data-lucide="rocket"></i></div><span class="l">Rocket</span></div>
+  <div class="ic"><div class="bubble b4"><i data-lucide="smile"></i></div><span class="l">Mascot</span></div>
+<script>lucide.createIcons();</script>
+</body></html>

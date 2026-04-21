@@ -1,277 +1,474 @@
+import React from "react";
 import { Link, Navigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { User, Brain, ArrowRight, Sparkles, Zap, Quote } from "lucide-react";
+import {
+  ArrowRight, Rocket, Eye, Zap, Sparkles, Star, Flame, CheckCircle2, Trophy,
+  Brain, Users, FileText, Play,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import Navbar from "@/components/Navbar";
 import Logo from "../assets/logo.png";
 
-const heroStats = [
-  { label: "Active learners", value: "12K+" },
-  { label: "Resources shared", value: "4.3K" },
-  { label: "Avg. session score", value: "4.9/5" },
-];
+/* ── brand colours ─────────────────────────────────────────────────────── */
+const C = {
+  cyan:       "#3BD6F5",
+  blue:       "#2F7CFF",
+  indigo:     "#2E2BE5",
+  ink:        "#0F172A",
+  skySoft:    "#DDF3FF",
+  blueSoft:   "#C8DEFF",
+  indigoSoft: "#D6D4FF",
+  cloud:      "#F3FAFF",
+  sun:        "#FFD65C",
+  pop:        "#FF7A59",
+};
 
-const trustedBy = ["PoliTech", "Northstar STEM", "ACE Collegiate", "Quantum Labs"];
+/* ── shared style snippets ──────────────────────────────────────────────── */
+const DISPLAY = "font-['Baloo_2'] tracking-tight";
+const STICKER =
+  "border-[3px] border-[#0F172A] rounded-[28px] shadow-[6px_6px_0_0_#0F172A] bg-white transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-[10px_12px_0_0_#0F172A]";
+const STICKER_SM =
+  "border-[2.5px] border-[#0F172A] rounded-[18px] shadow-[4px_4px_0_0_#0F172A] bg-white transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[6px_8px_0_0_#0F172A]";
+const PILL =
+  "border-[2.5px] border-[#0F172A] rounded-full shadow-[3px_3px_0_0_#0F172A] bg-white";
+const BTN =
+  "inline-flex items-center gap-2.5 font-extrabold font-['Baloo_2'] border-[3px] border-[#0F172A] rounded-full px-6 py-3.5 shadow-[6px_6px_0_0_#0F172A] transition-all duration-150 cursor-pointer hover:-translate-y-1 hover:shadow-[8px_10px_0_0_#0F172A] active:translate-y-0.5 active:shadow-[2px_2px_0_0_#0F172A]";
+const TAG =
+  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[2.5px] border-[#0F172A] font-extrabold text-xs transition-transform duration-150 hover:scale-105 hover:-translate-y-0.5";
 
-const testimonials = [
-  {
-    quote:
-      "AceTerus helps me stay consistent with CS prep. The quizzes feel like mini wins every day.",
-    author: "Nadia Rahman",
-    role: "2nd year CS, Purdue",
-  },
-  {
-    quote: "Materials + community feedback have replaced three separate tools I used before.",
-    author: "Aiden Cross",
-    role: "AP CS Student",
-  },
-];
+const tiltL: React.CSSProperties = { transform: "rotate(-2.5deg)" };
+const tiltR: React.CSSProperties = { transform: "rotate(2.5deg)" };
 
+function IconBlob({ bg, children }: { bg: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="relative w-16 h-16 rounded-[22px] border-[3px] border-[#0F172A] flex items-center justify-center shadow-[4px_4px_0_0_#0F172A] transition-all duration-200 hover:scale-110 hover:rotate-6 hover:shadow-[6px_6px_0_0_#0F172A]"
+      style={{ background: bg }}
+    >
+      <span
+        aria-hidden
+        className="absolute top-2 left-2.5 w-4 h-2.5 rounded-[10px] bg-white/70"
+        style={{ transform: "rotate(-18deg)" }}
+      />
+      {children}
+    </div>
+  );
+}
+
+/* ── smooth anchor scroll ───────────────────────────────────────────────── */
+function useSmoothAnchor() {
+  React.useEffect(() => {
+    const ease = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const handler = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement).closest('a[href^="#"]') as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const id = anchor.getAttribute("href")?.slice(1);
+      if (!id) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      e.preventDefault();
+      const start = window.scrollY;
+      const end = el.getBoundingClientRect().top + window.scrollY - 80;
+      const duration = 1400;
+      const t0 = performance.now();
+      const step = (now: number) => {
+        const p = Math.min((now - t0) / duration, 1);
+        window.scrollTo(0, start + (end - start) * ease(p));
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+}
+
+/* ── page component ─────────────────────────────────────────────────────── */
 const Index = () => {
   const { user, isLoading } = useAuth();
+  useSmoothAnchor();
 
-  // Redirect authenticated users to feed
-  if (isLoading) {
-    return null; // or a loading spinner
-  }
-
-  if (user) {
-    return <Navigate to="/feed" replace />;
-  }
+  if (isLoading) return null;
+  if (user) return <Navigate to="/feed" replace />;
 
   return (
-    <div className="min-h-screen overflow-hidden bg-transparent text-foreground">
-      <Navbar />
-      <main>
-        <section className="relative min-h-[95vh] flex items-center overflow-hidden">
-          <video
-            className="absolute inset-0 w-full h-full object-cover opacity-80"
-            src="/videos/promotional.mp4"
-            autoPlay
-            muted
-            loop
-            playsInline
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/60 to-background/30 backdrop-brightness-75" />
-          <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20" />
+    <div
+      className="font-['Nunito'] relative text-[#0F172A] min-h-screen"
+      style={{
+        backgroundImage: `
+          radial-gradient(1200px 600px at 85% -10%, rgba(59,214,245,.55), transparent 60%),
+          radial-gradient(900px 500px at -5% 10%,  rgba(47,124,255,.45), transparent 60%),
+          radial-gradient(800px 600px at 50% 100%, rgba(46,43,229,.30),  transparent 60%)
+        `,
+        backgroundColor: C.cloud,
+      }}
+    >
+      {/* grain overlay */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[1] opacity-[0.05] mix-blend-multiply"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>\")",
+        }}
+      />
 
-          <div className="container relative mx-auto px-6 py-24">
-            <div className="grid items-center gap-12">
-              <div className="space-y-8 text-foreground">
-                <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 shadow-sm">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium tracking-wide text-foreground">Where learning meets achievement</span>
-                </div>
+      {/* animation keyframes */}
+      <style>{`
+        @keyframes atl-float  { 0%,100%{transform:translateY(0)}  50%{transform:translateY(-10px)} }
+        @keyframes atl-wobble { 0%,100%{transform:rotate(-3deg)}  50%{transform:rotate(3deg)}      }
+        .atl-float  { animation: atl-float  4s   ease-in-out infinite;      }
+        .atl-float2 { animation: atl-float  5s   ease-in-out infinite .6s;  }
+        .atl-float3 { animation: atl-float  3.5s ease-in-out infinite 1.2s; }
+        .atl-wobble { animation: atl-wobble 6s   ease-in-out infinite;      }
+        .atl-underline { position:relative; display:inline-block; }
+        .atl-underline::after {
+          content:''; position:absolute; left:-4px; right:-4px; bottom:2px;
+          height:14px; z-index:-1; background:${C.cyan}; border-radius:8px;
+          transform:rotate(-1.5deg);
+        }
+        .atl-dots {
+          background-image: radial-gradient(${C.blue} 2px, transparent 2px);
+          background-size: 20px 20px;
+        }
+        .atl-nav-link {
+          display: inline-block;
+          transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), color 0.15s;
+        }
+        .atl-nav-link:hover { transform: translateY(-3px); }
+        .atl-logo:hover { transform: rotate(8deg) scale(1.12); transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+        .atl-logo { transition: transform 0.2s ease; }
+        .atl-pill-hover {
+          transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;
+        }
+        .atl-pill-hover:hover {
+          transform: translateY(-4px) scale(1.05);
+          box-shadow: 7px 9px 0 0 rgba(255,255,255,0.3);
+        }
+        .atl-mascot-wrap { transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+        .atl-mascot-wrap:hover { transform: scale(1.06); }
+        .atl-stat-item { transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1); }
+        .atl-stat-item:hover { transform: scale(1.1) translateY(-4px); }
+      `}</style>
 
-                <h1 className="text-5xl font-bold leading-tight tracking-tight text-foreground md:text-7xl lg:text-8xl">
-                  Ace your
-                  <span className="block text-primary">journey</span>
-                  with AceTerus
-                </h1>
+      {/* ── NAV ──────────────────────────────────────────────────────────── */}
+      {/* ── HERO (nav lives inside so it floats over the video) ──────────── */}
+      <section className="relative px-5 pt-6 pb-24">
+        {/* background video */}
+        <video
+          className="absolute inset-0 w-full h-full object-cover"
+          src="/videos/promotional.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+        />
+        {/* video overlay — keeps text readable over the video */}
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]" />
 
-                <p className="max-w-2xl text-lg text-foreground/80 md:text-2xl">
-                  Immersive quizzes, collaborative materials, and live insights—crafted to keep you learning, sharing, and celebrating every win.
-                </p>
-
-                <div className="flex flex-wrap gap-4">
-                  <Button
-                    size="lg"
-                    className="group h-14 px-8 text-lg shadow-glow"
-                    onClick={() => {
-                      document.getElementById("GetStarted")?.scrollIntoView({ behavior: "smooth" });
-                    }}
-                  >
-                    Start Learning
-                    <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                  </Button>
-
-                  <Link to="/auth">
-                    <Button size="lg" variant="outline" className="h-14 px-8 text-lg">
-                      Sign Up — it’s free!
-                    </Button>
-                  </Link>
-                </div>
-
-                <div className="grid gap-6 pt-10 sm:grid-cols-3">
-                  {heroStats.map((stat) => (
-                    <div key={stat.label} className="rounded-2xl border border-black/10 bg-white/80 p-4 text-center shadow-md">
-                      <p className="text-3xl font-bold text-foreground">{stat.value}</p>
-                      <p className="text-sm uppercase tracking-wide text-foreground/70">{stat.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+        {/* ── NAV ── floats over the hero video */}
+        <header className="relative z-30 mb-10">
+          <div className={`${PILL} max-w-6xl mx-auto flex items-center justify-between px-5 py-2`}>
+            <Link to="/" className="flex items-center gap-2">
+              <img src={Logo} alt="AceTerus" className="w-10 h-10 rounded-xl atl-logo" />
+              <span className={`${DISPLAY} font-extrabold text-xl`}>AceTerus</span>
+            </Link>
+            <nav className="hidden md:flex items-center gap-6 font-bold text-sm">
+              <a href="#play"    className="atl-nav-link hover:text-[#2F7CFF]">Play</a>
+              <a href="#learn"   className="atl-nav-link hover:text-[#2F7CFF]">Learn</a>
+              <a href="#squad"   className="atl-nav-link hover:text-[#2F7CFF]">Squad</a>
+              <a href="#rewards" className="atl-nav-link hover:text-[#2F7CFF]">Rewards</a>
+            </nav>
+            <Link to="/auth">
+              <button className={`${BTN} !py-2 !px-4 !text-sm text-white`} style={{ background: C.blue }}>
+                Jump in <ArrowRight className="w-4 h-4" />
+              </button>
+            </Link>
           </div>
-        </section>
+        </header>
 
-        <section className="border-y border-muted/40 bg-muted/20 py-8">
-          <div className="container mx-auto px-6">
-            <p className="mb-6 text-center text-sm uppercase tracking-[0.5em] text-muted-foreground">Trusted by learners at</p>
-            <div className="grid gap-4 text-center text-base font-semibold text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-              {trustedBy.map((logo) => (
-                <div key={logo} className="rounded-2xl border border-muted/30 bg-card/40 px-6 py-4">
-                  {logo}
-                </div>
-              ))}
+        {/* floating clouds */}
+        <div className="absolute atl-float2 bg-white border-[3px] border-[#0F172A] rounded-full shadow-[4px_4px_0_0_#0F172A]"
+          style={{ top: 180, right: "8%", width: 90, height: 40 }} />
+        <div className="absolute atl-float3 bg-white border-[3px] border-[#0F172A] rounded-full shadow-[4px_4px_0_0_#0F172A]"
+          style={{ bottom: 100, left: "45%", width: 70, height: 32 }} />
+        {/* sparkle decorations */}
+        <Sparkles className="absolute atl-float"  style={{ top: 140, left: "10%",  color: C.cyan,   width: 28, height: 28 }} />
+        <Star     className="absolute atl-float2" style={{ top: 70,  right: "14%", color: C.indigo, fill: C.indigo, width: 30, height: 30 }} />
+        <Zap      className="absolute atl-float3" style={{ bottom: 50, left: "20%", color: C.sun, fill: C.sun, width: 28, height: 28 }} />
+
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative">
+          {/* left: copy */}
+          <div>
+            <span className={TAG} style={{ background: C.cyan }}>
+              <Zap className="w-3.5 h-3.5" /> Malaysia's #1 study sidekick
+            </span>
+            <h1
+              className={`${DISPLAY} font-extrabold mt-5 leading-[0.95]`}
+              style={{ fontSize: "clamp(44px,7vw,96px)" }}
+            >
+              Learn stuff.<br />
+              <span className="atl-underline">Ace quizzes.</span><br />
+              <span style={{ color: C.blue }}>Have fun</span> doing it.
+            </h1>
+            <p className="mt-6 text-lg md:text-xl max-w-xl font-medium">
+              AceTerus turns studying into a game you actually want to play. Quizzes, streaks, squads, and an AI companion — all in one platform. Built for Malaysian students, powered by AI.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link to="/auth">
+                <button className={`${BTN} text-white`} style={{ background: C.blue }}>
+                  Start my quest <Rocket className="w-5 h-5" />
+                </button>
+              </Link>
+              <a href="#play">
+                <button className={`${BTN} bg-white`}>
+                  Peek inside <Eye className="w-5 h-5" />
+                </button>
+              </a>
             </div>
-          </div>
-        </section>
-
-        <section id="GetStarted" className="relative overflow-hidden py-32">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-muted/30" />
-          <div className="absolute inset-x-0 top-10 mx-auto h-48 w-48 rounded-full bg-primary/20 blur-3xl" />
-          <div className="container relative mx-auto px-6">
-            <div className="mx-auto mb-16 max-w-4xl text-center space-y-6">
-              <h2 className="text-4xl font-bold md:text-6xl">Start your journey with AceTerus</h2>
-              <p className="text-xl text-muted-foreground">
-                A powerful all-in-one platform to help you master computer science through quizzes, study materials, AI analytics, and a thriving community.
-              </p>
-            </div>
-
-            <div className="grid gap-10 md:grid-cols-2 max-w-6xl mx-auto">
-              <div className="rounded-3xl border border-white/20 bg-white/70 p-8 shadow-2xl backdrop-blur-lg dark:bg-black/30">
-                <h3 className="text-3xl font-semibold">1. Sign up — free</h3>
-                <p className="mt-4 text-muted-foreground">
-                  Create your account instantly using Google or email. No friction, no commitment—just immediate access to your dashboard.
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-white/20 bg-white/70 p-8 shadow-2xl backdrop-blur-lg dark:bg-black/30">
-                <h3 className="text-3xl font-semibold">2. Personalize everything</h3>
-                <p className="mt-4 text-muted-foreground">
-                  Choose topics, pace, and study goals so AceTerus can adapt quizzes, reminders, and recommended materials to you.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-10 rounded-[2.5rem] border border-white/20 bg-white/80 p-10 shadow-2xl backdrop-blur-lg dark:bg-black/30">
-              <h3 className="mb-10 text-center text-3xl font-semibold">3. Explore the toolkit</h3>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  { title: "Quizzes", tagline: "500+ curated CS questions" },
-                  { title: "Materials", tagline: "Notes & diagrams for fast learning" },
-                  { title: "AI Analytics", tagline: "Track strengths & weaknesses" },
-                  { title: "Tutor Classes", tagline: "Live & recorded CS sessions" },
-                ].map((feature) => (
-                  <div key={feature.title} className="rounded-2xl border border-muted/30 bg-card/80 p-6 text-center shadow-lg">
-                    <h4 className="text-2xl font-semibold">{feature.title}</h4>
-                    <p className="mt-2 text-sm text-muted-foreground">{feature.tagline}</p>
-                  </div>
+            <div className="mt-8 flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {[C.cyan, C.blue, C.indigo, C.sun].map((c, i) => (
+                  <div key={i} className="w-9 h-9 rounded-full border-[3px] border-[#0F172A]" style={{ background: c }} />
                 ))}
               </div>
-            </div>
-
-            <div className="mt-10 rounded-3xl border border-muted/40 bg-card/90 p-10 text-center shadow-xl">
-              <h3 className="text-3xl font-semibold">4. Join the community feed</h3>
-              <p className="mt-4 text-muted-foreground">
-                Share your progress, ask questions, get feedback, and learn together with other students. AceTerus isn’t just a platform—it’s a community.
-              </p>
+              <p className="font-bold text-sm">Join students already levelling up today</p>
             </div>
           </div>
-        </section>
 
-        <section className="bg-muted/30 py-28">
-          <div className="container mx-auto px-6">
-            <div className="mx-auto mb-16 max-w-3xl text-center">
-              <p className="text-sm uppercase tracking-[0.4em] text-primary">What's inside</p>
-              <h2 className="mt-4 text-4xl font-bold md:text-5xl">Everything you need to succeed in education</h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Each module is designed to keep you accountable, inspired, and in sync with your learning milestones.
-              </p>
+          {/* right: mascot cluster */}
+          <div className="relative h-[520px] atl-mascot-wrap">
+            {/* wobbling circle */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="w-[380px] h-[380px] rounded-full atl-wobble border-[4px] border-[#0F172A] shadow-[10px_10px_0_0_#0F172A]"
+                style={{ background: C.blue }}
+              />
             </div>
-
-            <div className="grid gap-8 md:grid-cols-2">
-              <Link to="/quiz" className="group md:col-span-2">
-                <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-10 shadow-2xl transition-all duration-300 hover:shadow-glow">
-                  <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl group-hover:bg-primary/20" />
-                  <div className="relative">
-                    <Brain className="mb-6 h-12 w-12 text-primary" />
-                    <h3 className="text-4xl font-semibold">Interactive quizzes</h3>
-                    <p className="mt-3 text-lg text-muted-foreground">
-                      Test your knowledge with engaging computer science quizzes designed to challenge and improve your skills.
-                    </p>
-                    <div className="mt-6 flex items-center gap-2 text-primary">
-                      Take a quiz
-                      <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-2" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              <Link to="/profile" className="group">
-                <div className="h-full rounded-3xl border border-border bg-card p-8 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-glow">
-                  <User className="mb-6 h-10 w-10 text-primary" />
-                  <h3 className="text-2xl font-semibold">Your profile</h3>
-                  <p className="mt-4 text-muted-foreground">
-                    Build your academic identity with posts, uploads, and achievements that grow alongside you.
-                  </p>
-                  <div className="mt-6 flex items-center gap-2 text-primary text-sm font-semibold">
-                    View profiles
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </div>
-              </Link>
-
-              <Link to="/discover" className="group">
-                <div className="h-full rounded-3xl border border-border bg-card p-8 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-glow">
-                  <Zap className="mb-6 h-10 w-10 text-primary" />
-                  <h3 className="text-2xl font-semibold">Connect & grow</h3>
-                  <p className="mt-4 text-muted-foreground">
-                    Join a community of learners, share knowledge, and grow together with curated rooms and discussions.
-                  </p>
-                  <div className="mt-6 flex items-center gap-2 text-primary text-sm font-semibold">
-                    Discover more
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </div>
-              </Link>
+            {/* Ace mascot SVG */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg viewBox="0 0 260 260" className="w-[280px] h-[280px] atl-float">
+                <g stroke="#0F172A" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round">
+                  <ellipse cx={130} cy={140} rx={100} ry={95} fill={C.cyan} />
+                  <ellipse cx={95}  cy={105} rx={24}  ry={14} fill={C.skySoft} stroke="none" opacity={0.7} />
+                  <circle cx={95}  cy={130} r={13}  fill="#0F172A" />
+                  <circle cx={165} cy={130} r={13}  fill="#0F172A" />
+                  <circle cx={100} cy={125} r={3.5} fill="#fff" stroke="none" />
+                  <circle cx={170} cy={125} r={3.5} fill="#fff" stroke="none" />
+                  <path d="M95 170 Q130 200 165 170" fill="none" />
+                  <ellipse cx={70}  cy={160} rx={14} ry={8} fill={C.pop} opacity={0.85} />
+                  <ellipse cx={190} cy={160} rx={14} ry={8} fill={C.pop} opacity={0.85} />
+                  <path d="M78 72 Q130 20 182 72 Q182 80 78 80 Z" fill={C.indigo} />
+                  <circle cx={130} cy={38} r={7} fill={C.sun} />
+                </g>
+              </svg>
             </div>
-          </div>
-        </section>
-
-        <section className="py-28">
-          <div className="container mx-auto px-6">
-            <div className="grid gap-10 lg:grid-cols-2">
-              {testimonials.map((item) => (
-                <div key={item.author} className="rounded-[2rem] border border-border bg-card/90 p-10 shadow-xl backdrop-blur">
-                  <Quote className="h-10 w-10 text-primary" />
-                  <p className="mt-6 text-2xl font-light leading-relaxed">{item.quote}</p>
-                  <div className="mt-8 text-sm uppercase tracking-[0.3em] text-primary">{item.role}</div>
-                  <p className="text-lg font-semibold">{item.author}</p>
+            {/* floating mini-cards */}
+            <div className={`${STICKER_SM} absolute top-2 left-2 p-3 w-44 atl-float`} style={{ ...tiltL, background: C.cyan }}>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-[14px] border-[2px] border-[#0F172A] bg-white flex items-center justify-center shadow-[3px_3px_0_0_#0F172A]">
+                  <Flame className="w-5 h-5" style={{ color: C.pop }} />
                 </div>
-              ))}
+                <div>
+                  <div className={`${DISPLAY} font-extrabold text-lg leading-none`}>12 day</div>
+                  <div className="text-[10px] font-bold">streak 🔥</div>
+                </div>
+              </div>
             </div>
-          </div>
-        </section>
-
-        <section className="py-32">
-          <div className="container mx-auto px-6">
-            <div className="mx-auto max-w-4xl rounded-[3rem] border border-primary/30 bg-gradient-to-br from-primary via-primary/80 to-secondary p-12 text-center text-primary-foreground shadow-2xl">
-              <h2 className="text-4xl font-bold md:text-5xl">Ready to level up your CS skills?</h2>
-              <p className="mt-4 text-xl text-primary-foreground/90">Join 1,200+ students already learning on AceTerus.</p>
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-                <Link to="/quiz">
-                  <Button size="lg" className="h-14 px-10 text-lg">
-                    <img
-                      src={Logo}
-                      alt="AceTerus Logo"
-                      className="mr-3 h-8 w-8 rounded-lg object-contain"
-                    />
-                    Start your first quiz
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
-                <Link to="/auth">
-                  <Button size="lg" variant="secondary" className="h-14 px-8 text-lg text-primary">
-                    Create free account
-                  </Button>
-                </Link>
+            <div className={`${STICKER_SM} absolute bottom-4 right-0 p-3 w-52 atl-float2`} style={tiltR}>
+              <div className="text-[10px] font-bold mb-1 uppercase tracking-wider" style={{ color: C.blue }}>Quiz · Biology</div>
+              <div className="font-bold text-sm leading-snug">What powers the mitochondria?</div>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="text-[10px] font-bold" style={{ color: C.indigo }}>+50 XP</div>
+                <CheckCircle2 className="w-5 h-5" style={{ color: C.blue }} />
+              </div>
+            </div>
+            <div className={`${STICKER_SM} absolute top-28 right-2 p-2.5 w-36 atl-float3 text-white`} style={{ ...tiltR, background: C.indigo }}>
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5" style={{ color: C.sun }} />
+                <div className={`${DISPLAY} font-extrabold text-xs`}>Top 3 this week!</div>
               </div>
             </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      {/* ── HIGHLIGHTS STRIP ─────────────────────────────────────────────── */}
+      <section className="py-10 border-y-[3px] border-[#0F172A] overflow-hidden" style={{ background: C.indigo }}>
+        <div className="max-w-6xl mx-auto px-5">
+          <div className="flex flex-wrap justify-center gap-4">
+            {([
+              { Icon: Flame,    label: "Daily Streaks",  sub: "keep the fire alive",    bg: C.cyan,       text: C.ink,  shadow: "rgba(0,0,0,0.25)" },
+              { Icon: Brain,    label: "AI Tutor",        sub: "your smartest study pal", bg: "#fff",       text: C.ink,  shadow: "rgba(0,0,0,0.25)" },
+              { Icon: Users,    label: "Squad Mode",      sub: "no one studies alone",   bg: C.blue,       text: "#fff", shadow: "rgba(0,0,0,0.25)" },
+              { Icon: Trophy,   label: "Leaderboards",   sub: "flex on your classmates", bg: C.sun,        text: C.ink,  shadow: "rgba(0,0,0,0.25)" },
+              { Icon: Sparkles, label: "Smart Quizzes",  sub: "adaptive to your level",  bg: C.pop,        text: "#fff", shadow: "rgba(0,0,0,0.25)" },
+            ] as { Icon: React.ElementType; label: string; sub: string; bg: string; text: string; shadow: string }[]).map(({ Icon, label, sub, bg, text }) => (
+              <div
+                key={label}
+                className="atl-pill-hover flex items-center gap-3 px-5 py-3.5 rounded-[20px] border-[3px] border-[#0F172A] shadow-[5px_5px_0_0_rgba(255,255,255,0.25)]"
+                style={{ background: bg, color: text }}
+              >
+                <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] bg-white/20 flex items-center justify-center shrink-0">
+                  <Icon className="w-4.5 h-4.5" style={{ color: text }} />
+                </div>
+                <div>
+                  <div className={`${DISPLAY} font-extrabold text-sm leading-none`}>{label}</div>
+                  <div className="text-[10px] font-bold opacity-75 mt-0.5">{sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FEATURE GRID ─────────────────────────────────────────────────── */}
+      <section id="play" className="px-5 py-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <span className={TAG} style={{ background: C.cyan }}>What's inside</span>
+            <h2 className={`${DISPLAY} font-extrabold mt-4 leading-none`} style={{ fontSize: "clamp(36px,5vw,64px)" }}>
+              Your new favourite<br />study kit 🎒
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {([
+              { t: "Brainy quizzes",    d: "Bite-sized quizzes across every subject that feel like mini-games. Make your own or grab ones from the community.",               Icon: Brain,    cardBg: C.cyan,       blob: C.blue,   iconColor: "#fff",  tilt: tiltL },
+              { t: "Streaks that stick",d: "Show up, earn XP, keep your flame alive. Miss a day and Ace will absolutely guilt-trip you (lovingly).",                         Icon: Flame,    cardBg: C.blueSoft,   blob: C.indigo, iconColor: "#fff"             },
+              { t: "AI study buddy",    d: "Stuck on a topic? Ace breaks it down, suggests study plans, and gives you real-time feedback — like your coolest tutor.",        Icon: Sparkles, cardBg: C.indigo,     blob: C.cyan,   iconColor: C.ink,   tilt: tiltR, text: "#fff" },
+              { t: "Squad up",          d: "Pull your friends in. Study sessions, shared notes, group challenges. It's more fun when nobody falls behind alone.",            Icon: Users,    cardBg: C.skySoft,    blob: C.sun,    iconColor: C.ink,   tilt: tiltR },
+              { t: "Drop your notes",   d: "Upload notes, get an AI-generated quiz. Centralise all your study materials in one place — zero tab-switching required.",        Icon: FileText, cardBg: C.indigoSoft, blob: C.blue,   iconColor: "#fff"             },
+              { t: "Real rewards",      d: "Climb the leaderboard, collect badges, and unlock achievements. Motivation built right into the platform.",                      Icon: Trophy,   cardBg: C.blue,       blob: C.sun,    iconColor: C.ink,   tilt: tiltL, text: "#fff" },
+            ] as { t: string; d: string; Icon: React.ElementType; cardBg: string; blob: string; iconColor: string; text?: string; tilt?: React.CSSProperties }[]).map(({ t, d, Icon, cardBg, blob, iconColor, text, tilt }) => (
+              <div key={t} className={`${STICKER} p-6`} style={{ background: cardBg, color: text ?? C.ink, ...(tilt ?? {}) }}>
+                <IconBlob bg={blob}>
+                  <Icon className="w-[30px] h-[30px]" strokeWidth={2.5} style={{ color: iconColor }} />
+                </IconBlob>
+                <h3 className={`${DISPLAY} font-extrabold text-2xl mt-4`}>{t}</h3>
+                <p className="mt-2 font-medium">{d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
+      <section id="learn" className="px-5 py-24 relative border-y-[3px] border-[#0F172A]" style={{ background: C.skySoft }}>
+        <div className="absolute top-8 right-8 atl-dots w-28 h-28 opacity-60" />
+        <div className="absolute bottom-8 left-8 atl-dots w-24 h-24 opacity-60" />
+        <div className="max-w-6xl mx-auto relative">
+          <div className="text-center mb-16">
+            <span className={`${TAG} text-white`} style={{ background: C.blue }}>3 easy steps</span>
+            <h2 className={`${DISPLAY} font-extrabold mt-4 leading-none`} style={{ fontSize: "clamp(36px,5vw,64px)" }}>
+              How it works ✨
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {([
+              { n: "1", c: C.cyan,   t: "Sign up free",      d: "Takes 30 seconds. No cards, no catches — just immediate access to your dashboard.", tilt: tiltL },
+              { n: "2", c: C.blue,   t: "Pick your subjects", d: "Set your subjects, pace, and goals. Ace tailors quizzes and study plans just for you." },
+              { n: "3", c: C.indigo, t: "Start acing it",     d: "Play daily, crush streaks, collaborate with your squad, and flex on the leaderboard.", tilt: tiltR },
+            ] as { n: string; c: string; t: string; d: string; tilt?: React.CSSProperties }[]).map(({ n, c, t, d, tilt }) => (
+              <div key={n} className={`${STICKER} p-6 text-center`} style={tilt}>
+                <div className={`${DISPLAY} font-extrabold text-7xl`} style={{ color: c, WebkitTextStroke: `3px ${C.ink}` }}>{n}</div>
+                <h3 className={`${DISPLAY} font-extrabold text-2xl`}>{t}</h3>
+                <p className="font-medium mt-2">{d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIALS ─────────────────────────────────────────────────── */}
+      <section id="squad" className="px-5 py-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <span className={TAG} style={{ background: C.cyan }}>Real students</span>
+            <h2 className={`${DISPLAY} font-extrabold mt-4 leading-none`} style={{ fontSize: "clamp(36px,5vw,64px)" }}>
+              The squad loves it 💙
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {([
+              { q: "I used to juggle three different apps just to study. AceTerus replaced all of them — everything is finally in one place.", n: "Sarah L.",  r: "Undergraduate, KL",    bg: "#fff",   starColor: C.blue,   avBg: C.cyan,   tilt: tiltL },
+              { q: "The streak system is evil in the best way. I literally cannot miss a day — and my grades actually went up.",              n: "Marcus T.", r: "Secondary School, PJ", bg: C.cyan,   starColor: C.indigo, avBg: C.indigo             },
+              { q: "My study group of six meets on AceTerus every night now. It's basically TikTok but for actually passing your exams.",    n: "Mei Y.",    r: "Pre-U, Penang",        bg: C.indigo, starColor: C.sun,    avBg: C.sun,    tilt: tiltR, text: "#fff" },
+            ] as { q: string; n: string; r: string; bg: string; starColor: string; avBg: string; tilt?: React.CSSProperties; text?: string }[]).map((x, i) => (
+              <div key={i} className={`${STICKER} p-6`} style={{ background: x.bg, color: x.text ?? C.ink, ...(x.tilt ?? {}) }}>
+                <div className="flex items-center gap-1 text-xl" style={{ color: x.starColor }}>★★★★★</div>
+                <p className="mt-3 font-medium text-lg">"{x.q}"</p>
+                <div className="mt-5 flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full border-[3px] border-[#0F172A]" style={{ background: x.avBg }} />
+                  <div>
+                    <div className={`${DISPLAY} font-extrabold`}>{x.n}</div>
+                    <div className="text-xs font-bold opacity-70">{x.r}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── STATS STRIP ──────────────────────────────────────────────────── */}
+      <section id="rewards" className="px-5 py-16">
+        <div className={`${STICKER} max-w-6xl mx-auto p-10 grid md:grid-cols-4 gap-6 text-center text-white`} style={{ background: C.blue }}>
+          {([
+            { n: "Unified",      l: "all subjects, one platform"  },
+            { n: "Personalised", l: "adaptive AI study plans"     },
+            { n: "Gamified",     l: "streaks, XP & challenges"    },
+            { n: "4.9★",         l: "avg student rating"          },
+          ] as const).map((s) => (
+            <div key={s.n} className="atl-stat-item">
+              <div className={`${DISPLAY} font-extrabold text-4xl`}>{s.n}</div>
+              <div className="font-bold text-sm mt-1">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── CTA ──────────────────────────────────────────────────────────── */}
+      <section className="px-5 py-24">
+        <div
+          className={`${STICKER} max-w-4xl mx-auto p-12 text-center relative overflow-hidden text-white`}
+          style={{ background: `linear-gradient(135deg, ${C.cyan} 0%, ${C.blue} 55%, ${C.indigo} 100%)` }}
+        >
+          <Star     className="absolute" style={{ top: 20,    left:  30,  color: C.sun, fill: C.sun, width: 36, height: 36 }} />
+          <Sparkles className="absolute" style={{ bottom: 20, right: 30,  color: "#fff", width: 36, height: 36 }} />
+          <h2 className={`${DISPLAY} font-extrabold leading-none`} style={{ fontSize: "clamp(36px,6vw,72px)" }}>
+            Ready to ace it?
+          </h2>
+          <p className="mt-4 font-bold text-lg md:text-xl max-w-xl mx-auto">
+            Malaysia's all-in-one academic ecosystem — gamified learning, AI personalisation, and a real study community. Free to join.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <Link to="/auth">
+              <button className={`${BTN} bg-white text-[#0F172A]`}>Let's go! <Rocket className="w-5 h-5" /></button>
+            </Link>
+            <Link to="/auth">
+              <button className={`${BTN} text-white`} style={{ background: C.ink }}>Create free account <Play className="w-5 h-5" /></button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ───────────────────────────────────────────────────────── */}
+      <footer className="px-5 py-10">
+        <div className={`${PILL} max-w-6xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3`}>
+          <div className="flex items-center gap-2">
+            <img src={Logo} className="w-8 h-8 rounded-lg" alt="AceTerus" />
+            <span className={`${DISPLAY} font-extrabold`}>AceTerus</span>
+          </div>
+          <div className="flex gap-5 font-bold text-sm">
+            <a href="#play"  className="hover:text-[#2F7CFF] transition-colors">Features</a>
+            <a href="#learn" className="hover:text-[#2F7CFF] transition-colors">How it works</a>
+            <a href="#squad" className="hover:text-[#2F7CFF] transition-colors">Community</a>
+            <Link to="/auth" className="hover:text-[#2F7CFF] transition-colors">Sign up</Link>
+          </div>
+          <div className="font-bold text-xs opacity-70">Made with 💙 for Malaysian students.</div>
+        </div>
+      </footer>
     </div>
   );
 };

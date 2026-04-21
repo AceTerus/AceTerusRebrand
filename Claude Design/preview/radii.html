@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0;padding:0;background:#fff;}
+  body{padding:20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  .row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  .box{width:90px;height:60px;background:#fff;border:1px dashed #ddd;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:9px;color:hsl(var(--muted-foreground));}
+  .sm{border-radius:4px;} .md{border-radius:6px;} .lg{border-radius:8px;} .xl{border-radius:16px;} .x2{border-radius:24px;} .x3{border-radius:32px;} .full{border-radius:9999px;width:60px;height:60px;}
+  .shadow-box{width:120px;height:70px;background:#fff;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;}
+  .s-sm{box-shadow:0 1px 2px rgba(37,99,235,.06);}
+  .s-el{box-shadow:0 10px 30px -10px rgba(37,99,235,.1);}
+  .s-gl{box-shadow:0 0 40px rgba(70,130,246,.25);}
+  .label{font-family:var(--font-mono);font-size:9px;color:hsl(var(--muted-foreground));display:block;text-align:center;margin-top:4px;}
+  .group{display:flex;flex-direction:column;align-items:center;gap:2px;}
+</style></head>
+<body>
+  <div class="row">
+    <div class="group"><div class="box sm">4</div><span class="label">sm</span></div>
+    <div class="group"><div class="box md">6</div><span class="label">md</span></div>
+    <div class="group"><div class="box lg">8</div><span class="label">lg</span></div>
+    <div class="group"><div class="box xl">16</div><span class="label">xl</span></div>
+    <div class="group"><div class="box x2">24</div><span class="label">2xl</span></div>
+    <div class="group"><div class="box x3">32</div><span class="label">3xl</span></div>
+    <div class="group"><div class="box full">∞</div><span class="label">full</span></div>
+  </div>
+</body></html>
