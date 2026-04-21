@@ -210,7 +210,8 @@ const Index = () => {
             >
               Learn stuff.<br />
               <span className="atl-underline">Ace quizzes.</span><br />
-              <span style={{ color: C.blue }}>Have fun</span> doing it.
+              <span style={{ color: C.blue }}>Have Fun</span><br />
+              doing it!
             </h1>
             <p className="mt-6 text-lg md:text-xl max-w-xl font-medium">
               AceTerus turns studying into a game you actually want to play. Quizzes, streaks, squads, and an AI companion — all in one platform. Built for Malaysian students, powered by AI.
