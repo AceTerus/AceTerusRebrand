@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+*, *::before, *::after {
+  cursor: url('/pointer.png'), auto;
+}
+
+a, button, [role="button"], label, select, summary, [tabindex] {
+  cursor: url('/hover.png'), pointer;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
