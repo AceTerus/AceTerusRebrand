@@ -24,13 +24,13 @@ const C = {
 /* ── shared style snippets ──────────────────────────────────────────────── */
 const DISPLAY = "font-['Baloo_2'] tracking-tight";
 const STICKER =
-  "border-[3px] border-[#0F172A] rounded-[28px] shadow-[6px_6px_0_0_#0F172A] bg-white transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-[10px_12px_0_0_#0F172A]";
+  "border-[3px] border-[#0F172A] rounded-[28px] shadow-[4px_4px_0_0_#0F172A] bg-white transition-all duration-200 ease-out hover:-translate-y-2 hover:shadow-[7px_8px_0_0_#0F172A]";
 const STICKER_SM =
   "border-[2.5px] border-[#0F172A] rounded-[18px] shadow-[4px_4px_0_0_#0F172A] bg-white transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[6px_8px_0_0_#0F172A]";
 const PILL =
   "border-[2.5px] border-[#0F172A] rounded-full shadow-[3px_3px_0_0_#0F172A] bg-white";
 const BTN =
-  "inline-flex items-center gap-2.5 font-extrabold font-['Baloo_2'] border-[3px] border-[#0F172A] rounded-full px-6 py-3.5 shadow-[6px_6px_0_0_#0F172A] transition-all duration-150 cursor-pointer hover:-translate-y-1 hover:shadow-[8px_10px_0_0_#0F172A] active:translate-y-0.5 active:shadow-[2px_2px_0_0_#0F172A]";
+  "inline-flex items-center gap-2.5 font-extrabold font-['Baloo_2'] border-[3px] border-[#0F172A] rounded-full px-6 py-3.5 shadow-[4px_4px_0_0_#0F172A] transition-all duration-150 cursor-pointer hover:-translate-y-1 hover:shadow-[6px_7px_0_0_#0F172A] active:translate-y-0.5 active:shadow-[2px_2px_0_0_#0F172A]";
 const TAG =
   "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[2.5px] border-[#0F172A] font-extrabold text-xs transition-transform duration-150 hover:scale-105 hover:-translate-y-0.5";
 
@@ -40,7 +40,7 @@ const tiltR: React.CSSProperties = { transform: "rotate(2.5deg)" };
 function IconBlob({ bg, children }: { bg: string; children: React.ReactNode }) {
   return (
     <div
-      className="relative w-16 h-16 rounded-[22px] border-[3px] border-[#0F172A] flex items-center justify-center shadow-[4px_4px_0_0_#0F172A] transition-all duration-200 hover:scale-110 hover:rotate-6 hover:shadow-[6px_6px_0_0_#0F172A]"
+      className="relative w-16 h-16 rounded-[22px] border-[3px] border-[#0F172A] flex items-center justify-center shadow-[4px_4px_0_0_#0F172A] transition-all duration-200 hover:scale-110 hover:rotate-6 hover:shadow-[4px_4px_0_0_#0F172A]"
       style={{ background: bg }}
     >
       <span
@@ -96,7 +96,7 @@ function CuratorFeed({ feedId }: { feedId: string }) {
     <>
       <style>{`
         #curator-feed-default-feed-layout .crt-post { border-radius: 22px !important; border: 3px solid #0F172A !important; box-shadow: 5px 5px 0 0 #0F172A !important; overflow: hidden !important; transition: transform 0.2s ease, box-shadow 0.2s ease !important; }
-        #curator-feed-default-feed-layout .crt-post:hover { transform: translateY(-6px) !important; box-shadow: 8px 10px 0 0 #0F172A !important; }
+        #curator-feed-default-feed-layout .crt-post:hover { transform: translateY(-6px) !important; box-shadow: 6px 7px 0 0 #0F172A !important; }
         #curator-feed-default-feed-layout .crt-logo { font-family: 'Nunito', sans-serif !important; font-weight: 700 !important; }
       `}</style>
       <div id="curator-feed-default-feed-layout">
@@ -254,8 +254,8 @@ const Index = () => {
         .atl-pop-in { animation: atl-pop-in 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
 
         @keyframes atl-pulse-glow {
-          0%,100% { box-shadow: 6px 6px 0 0 #0F172A, 0 0 0 0 rgba(47,124,255,0); }
-          50%      { box-shadow: 6px 6px 0 0 #0F172A, 0 0 18px 6px rgba(47,124,255,0.4); }
+          0%,100% { box-shadow: 4px 4px 0 0 #0F172A, 0 0 0 0 rgba(47,124,255,0); }
+          50%      { box-shadow: 4px 4px 0 0 #0F172A, 0 0 18px 6px rgba(47,124,255,0.4); }
         }
         .atl-cta-btn { animation: atl-pulse-glow 2.8s ease-in-out infinite; }
 
@@ -522,7 +522,7 @@ const Index = () => {
             {([
               { q: "I used to juggle three different apps just to study. AceTerus replaced all of them — everything is finally in one place.", n: "Sarah L.",  r: "Undergraduate, KL",    bg: "#fff",   starColor: C.blue,   avBg: C.cyan,   tilt: tiltL },
               { q: "The streak system is evil in the best way. I literally cannot miss a day — and my grades actually went up.",              n: "Marcus T.", r: "Secondary School, PJ", bg: C.cyan,   starColor: C.indigo, avBg: C.indigo             },
-              { q: "My study group of six meets on AceTerus every night now. It's basically TikTok but for actually passing your exams.",    n: "Mei Y.",    r: "Pre-U, Penang",        bg: C.indigo, starColor: C.sun,    avBg: C.sun,    tilt: tiltR, text: "#fff" },
+              { q: "Comel gilaaaaa, macam main Game!",    n: "Yasmin Hanani",    r: "Bachelor Degree, UKM",        bg: C.indigo, starColor: C.sun,    avBg: C.sun,    tilt: tiltR, text: "#fff" },
             ] as { q: string; n: string; r: string; bg: string; starColor: string; avBg: string; tilt?: React.CSSProperties; text?: string }[]).map((x, i) => (
               <Reveal key={i} delay={i * 110} from={i === 0 ? "left" : i === 2 ? "right" : "bottom"}>
               <div className={`${STICKER} p-6`} style={{ background: x.bg, color: x.text ?? C.ink, ...(x.tilt ?? {}) }}>
