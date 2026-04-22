@@ -106,6 +106,42 @@ function CuratorFeed({ feedId }: { feedId: string }) {
   );
 }
 
+/* ── scroll reveal ──────────────────────────────────────────────────────── */
+function Reveal({
+  children,
+  delay = 0,
+  from = "bottom",
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  from?: "bottom" | "left" | "right";
+  className?: string;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.style.animationDelay = `${delay}ms`;
+          el.classList.add("atl-revealed");
+          obs.unobserve(el);
+        }
+      },
+      { threshold: 0.12 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [delay]);
+  return (
+    <div ref={ref} className={`atl-reveal atl-reveal-${from} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 /* ── smooth anchor scroll ───────────────────────────────────────────────── */
 function useSmoothAnchor() {
   React.useEffect(() => {
@@ -203,6 +239,36 @@ const Index = () => {
         .atl-mascot-wrap:hover { transform: scale(1.06); }
         .atl-stat-item { transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1); }
         .atl-stat-item:hover { transform: scale(1.1) translateY(-4px); }
+
+        @keyframes atl-hero-in {
+          from { opacity: 0; transform: translateY(36px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .atl-hero-in { animation: atl-hero-in 0.75s cubic-bezier(0.22,1,0.36,1) both; }
+
+        @keyframes atl-pop-in {
+          0%   { opacity: 0; transform: scale(0.7) rotate(-4deg); }
+          70%  { transform: scale(1.08) rotate(2deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+        .atl-pop-in { animation: atl-pop-in 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+        @keyframes atl-pulse-glow {
+          0%,100% { box-shadow: 6px 6px 0 0 #0F172A, 0 0 0 0 rgba(47,124,255,0); }
+          50%      { box-shadow: 6px 6px 0 0 #0F172A, 0 0 18px 6px rgba(47,124,255,0.4); }
+        }
+        .atl-cta-btn { animation: atl-pulse-glow 2.8s ease-in-out infinite; }
+
+        .atl-reveal { opacity: 0; }
+        .atl-reveal-bottom { transform: translateY(40px); }
+        .atl-reveal-left   { transform: translateX(-40px); }
+        .atl-reveal-right  { transform: translateX(40px); }
+        .atl-revealed {
+          animation: atl-fade-in 0.65s cubic-bezier(0.22,1,0.36,1) forwards;
+        }
+        @keyframes atl-fade-in {
+          to { opacity: 1; transform: translate(0,0); }
+        }
       `}</style>
 
       {/* ── NAV ──────────────────────────────────────────────────────────── */}
@@ -254,24 +320,24 @@ const Index = () => {
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative">
           {/* left: copy */}
           <div>
-            <span className={TAG} style={{ background: C.cyan }}>
+            <span className={`${TAG} atl-hero-in`} style={{ background: C.cyan, animationDelay: "100ms" }}>
               <Zap className="w-3.5 h-3.5" /> Malaysia's #1 study sidekick
             </span>
             <h1
-              className={`${DISPLAY} font-extrabold mt-5 leading-[0.95]`}
-              style={{ fontSize: "clamp(44px,7vw,96px)" }}
+              className={`${DISPLAY} font-extrabold mt-5 leading-[0.95] atl-hero-in`}
+              style={{ fontSize: "clamp(44px,7vw,96px)", animationDelay: "220ms" }}
             >
               Learn stuff.<br />
               <span className="atl-underline">Ace quizzes.</span><br />
               <span style={{ color: C.blue }}>Have Fun</span><br />
               doing it!
             </h1>
-            <p className="mt-6 text-lg md:text-xl max-w-xl font-medium">
+            <p className="mt-6 text-lg md:text-xl max-w-xl font-medium atl-hero-in" style={{ animationDelay: "380ms" }}>
               AceTerus turns studying into a game you actually want to play. Quizzes, streaks, squads, and an AI companion — all in one platform. Built for Malaysian students, powered by AI.
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-8 flex flex-wrap gap-4 atl-hero-in" style={{ animationDelay: "500ms" }}>
               <Link to="/auth">
-                <button className={`${BTN} text-white`} style={{ background: C.blue }}>
+                <button className={`${BTN} text-white atl-cta-btn`} style={{ background: C.blue }}>
                   Start my quest <Rocket className="w-5 h-5" />
                 </button>
               </Link>
@@ -281,10 +347,10 @@ const Index = () => {
                 </button>
               </a>
             </div>
-            <div className="mt-8 flex items-center gap-3">
+            <div className="mt-8 flex items-center gap-3 atl-hero-in" style={{ animationDelay: "620ms" }}>
               <div className="flex -space-x-2">
                 {[C.cyan, C.blue, C.indigo, C.sun].map((c, i) => (
-                  <div key={i} className="w-9 h-9 rounded-full border-[3px] border-[#0F172A]" style={{ background: c }} />
+                  <div key={i} className="w-9 h-9 rounded-full border-[3px] border-[#0F172A] atl-pop-in" style={{ background: c, animationDelay: `${680 + i * 80}ms` }} />
                 ))}
               </div>
               <p className="font-bold text-sm">Join students already levelling up today</p>
@@ -292,7 +358,7 @@ const Index = () => {
           </div>
 
           {/* right: mascot cluster */}
-          <div className="relative h-[520px] atl-mascot-wrap">
+          <div className="relative h-[520px] atl-mascot-wrap atl-hero-in" style={{ animationDelay: "300ms" }}>
             {/* wobbling circle */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div
@@ -358,20 +424,21 @@ const Index = () => {
               { Icon: Users,    label: "Squad Mode",      sub: "no one studies alone",   bg: C.blue,       text: "#fff", shadow: "rgba(0,0,0,0.25)" },
               { Icon: Trophy,   label: "Leaderboards",   sub: "flex on your classmates", bg: C.sun,        text: C.ink,  shadow: "rgba(0,0,0,0.25)" },
               { Icon: Sparkles, label: "Smart Quizzes",  sub: "adaptive to your level",  bg: C.pop,        text: "#fff", shadow: "rgba(0,0,0,0.25)" },
-            ] as { Icon: React.ElementType; label: string; sub: string; bg: string; text: string; shadow: string }[]).map(({ Icon, label, sub, bg, text }) => (
-              <div
-                key={label}
-                className="atl-pill-hover flex items-center gap-3 px-5 py-3.5 rounded-[20px] border-[3px] border-[#0F172A] shadow-[5px_5px_0_0_rgba(255,255,255,0.25)]"
-                style={{ background: bg, color: text }}
-              >
-                <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] bg-white/20 flex items-center justify-center shrink-0">
-                  <Icon className="w-4.5 h-4.5" style={{ color: text }} />
+            ] as { Icon: React.ElementType; label: string; sub: string; bg: string; text: string; shadow: string }[]).map(({ Icon, label, sub, bg, text }, i) => (
+              <Reveal key={label} delay={i * 80} from="bottom">
+                <div
+                  className="atl-pill-hover flex items-center gap-3 px-5 py-3.5 rounded-[20px] border-[3px] border-[#0F172A] shadow-[5px_5px_0_0_rgba(255,255,255,0.25)]"
+                  style={{ background: bg, color: text }}
+                >
+                  <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] bg-white/20 flex items-center justify-center shrink-0">
+                    <Icon className="w-4.5 h-4.5" style={{ color: text }} />
+                  </div>
+                  <div>
+                    <div className={`${DISPLAY} font-extrabold text-sm leading-none`}>{label}</div>
+                    <div className="text-[10px] font-bold opacity-75 mt-0.5">{sub}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className={`${DISPLAY} font-extrabold text-sm leading-none`}>{label}</div>
-                  <div className="text-[10px] font-bold opacity-75 mt-0.5">{sub}</div>
-                </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -380,12 +447,14 @@ const Index = () => {
       {/* ── FEATURE GRID ─────────────────────────────────────────────────── */}
       <section id="play" className="px-5 py-24">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <span className={TAG} style={{ background: C.cyan }}>What's inside</span>
-            <h2 className={`${DISPLAY} font-extrabold mt-4 leading-none`} style={{ fontSize: "clamp(36px,5vw,64px)" }}>
-              Your new favourite<br />study kit 🎒
-            </h2>
-          </div>
+          <Reveal from="bottom">
+            <div className="text-center mb-14">
+              <span className={TAG} style={{ background: C.cyan }}>What's inside</span>
+              <h2 className={`${DISPLAY} font-extrabold mt-4 leading-none`} style={{ fontSize: "clamp(36px,5vw,64px)" }}>
+                Your new favourite<br />study kit 🎒
+              </h2>
+            </div>
+          </Reveal>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {([
               { t: "Brainy quizzes",    d: "Bite-sized quizzes across every subject that feel like mini-games. Make your own or grab ones from the community.",               Icon: Brain,    cardBg: C.cyan,       blob: C.blue,   iconColor: "#fff",  tilt: tiltL },
@@ -394,14 +463,16 @@ const Index = () => {
               { t: "Squad up",          d: "Pull your friends in. Study sessions, shared notes, group challenges. It's more fun when nobody falls behind alone.",            Icon: Users,    cardBg: C.skySoft,    blob: C.sun,    iconColor: C.ink,   tilt: tiltR },
               { t: "Drop your notes",   d: "Upload notes, get an AI-generated quiz. Centralise all your study materials in one place — zero tab-switching required.",        Icon: FileText, cardBg: C.indigoSoft, blob: C.blue,   iconColor: "#fff"             },
               { t: "Real rewards",      d: "Climb the leaderboard, collect badges, and unlock achievements. Motivation built right into the platform.",                      Icon: Trophy,   cardBg: C.blue,       blob: C.sun,    iconColor: C.ink,   tilt: tiltL, text: "#fff" },
-            ] as { t: string; d: string; Icon: React.ElementType; cardBg: string; blob: string; iconColor: string; text?: string; tilt?: React.CSSProperties }[]).map(({ t, d, Icon, cardBg, blob, iconColor, text, tilt }) => (
-              <div key={t} className={`${STICKER} p-6`} style={{ background: cardBg, color: text ?? C.ink, ...(tilt ?? {}) }}>
-                <IconBlob bg={blob}>
-                  <Icon className="w-[30px] h-[30px]" strokeWidth={2.5} style={{ color: iconColor }} />
-                </IconBlob>
-                <h3 className={`${DISPLAY} font-extrabold text-2xl mt-4`}>{t}</h3>
-                <p className="mt-2 font-medium">{d}</p>
-              </div>
+            ] as { t: string; d: string; Icon: React.ElementType; cardBg: string; blob: string; iconColor: string; text?: string; tilt?: React.CSSProperties }[]).map(({ t, d, Icon, cardBg, blob, iconColor, text, tilt }, i) => (
+              <Reveal key={t} delay={i * 100} from={i % 3 === 0 ? "left" : i % 3 === 2 ? "right" : "bottom"}>
+                <div className={`${STICKER} p-6 h-full`} style={{ background: cardBg, color: text ?? C.ink, ...(tilt ?? {}) }}>
+                  <IconBlob bg={blob}>
+                    <Icon className="w-[30px] h-[30px]" strokeWidth={2.5} style={{ color: iconColor }} />
+                  </IconBlob>
+                  <h3 className={`${DISPLAY} font-extrabold text-2xl mt-4`}>{t}</h3>
+                  <p className="mt-2 font-medium">{d}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -423,12 +494,14 @@ const Index = () => {
               { n: "1", c: C.cyan,   t: "Sign up free",      d: "Takes 30 seconds. No cards, no catches — just immediate access to your dashboard.", tilt: tiltL },
               { n: "2", c: C.blue,   t: "Pick your subjects", d: "Set your subjects, pace, and goals. Ace tailors quizzes and study plans just for you." },
               { n: "3", c: C.indigo, t: "Start acing it",     d: "Play daily, crush streaks, collaborate with your squad, and flex on the leaderboard.", tilt: tiltR },
-            ] as { n: string; c: string; t: string; d: string; tilt?: React.CSSProperties }[]).map(({ n, c, t, d, tilt }) => (
-              <div key={n} className={`${STICKER} p-6 text-center`} style={tilt}>
-                <div className={`${DISPLAY} font-extrabold text-7xl`} style={{ color: c, WebkitTextStroke: `3px ${C.ink}` }}>{n}</div>
-                <h3 className={`${DISPLAY} font-extrabold text-2xl`}>{t}</h3>
-                <p className="font-medium mt-2">{d}</p>
-              </div>
+            ] as { n: string; c: string; t: string; d: string; tilt?: React.CSSProperties }[]).map(({ n, c, t, d, tilt }, i) => (
+              <Reveal key={n} delay={i * 120} from={i === 0 ? "left" : i === 2 ? "right" : "bottom"}>
+                <div className={`${STICKER} p-6 text-center`} style={tilt}>
+                  <div className={`${DISPLAY} font-extrabold text-7xl`} style={{ color: c, WebkitTextStroke: `3px ${C.ink}` }}>{n}</div>
+                  <h3 className={`${DISPLAY} font-extrabold text-2xl`}>{t}</h3>
+                  <p className="font-medium mt-2">{d}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -437,19 +510,22 @@ const Index = () => {
       {/* ── TESTIMONIALS ─────────────────────────────────────────────────── */}
       <section id="squad" className="px-5 py-24">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <span className={TAG} style={{ background: C.cyan }}>Real students</span>
-            <h2 className={`${DISPLAY} font-extrabold mt-4 leading-none`} style={{ fontSize: "clamp(36px,5vw,64px)" }}>
-              The squad loves it 💙
-            </h2>
-          </div>
+          <Reveal from="bottom">
+            <div className="text-center mb-14">
+              <span className={TAG} style={{ background: C.cyan }}>Real students</span>
+              <h2 className={`${DISPLAY} font-extrabold mt-4 leading-none`} style={{ fontSize: "clamp(36px,5vw,64px)" }}>
+                The squad loves it 💙
+              </h2>
+            </div>
+          </Reveal>
           <div className="grid md:grid-cols-3 gap-6">
             {([
               { q: "I used to juggle three different apps just to study. AceTerus replaced all of them — everything is finally in one place.", n: "Sarah L.",  r: "Undergraduate, KL",    bg: "#fff",   starColor: C.blue,   avBg: C.cyan,   tilt: tiltL },
               { q: "The streak system is evil in the best way. I literally cannot miss a day — and my grades actually went up.",              n: "Marcus T.", r: "Secondary School, PJ", bg: C.cyan,   starColor: C.indigo, avBg: C.indigo             },
               { q: "My study group of six meets on AceTerus every night now. It's basically TikTok but for actually passing your exams.",    n: "Mei Y.",    r: "Pre-U, Penang",        bg: C.indigo, starColor: C.sun,    avBg: C.sun,    tilt: tiltR, text: "#fff" },
             ] as { q: string; n: string; r: string; bg: string; starColor: string; avBg: string; tilt?: React.CSSProperties; text?: string }[]).map((x, i) => (
-              <div key={i} className={`${STICKER} p-6`} style={{ background: x.bg, color: x.text ?? C.ink, ...(x.tilt ?? {}) }}>
+              <Reveal key={i} delay={i * 110} from={i === 0 ? "left" : i === 2 ? "right" : "bottom"}>
+              <div className={`${STICKER} p-6`} style={{ background: x.bg, color: x.text ?? C.ink, ...(x.tilt ?? {}) }}>
                 <div className="flex items-center gap-1 text-xl" style={{ color: x.starColor }}>★★★★★</div>
                 <p className="mt-3 font-medium text-lg">"{x.q}"</p>
                 <div className="mt-5 flex items-center gap-3">
@@ -460,6 +536,7 @@ const Index = () => {
                   </div>
                 </div>
               </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -473,11 +550,13 @@ const Index = () => {
             { n: "Personalised", l: "adaptive AI study plans"     },
             { n: "Gamified",     l: "streaks, XP & challenges"    },
             { n: "4.9★",         l: "avg student rating"          },
-          ] as const).map((s) => (
-            <div key={s.n} className="atl-stat-item">
-              <div className={`${DISPLAY} font-extrabold text-4xl`}>{s.n}</div>
-              <div className="font-bold text-sm mt-1">{s.l}</div>
-            </div>
+          ] as const).map((s, i) => (
+            <Reveal key={s.n} delay={i * 90} from="bottom">
+              <div className="atl-stat-item">
+                <div className={`${DISPLAY} font-extrabold text-4xl`}>{s.n}</div>
+                <div className="font-bold text-sm mt-1">{s.l}</div>
+              </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -521,12 +600,15 @@ const Index = () => {
 
       {/* ── CTA ──────────────────────────────────────────────────────────── */}
       <section className="px-5 py-24">
+        <Reveal from="bottom">
         <div
           className={`${STICKER} max-w-4xl mx-auto p-12 text-center relative overflow-hidden text-white`}
           style={{ background: `linear-gradient(135deg, ${C.cyan} 0%, ${C.blue} 55%, ${C.indigo} 100%)` }}
         >
-          <Star     className="absolute" style={{ top: 20,    left:  30,  color: C.sun, fill: C.sun, width: 36, height: 36 }} />
-          <Sparkles className="absolute" style={{ bottom: 20, right: 30,  color: "#fff", width: 36, height: 36 }} />
+          <Star     className="absolute atl-float"  style={{ top: 20,    left:  30,  color: C.sun, fill: C.sun, width: 36, height: 36 }} />
+          <Sparkles className="absolute atl-float2" style={{ bottom: 20, right: 30,  color: "#fff", width: 36, height: 36 }} />
+          <Star     className="absolute atl-float3" style={{ bottom: 40, left:  60,  color: "#fff", fill: "#fff", width: 20, height: 20, opacity: 0.5 }} />
+          <Sparkles className="absolute atl-float"  style={{ top: 40,   right: 80,  color: C.sun,  width: 22, height: 22, opacity: 0.6 }} />
           <h2 className={`${DISPLAY} font-extrabold leading-none`} style={{ fontSize: "clamp(36px,6vw,72px)" }}>
             Ready to ace it?
           </h2>
@@ -542,6 +624,7 @@ const Index = () => {
             </Link>
           </div>
         </div>
+        </Reveal>
       </section>
 
       {/* ── FOOTER ───────────────────────────────────────────────────────── */}
