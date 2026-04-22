@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { AppSidebar } from "./components/AppSidebar";
 import { MobileNav } from "./components/MobileNav";
@@ -26,8 +26,33 @@ import MascotCompanion from "./components/MascotCompanion";
 import MascotGreeter from "./components/MascotGreeter";
 import MascotChat from "./components/MascotChat";
 import { useGoalReminders } from "./hooks/useGoalReminders";
+import { PomodoroProvider } from "./context/PomodoroContext";
+import { PomodoroFloatingWidget } from "./components/PomodoroFloatingWidget";
 
 const queryClient = new QueryClient();
+
+const AnimatedRoutes = () => {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="page-enter">
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/feed" element={<Feed />} />
+        <Route path="/quiz" element={<Quiz />} />
+        <Route path="/omr-scan" element={<OmrScanner />} />
+        <Route path="/ar-scanner" element={<ArScanner />} />
+        <Route path="/admin" element={<AdminQuiz />} />
+        <Route path="/materials" element={<Materials />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/:userId" element={<Profile />} />
+        <Route path="/discover" element={<Discover />} />
+        <Route path="/chat" element={<Chat />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </div>
+  );
+};
 
 const AppContent = () => {
   const { user } = useAuth();
@@ -49,23 +74,9 @@ const AppContent = () => {
         {user && <MascotGreeter />}
         {user && <MascotCompanion />}
         {user && <MascotChat />}
+        {user && <PomodoroFloatingWidget />}
         <main className={`flex-1 transition-all duration-300 ${user ? (sidebarCollapsed ? 'lg:pl-[70px]' : 'lg:pl-64') : ''}`}>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/feed" element={<Feed />} />
-            <Route path="/quiz" element={<Quiz />} />
-            <Route path="/omr-scan" element={<OmrScanner />} />
-            <Route path="/ar-scanner" element={<ArScanner />} />
-            <Route path="/admin" element={<AdminQuiz />} />
-            <Route path="/materials" element={<Materials />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/:userId" element={<Profile />} />
-            <Route path="/discover" element={<Discover />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/auth" element={<Auth />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AnimatedRoutes />
         </main>
       </div>
     </BrowserRouter>
@@ -78,11 +89,13 @@ const App = () => (
       <ChatNotificationsProvider>
         <NotificationsProvider>
           <MascotProvider>
+            <PomodoroProvider>
             <TooltipProvider>
               <Toaster />
               <Sonner />
               <AppContent />
             </TooltipProvider>
+            </PomodoroProvider>
           </MascotProvider>
         </NotificationsProvider>
       </ChatNotificationsProvider>

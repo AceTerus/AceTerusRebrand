@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes page-enter {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.99); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.page-enter {
+  animation: page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 *, *::before, *::after {
   cursor: url('/pointer.png'), auto;
 }

@@ -522,7 +522,7 @@ const Index = () => {
             {([
               { q: "I used to juggle three different apps just to study. AceTerus replaced all of them — everything is finally in one place.", n: "Sarah L.",  r: "Undergraduate, KL",    bg: "#fff",   starColor: C.blue,   avBg: C.cyan,   tilt: tiltL },
               { q: "The streak system is evil in the best way. I literally cannot miss a day — and my grades actually went up.",              n: "Marcus T.", r: "Secondary School, PJ", bg: C.cyan,   starColor: C.indigo, avBg: C.indigo             },
-              { q: "Comel gilaaaaa, macam main Game!",    n: "Yasmin Hanani",    r: "Bachelor Degree, UKM",        bg: C.indigo, starColor: C.sun,    avBg: C.sun,    tilt: tiltR, text: "#fff" },
+              { q: "Comel gilaaaaa, macam main Game! I will definitely use this kalau go back in time waktu tengah study SPM.",    n: "Yasmin Hanani",    r: "Undergraduate, UKM Bangi",        bg: C.indigo, starColor: C.sun,    avBg: C.sun,    tilt: tiltR, text: "#fff" },
             ] as { q: string; n: string; r: string; bg: string; starColor: string; avBg: string; tilt?: React.CSSProperties; text?: string }[]).map((x, i) => (
               <Reveal key={i} delay={i * 110} from={i === 0 ? "left" : i === 2 ? "right" : "bottom"}>
               <div className={`${STICKER} p-6`} style={{ background: x.bg, color: x.text ?? C.ink, ...(x.tilt ?? {}) }}>
