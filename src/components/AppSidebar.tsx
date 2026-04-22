@@ -1,9 +1,10 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, User, Search, LogOut, Compass, FileText, MessageCircle, ShieldCheck, ScanLine, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Search, LogOut, Compass, FileText, MessageCircle, ShieldCheck, ScanLine, ChevronLeft, ChevronRight, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import Logo from "../assets/logo.png";
 import { useChatNotifications } from "@/context/ChatNotificationsContext";
 import { NotificationsBell } from "@/components/NotificationsBell";
@@ -19,33 +20,49 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
   const { user, isAdmin, signOut } = useAuth();
   const { toast } = useToast();
   const { totalSenders } = useChatNotifications();
+  const [profileAvatar, setProfileAvatar] = useState<string | null>(null);
+  const [profileUsername, setProfileUsername] = useState<string | null>(null);
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + "/");
+
+  // Fetch uploaded avatar from profiles table
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("avatar_url, username")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.avatar_url) setProfileAvatar(data.avatar_url);
+        if (data?.username) setProfileUsername(data.username);
+      });
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
-    toast({
-      title: "Signed out",
-      description: "You have been successfully signed out.",
-    });
+    toast({ title: "Signed out", description: "You have been successfully signed out." });
   };
 
   const navItems = [
-    { href: "/feed", label: "Feed", icon: Compass },
-    { href: "/discover", label: "Discover", icon: Search },
+    { href: "/feed",       label: "Feed",       icon: Compass },
+    { href: "/discover",   label: "Discover",   icon: Search },
     {
       href: "/chat",
       label: "Chat",
       icon: MessageCircle,
       badge: totalSenders > 0 ? Math.min(totalSenders, 99) : undefined,
     },
-    { href: "/quiz", label: "Quiz", icon: BookOpen },
-    { href: "/materials", label: "Materials", icon: FileText },
+    { href: "/quiz",       label: "Quiz",       icon: BookOpen },
+    { href: "/materials",  label: "Materials",  icon: FileText },
     { href: "/ar-scanner", label: "AR Scanner", icon: ScanLine },
-    { href: "/profile", label: "Profile", icon: User },
     ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: ShieldCheck }] : []),
   ];
+
+  const avatarSrc = profileAvatar || user?.user_metadata?.avatar_url;
+  const displayName = profileUsername || user?.email?.split("@")[0] || "User";
+  const initials = displayName[0]?.toUpperCase() || "U";
 
   return (
     <aside
@@ -85,9 +102,6 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
                 }
               `}
             >
-              {/* Active indicator bar */}
-              {/* active indicator hidden — full card is now highlighted */}
-
               <div className="relative flex-shrink-0">
                 <Icon className={`w-6 h-6 ${active ? "stroke-[2.5]" : "stroke-[1.8]"}`} />
                 {item.badge && (
@@ -96,16 +110,13 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
                   </span>
                 )}
               </div>
-
-              {!collapsed && (
-                <span className="text-[17px] flex-1">{item.label}</span>
-              )}
+              {!collapsed && <span className="text-[17px] flex-1">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {/* Collapse toggle button */}
+      {/* Collapse toggle */}
       <div className={`px-3 pb-2 ${collapsed ? "flex justify-center" : ""}`}>
         <button
           onClick={() => onCollapseToggle(!collapsed)}
@@ -116,17 +127,16 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
         </button>
       </div>
 
-      {/* User Section at Bottom */}
+      {/* ── Profile + actions ── */}
       {user && (
-        <div className="border-t border-border pt-4 pb-4 px-3 space-y-2">
+        <div className="border-t border-border pt-3 pb-3 px-3">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
-              <Link to="/profile" title="Profile">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={user?.user_metadata?.avatar_url} />
-                  <AvatarFallback>
-                    {user?.email?.[0]?.toUpperCase() || "U"}
-                  </AvatarFallback>
+              {/* Profile avatar — links to profile */}
+              <Link to="/profile" title={displayName}>
+                <Avatar className={`h-9 w-9 border-2 border-[#0F172A]/20 transition-all hover:border-[#0F172A]/50 ${isActive("/profile") ? "ring-2 ring-primary ring-offset-1" : ""}`}>
+                  <AvatarImage src={avatarSrc} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">{initials}</AvatarFallback>
                 </Avatar>
               </Link>
               <NotificationsBell />
@@ -139,32 +149,43 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               </button>
             </div>
           ) : (
-            <>
-              <div className="flex items-center gap-2">
-                <Link to="/profile" className="flex items-center space-x-3 px-2 py-2 rounded-xl hover:bg-muted/60 transition-all flex-1 min-w-0">
-                  <Avatar className="h-9 w-9 shrink-0">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} />
-                    <AvatarFallback>
-                      {user?.email?.[0]?.toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">
-                      {user?.email?.split("@")[0] || "User"}
-                    </p>
-                  </div>
-                </Link>
-                <NotificationsBell />
-              </div>
-              <Button
-                variant="ghost"
-                onClick={handleSignOut}
-                className="w-full justify-start space-x-2 hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground"
+            <div className="space-y-1">
+              {/* Profile card — merged nav + avatar */}
+              <Link
+                to="/profile"
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group
+                  ${isActive("/profile")
+                    ? "bg-primary text-white font-bold shadow-[3px_3px_0_0_#0F172A] border-2 border-[#0F172A] -translate-y-0.5"
+                    : "hover:bg-muted/60 hover:-translate-y-0.5"
+                  }`}
               >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
-              </Button>
-            </>
+                <Avatar className={`h-9 w-9 shrink-0 border-2 transition-all
+                  ${isActive("/profile") ? "border-white/40" : "border-[#0F172A]/20 group-hover:border-[#0F172A]/40"}`}>
+                  <AvatarImage src={avatarSrc} />
+                  <AvatarFallback className={`font-bold text-sm ${isActive("/profile") ? "bg-white/20 text-white" : "bg-primary/10 text-primary"}`}>
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[15px] font-semibold truncate leading-tight ${isActive("/profile") ? "text-white" : ""}`}>
+                    {displayName}
+                  </p>
+                  <p className={`text-[11px] truncate mt-0.5 flex items-center gap-1 ${isActive("/profile") ? "text-white/70" : "text-muted-foreground"}`}>
+                    <User className="w-3 h-3 shrink-0" /> View profile
+                  </p>
+                </div>
+                <NotificationsBell />
+              </Link>
+
+              {/* Sign out */}
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-all duration-150 hover:-translate-y-0.5"
+              >
+                <LogOut className="w-5 h-5 shrink-0" />
+                <span className="text-[15px]">Sign Out</span>
+              </button>
+            </div>
           )}
         </div>
       )}
