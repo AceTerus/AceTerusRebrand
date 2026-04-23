@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { SignInGate } from "@/components/SignInGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -207,13 +208,7 @@ export const Feed = () => {
     setTouchStartX(null);
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <p className="font-semibold text-slate-500">Please sign in to view your feed</p>
-      </div>
-    );
-  }
+  if (!user) return <SignInGate message="Please sign in to view your feed." />;
 
   const currentLightboxPost = lightboxPostId ? posts.find((p) => p.id === lightboxPostId) : null;
   const currentLightboxImage = currentLightboxPost?.images?.[lightboxIndex];

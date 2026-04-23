@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SignInGate } from '@/components/SignInGate';
 import { createPortal } from 'react-dom';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -88,6 +89,7 @@ export const Profile = () => {
   const [isFollowersOpen, setIsFollowersOpen] = useState(false);
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const profileUserId = userId || user?.id;
   const isOwnProfile = !userId || userId === user?.id;
@@ -116,9 +118,9 @@ export const Profile = () => {
           .insert({ user_id: profileUserId, username: user.email?.split('@')[0] || 'Anonymous' })
           .select().single();
         if (createError) { console.error(createError); return; }
-        setProfile(newProfile);
+        setProfile(newProfile as unknown as Profile);
       } else {
-        setProfile(data);
+        setProfile(data as unknown as Profile);
         setEditUsername(data.username || '');
         setEditBio(data.bio || '');
       }
@@ -143,7 +145,7 @@ export const Profile = () => {
         if (error) throw error;
         coverUrl = supabase.storage.from('profile-images').getPublicUrl(filePath).data.publicUrl;
       }
-      const { error } = await supabase.from('profiles').update({ username: editUsername, bio: editBio, avatar_url: avatarUrl, cover_url: coverUrl }).eq('user_id', user.id);
+      const { error } = await (supabase.from('profiles') as any).update({ username: editUsername, bio: editBio, avatar_url: avatarUrl, cover_url: coverUrl }).eq('user_id', user.id);
       if (error) throw error;
       toast({ title: 'Profile updated!' });
       setIsEditDialogOpen(false);
@@ -192,7 +194,7 @@ export const Profile = () => {
     setIsSearching(true);
     try {
       const { data } = await supabase.from('profiles').select('*').ilike('username', `%${query}%`).neq('user_id', user?.id || '').limit(10);
-      setSearchResults(data || []);
+      setSearchResults((data || []) as unknown as Profile[]);
     } catch (e) { console.error(e); }
     finally { setIsSearching(false); }
   };
@@ -233,15 +235,7 @@ export const Profile = () => {
     setQuizHistoryLoading(false);
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center">
-        <div className={`${CARD} p-8 text-center`}>
-          <p className="font-semibold text-slate-400">Please sign in to view your profile.</p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return <SignInGate message="Please sign in to view your profile." />;
 
   const displayName = profile?.username || user?.email?.split('@')[0] || 'Anonymous';
 
@@ -282,7 +276,7 @@ export const Profile = () => {
                   const { error } = await supabase.storage.from('profile-images').upload(filePath, file, { upsert: true });
                   if (error) { toast({ title: 'Error', description: 'Failed to upload cover', variant: 'destructive' }); return; }
                   const { data: { publicUrl } } = supabase.storage.from('profile-images').getPublicUrl(filePath);
-                  await supabase.from('profiles').update({ cover_url: publicUrl }).eq('user_id', user.id);
+                  await (supabase.from('profiles') as any).update({ cover_url: publicUrl }).eq('user_id', user.id);
                   setProfile((prev) => prev ? { ...prev, cover_url: publicUrl } : prev);
                   toast({ title: 'Cover photo updated!' });
                 }} />
@@ -578,9 +572,9 @@ export const Profile = () => {
               {isOwnProfile && <PostUpload onPostCreated={fetchPosts} />}
 
               {isLoading ? (
-                <div className={CARD}>
-                  <div className="p-5 space-y-3">
-                    {[1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-[14px]" />)}
+                <div className={`${CARD} p-1`}>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="aspect-square w-full rounded-none" />)}
                   </div>
                 </div>
               ) : posts.length === 0 ? (
@@ -592,64 +586,38 @@ export const Profile = () => {
                   {isOwnProfile && <p className="text-sm font-semibold text-slate-400">Create your first post above!</p>}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {posts.map((post) => {
-                    const hasGalleryImages = !!(post.images && post.images.length);
-                    const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(!hasGalleryImages && post.image_url ? [post.image_url] : []);
-                    return (
-                      <article key={post.id} className={`${CARD}`}>
-                        {/* Header */}
-                        <div className="flex items-center gap-3 px-4 py-3">
-                          <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A] flex-shrink-0">
-                            <AvatarImage src={profile?.avatar_url || undefined} />
-                            <AvatarFallback className={`${DISPLAY} font-extrabold text-sm`} style={{ background: C.cyan, color: C.ink }}>
-                              {displayName[0]?.toUpperCase() || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className={`${DISPLAY} font-extrabold text-sm leading-tight truncate`}>{displayName}</p>
-                            <p className="text-[11px] font-semibold text-slate-500">
-                              {new Date(post.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </p>
-                          </div>
-                          {isOwnProfile && (
-                            <button
-                              onClick={() => deletePost(post.id)}
-                              className="h-8 w-8 rounded-full border-[2px] border-[#0F172A]/20 bg-white/70 flex items-center justify-center hover:border-red-300 hover:bg-red-50 transition-colors flex-shrink-0"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-slate-400" />
-                            </button>
+                <div className={`${CARD} overflow-hidden`}>
+                  <div className="flex items-center gap-2 px-4 py-3 border-b-[2px] border-[#0F172A]/10">
+                    <PenLine className="w-4 h-4" style={{ color: C.indigo }} />
+                    <p className={`${DISPLAY} font-extrabold text-sm`}>Posts</p>
+                    <span className="ml-auto text-xs font-bold text-slate-400">{posts.length}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-[2px] bg-[#0F172A]/10">
+                    {posts.map((post) => {
+                      const thumb = post.images?.[0]?.file_url ?? post.image_url ?? null;
+                      return (
+                        <button
+                          key={post.id}
+                          className="aspect-square relative overflow-hidden group cursor-pointer bg-slate-100 focus:outline-none"
+                          onClick={() => setSelectedPostId(post.id)}
+                        >
+                          {thumb ? (
+                            <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center p-2" style={{ background: C.indigoSoft }}>
+                              <p className="text-[11px] font-bold text-center text-slate-600 line-clamp-4 leading-tight">{post.content}</p>
+                            </div>
                           )}
-                        </div>
-
-                        {gallery.length > 0 && (
-                          <div className="border-y-[2px] border-[#0F172A]/10">
-                            <PostImageCarousel images={gallery} onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined} />
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
+                            <span className="text-white font-extrabold text-sm flex items-center gap-1">
+                              <PenLine className="w-4 h-4" /> {post.likes_count}
+                            </span>
                           </div>
-                        )}
-
-                        <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
-                          <LikeButton postId={post.id} likesCount={post.likes_count} onLikeChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, likes_count: n } : p))} />
-                          <CommentSection postId={post.id} commentsCount={post.comments_count} onCommentChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: n } : p))} />
-                        </div>
-
-                        {post.content && (
-                          <p className="px-4 pb-2 text-sm font-medium leading-snug">
-                            <span className={`${DISPLAY} font-extrabold mr-1.5`}>{displayName}</span>
-                            {post.content}
-                          </p>
-                        )}
-
-                        {post.tags.length > 0 && (
-                          <div className="px-4 pb-3 flex flex-wrap gap-x-2 gap-y-1">
-                            {post.tags.map((tag, i) => (
-                              <span key={i} className="text-xs font-bold" style={{ color: C.indigo }}>#{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </>
@@ -679,6 +647,88 @@ export const Profile = () => {
         </div>,
         document.body
       )}
+
+      {/* ── Expanded post modal (Instagram-style) ── */}
+      {selectedPostId && (() => {
+        const post = posts.find((p) => p.id === selectedPostId);
+        if (!post) return null;
+        const hasGalleryImages = !!(post.images && post.images.length);
+        const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(!hasGalleryImages && post.image_url ? [post.image_url] : []);
+        return createPortal(
+          <div
+            className="fixed inset-0 z-[55] flex items-center justify-center px-4"
+            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+            onClick={() => setSelectedPostId(null)}
+          >
+            <div
+              className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto border-[2.5px] border-[#0F172A] rounded-[24px] shadow-[6px_6px_0_0_#0F172A] bg-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b-[2px] border-[#0F172A]/10 sticky top-0 bg-white z-10">
+                <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A] flex-shrink-0">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className={`${DISPLAY} font-extrabold text-sm`} style={{ background: C.cyan, color: C.ink }}>
+                    {displayName[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className={`${DISPLAY} font-extrabold text-sm leading-tight`}>{displayName}</p>
+                  <p className="text-[11px] font-semibold text-slate-400">
+                    {new Date(post.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => { deletePost(post.id); setSelectedPostId(null); }}
+                    className="h-8 w-8 rounded-full border-[2px] border-[#0F172A]/20 bg-white flex items-center justify-center hover:border-red-300 hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-slate-400" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedPostId(null)}
+                  className="h-8 w-8 rounded-full border-[2px] border-[#0F172A]/20 bg-white flex items-center justify-center hover:bg-slate-50 transition-colors ml-1"
+                  aria-label="Close"
+                >
+                  <span className="text-slate-400 text-base leading-none">✕</span>
+                </button>
+              </div>
+
+              {/* Image */}
+              {gallery.length > 0 && (
+                <div className="border-b-[2px] border-[#0F172A]/10">
+                  <PostImageCarousel images={gallery} onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined} />
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
+                <LikeButton postId={post.id} likesCount={post.likes_count} onLikeChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, likes_count: n } : p))} />
+                <CommentSection postId={post.id} commentsCount={post.comments_count} onCommentChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: n } : p))} />
+              </div>
+
+              {/* Caption */}
+              {post.content && (
+                <p className="px-4 pb-2 text-sm font-medium leading-snug">
+                  <span className={`${DISPLAY} font-extrabold mr-1.5`}>{displayName}</span>
+                  {post.content}
+                </p>
+              )}
+
+              {/* Tags */}
+              {post.tags.length > 0 && (
+                <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">
+                  {post.tags.map((tag, i) => (
+                    <span key={i} className="text-xs font-bold" style={{ color: C.indigo }}>#{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* ── Post image lightbox ── */}
       {lightboxPostId && (() => {
