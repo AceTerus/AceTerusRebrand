@@ -560,15 +560,18 @@ const Quiz = () => {
                 )}
 
                 {loadingDecks ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="border-[2px] border-[#0F172A] rounded-[16px] shadow-[2px_2px_0_0_#0F172A] bg-white p-4 flex items-center gap-4">
-                        <Skeleton className="w-11 h-11 rounded-[13px] shrink-0" />
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="h-4 w-36 rounded-lg" />
-                          <Skeleton className="h-3 w-24 rounded-lg" />
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[3px_3px_0_0_#0F172A] bg-white overflow-hidden">
+                        <Skeleton className="h-[100px] w-full rounded-none" />
+                        <div className="p-4 space-y-2">
+                          <Skeleton className="h-4 w-28 rounded-lg" />
+                          <Skeleton className="h-3 w-20 rounded-lg" />
+                          <div className="flex gap-1 pt-1">
+                            <Skeleton className="h-5 w-16 rounded-full" />
+                            <Skeleton className="h-5 w-16 rounded-full" />
+                          </div>
                         </div>
-                        <Skeleton className="w-20 h-8 rounded-full shrink-0" />
                       </div>
                     ))}
                   </div>
@@ -583,7 +586,7 @@ const Quiz = () => {
                     <button onClick={() => setCategorySearch("")} className="mt-3 text-xs font-bold underline" style={{ color: C.blue }}>Clear search</button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {visibleCategories.map((cat, i) => {
                       const catImage = getCategoryImage(cat.name);
                       const accentColors = [C.cyan, C.blue, C.indigo, C.sun, C.pop, "#22c55e", "#f59e0b", "#ec4899"];
@@ -594,54 +597,56 @@ const Quiz = () => {
                           key={cat.name}
                           disabled={isEmpty}
                           onClick={() => { if (!isEmpty) { setSelectedCategory(cat.name); setView("decks"); } }}
-                          className={`w-full text-left border-[2.5px] border-[#0F172A] rounded-[18px] bg-white transition-all duration-150 atl-fade-up flex items-center gap-4 px-4 py-3 group
-                            ${isEmpty ? "opacity-60 cursor-not-allowed shadow-[2px_2px_0_0_#0F172A]" : "shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[4px_5px_0_0_#0F172A] cursor-pointer"}`}
+                          className={`text-left border-[2.5px] border-[#0F172A] rounded-[20px] bg-white overflow-hidden atl-fade-up flex flex-col group
+                            ${isEmpty ? "opacity-60 cursor-not-allowed shadow-[2px_2px_0_0_#0F172A]" : "shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-1 hover:shadow-[6px_7px_0_0_#0F172A] cursor-pointer"} transition-all duration-200`}
                           style={{ animationDelay: `${i * 40}ms` }}
                         >
-                          {/* Thumbnail or color blob */}
-                          <div className="w-11 h-11 rounded-[13px] border-[2px] border-[#0F172A] shrink-0 overflow-hidden" style={{ boxShadow: "2px 2px 0 0 #0F172A" }}>
+                          {/* Cover image / accent banner */}
+                          <div className="relative h-[100px] w-full shrink-0 border-b-[2.5px] border-[#0F172A]">
                             {catImage
-                              ? <img src={catImage} alt={cat.name} className="w-full h-full object-cover" />
-                              : <div className="w-full h-full flex items-center justify-center" style={{ background: accent }}>
-                                  <BookOpenCheck className="w-5 h-5" style={{ color: accent === C.sun ? C.ink : "#fff" }} />
-                                </div>
+                              ? <img src={catImage} alt={cat.name} className="absolute inset-0 w-full h-full object-cover" />
+                              : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${accent}cc, ${accent})` }} />
                             }
+                            <div className="absolute inset-0 bg-black/20" />
+                            {/* Subject icon badge */}
+                            <div
+                              className="absolute bottom-3 left-3 w-10 h-10 rounded-[12px] border-[2px] border-white flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,0.3)]"
+                              style={{ background: accent }}
+                            >
+                              <BookOpenCheck className="w-5 h-5" style={{ color: accent === C.sun ? C.ink : "#fff" }} />
+                            </div>
                           </div>
 
-                          {/* Name + meta */}
-                          <div className="flex-1 min-w-0">
-                            <p className={`${DISPLAY} font-extrabold text-base leading-tight truncate`}>{cat.name}</p>
+                          {/* Card body */}
+                          <div className="p-4 flex flex-col flex-1">
+                            <p className={`${DISPLAY} font-extrabold text-base leading-tight mb-1`}>{cat.name}</p>
                             {isEmpty ? (
-                              <p className="text-xs font-semibold text-slate-400 mt-0.5">Coming soon</p>
+                              <p className="text-xs font-semibold text-slate-400">Coming soon</p>
                             ) : (
-                              <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                                {cat.decks.length} {cat.decks.length === 1 ? "quiz" : "quizzes"} · {cat.totalQuestions.toLocaleString()} questions
-                              </p>
+                              <>
+                                <p className="text-xs font-semibold text-slate-400 mb-3">
+                                  {cat.decks.length} {cat.decks.length === 1 ? "quiz" : "quizzes"} · {cat.totalQuestions.toLocaleString()} Qs
+                                </p>
+                                {/* Deck pills */}
+                                <div className="flex flex-wrap gap-1 mt-auto">
+                                  {cat.decks.slice(0, 3).map((d) => (
+                                    <span
+                                      key={d.id}
+                                      className="px-2 py-0.5 rounded-full border-[1.5px] border-[#0F172A] text-[10px] font-bold truncate max-w-[90px]"
+                                      style={{ background: C.skySoft }}
+                                    >
+                                      {d.name}
+                                    </span>
+                                  ))}
+                                  {cat.decks.length > 3 && (
+                                    <span className="px-2 py-0.5 rounded-full border-[1.5px] border-[#0F172A] text-[10px] font-bold" style={{ background: C.indigoSoft }}>
+                                      +{cat.decks.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              </>
                             )}
                           </div>
-
-                          {/* Right: deck pills (up to 3) + arrow */}
-                          {!isEmpty && (
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div className="hidden sm:flex gap-1">
-                                {cat.decks.slice(0, 3).map((d) => (
-                                  <span
-                                    key={d.id}
-                                    className="px-2 py-0.5 rounded-full border-[1.5px] border-[#0F172A] text-[10px] font-bold truncate max-w-[80px]"
-                                    style={{ background: C.skySoft }}
-                                  >
-                                    {d.name}
-                                  </span>
-                                ))}
-                                {cat.decks.length > 3 && (
-                                  <span className="px-2 py-0.5 rounded-full border-[1.5px] border-[#0F172A] text-[10px] font-bold" style={{ background: C.indigoSoft }}>
-                                    +{cat.decks.length - 3}
-                                  </span>
-                                )}
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#2F7CFF] transition-colors" />
-                            </div>
-                          )}
                         </button>
                       );
                     })}
@@ -1201,10 +1206,7 @@ const Quiz = () => {
           ════════════════════════════════════════════════════════════ */}
           <aside className="hidden lg:flex flex-col gap-4 sticky top-4">
 
-            {/* Today's Goal — always on top */}
-            <TodayGoalBanner onSetGoal={() => setShowGoalSheet(true)} />
-
-            {/* My Goals card */}
+            {/* Goals card — merged today's goal + open goals */}
             <div className={SIDE_CARD}>
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.blue }}>
@@ -1213,6 +1215,12 @@ const Quiz = () => {
                 <div>
                   <p className={`${DISPLAY} font-extrabold text-sm`}>My Goals</p>
                   <p className="text-xs font-semibold text-slate-400">Track your study plan</p>
+                </div>
+              </div>
+              {/* Today's goal inline — no separate card border */}
+              <div className="rounded-[14px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] overflow-hidden mb-3">
+                <div className="p-3">
+                  <TodayGoalBanner onSetGoal={() => setShowGoalSheet(true)} inline />
                 </div>
               </div>
               <button

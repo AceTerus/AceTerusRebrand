@@ -4,17 +4,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ChevronLeft, Loader2, MessageSquare, Search, Send, Users } from "lucide-react";
+import { ChevronLeft, Loader2, MessageSquare, Search, Send, Users, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { useChatNotifications } from "@/context/ChatNotificationsContext";
 import { fetchMutualFollowIds } from "@/hooks/useMutualFollow";
-import { UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
+
+/* ── brand ── */
+const C = {
+  cyan: '#3BD6F5', blue: '#2F7CFF', indigo: '#2E2BE5',
+  ink: '#0F172A', skySoft: '#DDF3FF', indigoSoft: '#D6D4FF',
+};
+const DISPLAY = "font-['Baloo_2'] tracking-tight";
 
 type ChatMessage = Tables<"chat_messages">;
 
@@ -66,38 +70,24 @@ export const Chat = () => {
   const [showContactsList, setShowContactsList] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
   const targetUserId = searchParams.get("userId");
 
   const fetchContacts = useCallback(async () => {
     if (!userId) return;
-
     setIsLoadingContacts(true);
     try {
-      // Only show mutual follows as chat contacts
       const mutualIds = await fetchMutualFollowIds(userId);
-
-      if (mutualIds.length === 0) {
-        setContacts([]);
-        setIsLoadingContacts(false);
-        return;
-      }
-
+      if (mutualIds.length === 0) { setContacts([]); setIsLoadingContacts(false); return; }
       const { data, error } = await supabase
         .from("profiles")
         .select("user_id, username, avatar_url")
         .in("user_id", mutualIds)
         .order("username", { ascending: true });
-
       if (error) throw error;
       setContacts(data || []);
     } catch (error) {
       console.error("Failed to load contacts", error);
-      toast({
-        title: "Unable to load contacts",
-        description: "Please try refreshing the page.",
-        variant: "destructive",
-      });
+      toast({ title: "Unable to load contacts", description: "Please try refreshing the page.", variant: "destructive" });
     } finally {
       setIsLoadingContacts(false);
     }
@@ -105,14 +95,9 @@ export const Chat = () => {
 
   const fetchCurrentProfile = useCallback(async () => {
     if (!userId) return;
-
     try {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, username, avatar_url")
-        .eq("user_id", userId)
-        .single();
-
+        .from("profiles").select("user_id, username, avatar_url").eq("user_id", userId).single();
       if (error) throw error;
       setCurrentProfile(data);
     } catch (error) {
@@ -120,90 +105,49 @@ export const Chat = () => {
     }
   }, [userId]);
 
-  const fetchMessages = useCallback(
-    async (contactId: string) => {
-      if (!userId) return;
-      setIsLoadingMessages(true);
+  const fetchMessages = useCallback(async (contactId: string) => {
+    if (!userId) return;
+    setIsLoadingMessages(true);
+    try {
+      const { data, error } = await supabase
+        .from("chat_messages").select("*")
+        .or(`and(sender_id.eq.${userId},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${userId})`)
+        .order("created_at", { ascending: true }).limit(200);
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      console.error("Failed to load conversation", error);
+      toast({ title: "Unable to load chat", description: "Please try selecting the chat again.", variant: "destructive" });
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, [toast, userId]);
 
-      try {
-        const { data, error } = await supabase
-          .from("chat_messages")
-          .select("*")
-          .or(
-            `and(sender_id.eq.${userId},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${userId})`
-          )
-          .order("created_at", { ascending: true })
-          .limit(200);
-
-        if (error) throw error;
-        setMessages(data || []);
-      } catch (error) {
-        console.error("Failed to load conversation", error);
-        toast({
-          title: "Unable to load chat",
-          description: "Please try selecting the chat again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingMessages(false);
-      }
-    },
-    [toast, userId]
-  );
-
-  const updateConversationPreview = useCallback(
-    (message: ChatMessage) => {
-      if (!userId) return;
-
-      const otherUserId =
-        message.sender_id === userId ? message.receiver_id : message.sender_id;
-
-      setConversationPreviews((prev) => {
-        const prevEntry = prev[otherUserId];
-        if (prevEntry && new Date(prevEntry.lastTimestamp) > new Date(message.created_at)) {
-          return prev;
-        }
-
-        return {
-          ...prev,
-          [otherUserId]: {
-            lastMessage: message.content,
-            lastTimestamp: message.created_at,
-            isUserSender: message.sender_id === userId,
-          },
-        };
-      });
-    },
-    [userId]
-  );
+  const updateConversationPreview = useCallback((message: ChatMessage) => {
+    if (!userId) return;
+    const otherUserId = message.sender_id === userId ? message.receiver_id : message.sender_id;
+    setConversationPreviews((prev) => {
+      const prevEntry = prev[otherUserId];
+      if (prevEntry && new Date(prevEntry.lastTimestamp) > new Date(message.created_at)) return prev;
+      return { ...prev, [otherUserId]: { lastMessage: message.content, lastTimestamp: message.created_at, isUserSender: message.sender_id === userId } };
+    });
+  }, [userId]);
 
   const fetchConversationPreviews = useCallback(async () => {
     if (!userId) return;
-
     try {
       const { data, error } = await supabase
-        .from("chat_messages")
-        .select("*")
+        .from("chat_messages").select("*")
         .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .order("created_at", { ascending: false })
-        .limit(200);
-
+        .order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
-
       const previews: ConversationPreview = {};
       (data || []).forEach((message) => {
-        const otherUserId =
-          message.sender_id === userId ? message.receiver_id : message.sender_id;
-
+        const otherUserId = message.sender_id === userId ? message.receiver_id : message.sender_id;
         if (!previews[otherUserId]) {
-          previews[otherUserId] = {
-            lastMessage: message.content,
-            lastTimestamp: message.created_at,
-            isUserSender: message.sender_id === userId,
-          };
+          previews[otherUserId] = { lastMessage: message.content, lastTimestamp: message.created_at, isUserSender: message.sender_id === userId };
         }
       });
-
       setConversationPreviews(previews);
     } catch (error) {
       console.error("Failed to load conversation previews", error);
@@ -212,15 +156,11 @@ export const Chat = () => {
 
   useEffect(() => {
     if (!userId) return;
-    fetchContacts();
-    fetchCurrentProfile();
-    fetchConversationPreviews();
+    fetchContacts(); fetchCurrentProfile(); fetchConversationPreviews();
   }, [fetchContacts, fetchConversationPreviews, fetchCurrentProfile, userId]);
 
   useEffect(() => {
-    if (selectedContact) {
-      clearUnread(selectedContact.user_id);
-    }
+    if (selectedContact) clearUnread(selectedContact.user_id);
   }, [selectedContact, clearUnread]);
 
   useEffect(() => {
@@ -231,132 +171,75 @@ export const Chat = () => {
 
   useEffect(() => {
     if (!userId) return;
-
-    const channel = supabase
-      .channel(`chat-realtime-${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages" },
-        (payload) => {
-          const newMessage = payload.new as ChatMessage;
-
-          const involvesUser =
-            newMessage.sender_id === userId || newMessage.receiver_id === userId;
-
-          if (!involvesUser) return;
-
-          updateConversationPreview(newMessage);
-
-          if (
-            selectedContact &&
-            (newMessage.sender_id === selectedContact.user_id ||
-              newMessage.receiver_id === selectedContact.user_id)
-          ) {
-            if (newMessage.sender_id !== userId) {
-              clearUnread(newMessage.sender_id);
-            }
-            setMessages((prev) => [...prev, newMessage]);
-          }
+    const channel = supabase.channel(`chat-realtime-${userId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (payload) => {
+        const newMessage = payload.new as ChatMessage;
+        const involvesUser = newMessage.sender_id === userId || newMessage.receiver_id === userId;
+        if (!involvesUser) return;
+        updateConversationPreview(newMessage);
+        if (selectedContact && (newMessage.sender_id === selectedContact.user_id || newMessage.receiver_id === selectedContact.user_id)) {
+          if (newMessage.sender_id !== userId) clearUnread(newMessage.sender_id);
+          setMessages((prev) => [...prev, newMessage]);
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [clearUnread, selectedContact, updateConversationPreview, userId]);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [messages, selectedContact]);
 
   useEffect(() => {
     if (!contacts.length) return;
-
     if (targetUserId) {
-      const match = contacts.find((contact) => contact.user_id === targetUserId);
-      if (match && (!selectedContact || selectedContact.user_id !== match.user_id)) {
-        setSelectedContact(match);
-        return;
-      }
+      const match = contacts.find((c) => c.user_id === targetUserId);
+      if (match && (!selectedContact || selectedContact.user_id !== match.user_id)) { setSelectedContact(match); return; }
     }
-
-    if (!selectedContact) {
-      setSelectedContact(contacts[0]);
-    }
+    if (!selectedContact) setSelectedContact(contacts[0]);
   }, [contacts, selectedContact, targetUserId]);
 
   const filteredContacts = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return contacts;
-    return contacts.filter((contact) =>
-      getDisplayName(contact).toLowerCase().includes(query)
-    );
+    return contacts.filter((c) => getDisplayName(c).toLowerCase().includes(query));
   }, [contacts, searchTerm]);
 
-  // Sort: conversations with recent messages first, then alphabetical
   const sortedContacts = useMemo(() => {
     return [...filteredContacts].sort((a, b) => {
-      const aPreview = conversationPreviews[a.user_id];
-      const bPreview = conversationPreviews[b.user_id];
-      if (aPreview && !bPreview) return -1;
-      if (!aPreview && bPreview) return 1;
-      if (aPreview && bPreview) {
-        return (
-          new Date(bPreview.lastTimestamp).getTime() -
-          new Date(aPreview.lastTimestamp).getTime()
-        );
-      }
+      const aP = conversationPreviews[a.user_id];
+      const bP = conversationPreviews[b.user_id];
+      if (aP && !bP) return -1;
+      if (!aP && bP) return 1;
+      if (aP && bP) return new Date(bP.lastTimestamp).getTime() - new Date(aP.lastTimestamp).getTime();
       return getDisplayName(a).localeCompare(getDisplayName(b));
     });
   }, [filteredContacts, conversationPreviews]);
 
-  // Group messages by date
   const groupedMessages = useMemo(() => {
     const groups: { date: string; messages: ChatMessage[] }[] = [];
     messages.forEach((msg) => {
       const label = getDateLabel(msg.created_at);
       const last = groups[groups.length - 1];
-      if (last && last.date === label) {
-        last.messages.push(msg);
-      } else {
-        groups.push({ date: label, messages: [msg] });
-      }
+      if (last && last.date === label) { last.messages.push(msg); }
+      else { groups.push({ date: label, messages: [msg] }); }
     });
     return groups;
   }, [messages]);
 
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedContact || !userId) return;
-
     setIsSending(true);
     const content = messageInput.trim();
-
     try {
-      const { error, data } = await supabase
-        .from("chat_messages")
-        .insert({
-          content,
-          sender_id: userId,
-          receiver_id: selectedContact.user_id,
-        })
-        .select()
-        .single();
-
+      const { error, data } = await supabase.from("chat_messages")
+        .insert({ content, sender_id: userId, receiver_id: selectedContact.user_id })
+        .select().single();
       if (error) throw error;
       setMessageInput("");
-      if (data) {
-        updateConversationPreview(data);
-      }
+      if (data) updateConversationPreview(data);
     } catch (error) {
       console.error("Failed to send message", error);
-      toast({
-        title: "Message not sent",
-        description: "Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Message not sent", description: "Please try again.", variant: "destructive" });
     } finally {
       setIsSending(false);
     }
@@ -370,79 +253,90 @@ export const Chat = () => {
   };
 
   const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      handleSendMessage();
-    }
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); handleSendMessage(); }
   };
 
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: C.indigo }} />
       </div>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
+  if (!user) return <Navigate to="/auth" replace />;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] lg:h-screen w-full overflow-hidden bg-transparent">
+
       {/* ── Left panel: contacts ── */}
-      <div className={`${showContactsList ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 flex-shrink-0 flex-col border-r bg-muted/20`}>
+      <div className={`${showContactsList ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 flex-shrink-0 flex-col bg-white border-r-[2.5px] border-[#0F172A]`}>
+
         {/* Panel header */}
-        <div className="border-b px-5 py-4">
-          <h1 className="text-base font-semibold tracking-tight">Messages</h1>
-          {!isLoadingContacts && (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {contacts.length} {contacts.length === 1 ? "member" : "members"} available
-            </p>
-          )}
+        <div className="border-b-[2.5px] border-[#0F172A] px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-8 h-8 rounded-[10px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0"
+              style={{ background: C.indigo }}
+            >
+              <MessageSquare className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h1 className={`${DISPLAY} font-extrabold text-lg leading-tight`}>Messages</h1>
+              {!isLoadingContacts && (
+                <p className="text-[11px] font-semibold text-slate-400">
+                  {contacts.length} {contacts.length === 1 ? "connection" : "connections"}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Search */}
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 border-b-[2px] border-[#0F172A]/10">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search members..."
-              className="h-9 border-border/60 bg-background pl-9 text-sm"
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: C.indigo }} />
+            <input
+              placeholder="Search contacts..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm font-semibold border-[2px] border-[#0F172A] rounded-full shadow-[1px_1px_0_0_#0F172A] bg-white outline-none focus:shadow-[2px_2px_0_0_#0F172A] transition-shadow placeholder:text-slate-400"
             />
           </div>
         </div>
 
         {/* Contact list */}
-        <div className="flex-1 overflow-y-auto px-2 pb-4 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-hide">
           {isLoadingContacts ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <Loader2 className="h-5 w-5 animate-spin" style={{ color: C.indigo }} />
             </div>
           ) : contacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-3">
-              <div className="rounded-full bg-muted p-3">
-                <UserPlus className="h-6 w-6 text-muted-foreground" />
+              <div
+                className="w-12 h-12 rounded-[14px] border-[2.5px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center"
+                style={{ background: C.skySoft }}
+              >
+                <UserPlus className="h-5 w-5" style={{ color: C.indigo }} />
               </div>
               <div>
-                <p className="text-sm font-medium">No connections yet</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className={`${DISPLAY} font-extrabold text-sm`}>No connections yet</p>
+                <p className="text-xs font-semibold text-slate-400 mt-1">
                   You can only chat with people who follow you back.
                 </p>
               </div>
               <Link
                 to="/discover"
-                className="mt-1 text-xs font-medium text-primary hover:underline"
+                className="mt-1 text-xs font-bold hover:underline"
+                style={{ color: C.indigo }}
               >
-                Discover people to follow →
+                Discover people →
               </Link>
             </div>
           ) : sortedContacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <Users className="h-8 w-8 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">
+              <Users className="h-7 w-7 text-slate-300" />
+              <p className="text-sm font-semibold text-slate-400">
                 No results for "{searchTerm}"
               </p>
             </div>
@@ -457,61 +351,52 @@ export const Chat = () => {
                   key={contact.user_id}
                   onClick={() => handleSelectContact(contact)}
                   className={cn(
-                    "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150",
+                    "flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-3 py-2.5 transition-all duration-150 border-[2px]",
                     isSelected
-                      ? "bg-primary/10 ring-1 ring-primary/20"
-                      : "hover:bg-muted/60"
+                      ? "border-[#0F172A] shadow-[2px_2px_0_0_#0F172A]"
+                      : "border-transparent hover:border-[#0F172A]/20 hover:bg-slate-50"
                   )}
+                  style={isSelected ? { background: C.indigoSoft } : {}}
                 >
-                  {/* Avatar → navigates to profile */}
                   <Link
                     to={`/profile/${contact.user_id}`}
                     onClick={(e) => e.stopPropagation()}
                     className="relative flex-shrink-0"
                   >
-                    <Avatar className="h-10 w-10">
+                    <Avatar className="h-10 w-10 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A]">
                       <AvatarImage src={contact.avatar_url || undefined} />
                       <AvatarFallback
-                        className={cn(
-                          "text-sm font-medium",
-                          isSelected && "bg-primary/20 text-primary"
-                        )}
+                        className={`${DISPLAY} font-extrabold text-sm`}
+                        style={{ background: C.cyan, color: C.ink }}
                       >
                         {getAvatarFallback(contact)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-500" />
+                    <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
                   </Link>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      {/* Name → navigates to profile */}
                       <Link
                         to={`/profile/${contact.user_id}`}
                         onClick={(e) => e.stopPropagation()}
                         className={cn(
-                          "truncate text-sm hover:underline",
-                          unreadCount ? "font-semibold text-foreground" : "font-medium"
+                          `${DISPLAY} truncate text-sm hover:underline`,
+                          unreadCount ? "font-extrabold text-[#0F172A]" : "font-bold text-[#0F172A]"
                         )}
                       >
                         {getDisplayName(contact)}
                       </Link>
                       {preview && (
-                        <span className="flex-shrink-0 text-[10px] text-muted-foreground">
-                          {formatDistanceToNow(new Date(preview.lastTimestamp), {
-                            addSuffix: false,
-                          })}
+                        <span className="flex-shrink-0 text-[10px] font-semibold text-slate-400">
+                          {formatDistanceToNow(new Date(preview.lastTimestamp), { addSuffix: false })}
                         </span>
                       )}
                     </div>
-                    <p
-                      className={cn(
-                        "truncate text-xs",
-                        unreadCount
-                          ? "font-medium text-foreground"
-                          : "text-muted-foreground"
-                      )}
-                    >
+                    <p className={cn(
+                      "truncate text-xs font-semibold",
+                      unreadCount ? "text-[#0F172A]" : "text-slate-400"
+                    )}>
                       {preview
                         ? `${preview.isUserSender ? "You: " : ""}${preview.lastMessage}`
                         : "Start a conversation"}
@@ -519,7 +404,10 @@ export const Chat = () => {
                   </div>
 
                   {unreadCount > 0 && (
-                    <span className="ml-1 flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                    <span
+                      className="ml-1 flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white border-[1.5px] border-[#0F172A]"
+                      style={{ background: C.indigo }}
+                    >
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
@@ -531,63 +419,70 @@ export const Chat = () => {
       </div>
 
       {/* ── Right panel: conversation ── */}
-      <div className={`${!showContactsList ? 'flex' : 'hidden'} lg:flex flex-1 flex-col overflow-hidden`}>
+      <div className={`${!showContactsList ? 'flex' : 'hidden'} lg:flex flex-1 flex-col overflow-hidden bg-white`}>
         {selectedContact ? (
           <>
             {/* Chat header */}
-            <div className="flex items-center justify-between border-b bg-background px-4 lg:px-6 py-3.5">
+            <div className="flex items-center justify-between border-b-[2.5px] border-[#0F172A] bg-white px-4 lg:px-6 py-3.5">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setShowContactsList(true)}
-                  className="lg:hidden flex items-center justify-center w-8 h-8 rounded-full hover:bg-muted transition-colors mr-1"
+                  className="lg:hidden flex items-center justify-center w-8 h-8 rounded-full border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A] bg-white hover:shadow-[2px_2px_0_0_#0F172A] transition-shadow mr-1"
                   aria-label="Back to contacts"
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-                <Link
-                  to={`/profile/${selectedContact.user_id}`}
-                  className="relative flex-shrink-0"
-                >
-                  <Avatar className="h-9 w-9">
+                <Link to={`/profile/${selectedContact.user_id}`} className="relative flex-shrink-0">
+                  <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A]">
                     <AvatarImage src={selectedContact.avatar_url || undefined} />
-                    <AvatarFallback>{getAvatarFallback(selectedContact)}</AvatarFallback>
+                    <AvatarFallback
+                      className={`${DISPLAY} font-extrabold text-sm`}
+                      style={{ background: C.cyan, color: C.ink }}
+                    >
+                      {getAvatarFallback(selectedContact)}
+                    </AvatarFallback>
                   </Avatar>
-                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-500" />
+                  <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
                 </Link>
                 <div>
                   <Link
                     to={`/profile/${selectedContact.user_id}`}
-                    className="text-sm font-semibold leading-tight hover:underline"
+                    className={`${DISPLAY} font-extrabold text-sm leading-tight hover:underline`}
                   >
                     {getDisplayName(selectedContact)}
                   </Link>
-                  <p className="text-xs font-medium text-emerald-600">Online</p>
+                  <p className="text-xs font-semibold text-emerald-500">Online</p>
                 </div>
               </div>
 
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A]"
+                style={{ background: C.indigoSoft, color: C.indigo }}
+              >
                 <MessageSquare className="h-3 w-3" />
                 Direct message
               </span>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto px-6 py-5 scrollbar-hide" style={{ background: '#F8FAFF' }}>
               {isLoadingMessages ? (
                 <div className="flex h-full items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-6 w-6 animate-spin" style={{ color: C.indigo }} />
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                  <div className="rounded-full bg-muted p-4">
-                    <MessageSquare className="h-7 w-7 text-muted-foreground" />
+                  <div
+                    className="w-16 h-16 rounded-[18px] border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A] flex items-center justify-center"
+                    style={{ background: C.skySoft }}
+                  >
+                    <MessageSquare className="h-7 w-7" style={{ color: C.indigo }} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">No messages yet</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Send a message to start the conversation with{" "}
-                      {getDisplayName(selectedContact)}
+                    <p className={`${DISPLAY} font-extrabold text-base`}>No messages yet</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-400">
+                      Say hello to {getDisplayName(selectedContact)}!
                     </p>
                   </div>
                 </div>
@@ -597,14 +492,16 @@ export const Chat = () => {
                     <div key={date}>
                       {/* Date separator */}
                       <div className="relative mb-5 flex items-center">
-                        <div className="flex-1 border-t border-border/50" />
-                        <span className="mx-3 flex-shrink-0 rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                        <div className="flex-1 border-t-[2px] border-[#0F172A]/10" />
+                        <span
+                          className="mx-3 flex-shrink-0 rounded-full px-3 py-1 text-[11px] font-bold border-[2px] border-[#0F172A]/20"
+                          style={{ background: C.skySoft, color: C.indigo }}
+                        >
                           {date}
                         </span>
-                        <div className="flex-1 border-t border-border/50" />
+                        <div className="flex-1 border-t-[2px] border-[#0F172A]/10" />
                       </div>
 
-                      {/* Messages for this day */}
                       <div className="space-y-2">
                         {dayMessages.map((message, index) => {
                           const isOwn = message.sender_id === userId;
@@ -616,51 +513,35 @@ export const Chat = () => {
                           return (
                             <div
                               key={message.id}
-                              className={cn(
-                                "flex items-end gap-2",
-                                isOwn && "flex-row-reverse"
-                              )}
+                              className={cn("flex items-end gap-2", isOwn && "flex-row-reverse")}
                             >
-                              {/* Avatar — only shown on last message in a run */}
-                              <div
-                                className={cn(
-                                  "w-7 flex-shrink-0",
-                                  !isLastInRun && "invisible"
-                                )}
-                              >
-                                <Link
-                                  to={`/profile/${isOwn ? userId : selectedContact.user_id}`}
-                                  className="block"
-                                >
-                                  <Avatar className="h-7 w-7">
-                                    <AvatarImage
-                                      src={profileForMsg?.avatar_url || undefined}
-                                    />
-                                    <AvatarFallback className="text-[10px]">
+                              <div className={cn("w-7 flex-shrink-0", !isLastInRun && "invisible")}>
+                                <Link to={`/profile/${isOwn ? userId : selectedContact.user_id}`} className="block">
+                                  <Avatar className="h-7 w-7 border-[1.5px] border-[#0F172A]">
+                                    <AvatarImage src={profileForMsg?.avatar_url || undefined} />
+                                    <AvatarFallback
+                                      className="text-[10px] font-bold"
+                                      style={{ background: C.cyan, color: C.ink }}
+                                    >
                                       {getAvatarFallback(profileForMsg)}
                                     </AvatarFallback>
                                   </Avatar>
                                 </Link>
                               </div>
 
-                              <div
-                                className={cn(
-                                  "group flex flex-col gap-1",
-                                  isOwn ? "items-end" : "items-start"
-                                )}
-                              >
+                              <div className={cn("group flex flex-col gap-1", isOwn ? "items-end" : "items-start")}>
                                 <div
                                   className={cn(
-                                    "max-w-[min(26rem,65vw)] break-words whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                                    "max-w-[min(26rem,65vw)] break-words whitespace-pre-wrap px-4 py-2.5 text-sm leading-relaxed font-medium border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A]",
                                     isOwn
-                                      ? "bg-gradient-primary text-primary-foreground rounded-br-sm"
-                                      : "bg-muted text-foreground rounded-bl-sm"
+                                      ? "text-white rounded-2xl rounded-br-sm"
+                                      : "bg-white text-[#0F172A] rounded-2xl rounded-bl-sm"
                                   )}
+                                  style={isOwn ? { background: `linear-gradient(135deg, ${C.indigo}, ${C.blue})` } : {}}
                                 >
                                   {message.content}
                                 </div>
-                                {/* Timestamp — visible on hover */}
-                                <span className="px-1 text-[10px] text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                <span className="px-1 text-[10px] font-semibold text-slate-400 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                   {format(new Date(message.created_at), "h:mm a")}
                                 </span>
                               </div>
@@ -676,11 +557,14 @@ export const Chat = () => {
             </div>
 
             {/* Input bar */}
-            <div className="border-t bg-background px-6 py-4">
-              <div className="flex items-end gap-3 rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
-                <Avatar className="mb-0.5 h-7 w-7 flex-shrink-0 self-end">
+            <div className="border-t-[2.5px] border-[#0F172A] bg-white px-6 py-4">
+              <div className="flex items-end gap-3 rounded-2xl border-[2.5px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] bg-white px-4 py-3 focus-within:shadow-[3px_3px_0_0_#0F172A] transition-shadow">
+                <Avatar className="mb-0.5 h-7 w-7 flex-shrink-0 self-end border-[1.5px] border-[#0F172A]">
                   <AvatarImage src={currentProfile?.avatar_url || undefined} />
-                  <AvatarFallback className="text-xs">
+                  <AvatarFallback
+                    className="text-xs font-bold"
+                    style={{ background: C.cyan, color: C.ink }}
+                  >
                     {getAvatarFallback(currentProfile)}
                   </AvatarFallback>
                 </Avatar>
@@ -690,37 +574,39 @@ export const Chat = () => {
                   onChange={(e) => setMessageInput(e.target.value)}
                   onKeyDown={handleTextareaKeyDown}
                   rows={1}
-                  className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60"
+                  className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0 placeholder:text-slate-400"
                   disabled={isSending}
                 />
-                <Button
-                  size="sm"
+                <button
                   onClick={handleSendMessage}
                   disabled={!messageInput.trim() || isSending}
-                  className="h-8 w-8 flex-shrink-0 rounded-full p-0"
+                  className="h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] text-white disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-[3px_3px_0_0_#0F172A] transition-shadow"
+                  style={{ background: C.indigo }}
                 >
                   {isSending ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Send className="h-3.5 w-3.5" />
                   )}
-                </Button>
+                </button>
               </div>
-              <p className="mt-2 text-center text-[10px] text-muted-foreground">
-                Press Enter to send · Shift+Enter for new line
+              <p className="mt-2 text-center text-[10px] font-semibold text-slate-400">
+                Enter to send · Shift+Enter for new line
               </p>
             </div>
           </>
         ) : (
-          /* Empty state when no contact is selected */
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-            <div className="rounded-full bg-muted p-5">
-              <MessageSquare className="h-9 w-9 text-muted-foreground" />
+            <div
+              className="w-20 h-20 rounded-[22px] border-[2.5px] border-[#0F172A] shadow-[4px_4px_0_0_#0F172A] flex items-center justify-center"
+              style={{ background: C.skySoft }}
+            >
+              <MessageSquare className="h-9 w-9" style={{ color: C.indigo }} />
             </div>
             <div>
-              <h3 className="font-semibold">Select a conversation</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Choose a member from the list to start messaging
+              <p className={`${DISPLAY} font-extrabold text-xl`}>Select a conversation</p>
+              <p className="mt-1 text-sm font-semibold text-slate-400">
+                Choose a contact from the list to start messaging
               </p>
             </div>
           </div>

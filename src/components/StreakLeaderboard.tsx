@@ -2,6 +2,24 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMutualFollowIds } from "@/hooks/useMutualFollow";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Flame, Trophy, Lock } from "lucide-react";
+
+/* ── brand ── */
+const C = {
+  cyan: '#3BD6F5', blue: '#2F7CFF', indigo: '#2E2BE5',
+  ink: '#0F172A', skySoft: '#DDF3FF', indigoSoft: '#D6D4FF',
+  pop: '#FF7A59', sun: '#FFD65C', mintSoft: '#D1FAE5',
+};
+const DISPLAY = "font-['Baloo_2'] tracking-tight";
+
+const TROPHY_STYLES = {
+  gold:   { bg: '#FEF9C3', border: '#F59E0B', color: '#B45309', label: '1st' },
+  silver: { bg: '#F1F5F9', border: '#94A3B8', color: '#475569', label: '2nd' },
+  bronze: { bg: '#FFF4ED', border: '#F97316', color: '#C2410C', label: '3rd' },
+} as const;
+
+type TrophyKey = keyof typeof TROPHY_STYLES;
 
 interface LeaderboardEntry {
   user_id: string;
@@ -10,117 +28,52 @@ interface LeaderboardEntry {
   streak: number;
 }
 
-const TROPHY = {
-  gold:   { bg: "linear-gradient(135deg,#f5c842,#c98a00)", glow: "0 0 24px rgba(220,165,0,0.45)",  icon: "🏆" },
-  silver: { bg: "linear-gradient(135deg,#d0d8e0,#8a96a0)", glow: "0 0 18px rgba(160,172,180,0.35)", icon: "🏆" },
-  bronze: { bg: "linear-gradient(135deg,#e0945a,#a05520)", glow: "0 0 18px rgba(190,110,60,0.35)",  icon: "🏆" },
-} as const;
-
-type TrophyKey = keyof typeof TROPHY;
-
-const C = {
-  bg:          "hsl(var(--card))",
-  bgMuted:     "hsl(var(--muted))",
-  bgMutedHalf: "hsl(var(--muted) / 0.6)",
-  border:      "hsl(var(--border))",
-  fg:          "hsl(var(--foreground))",
-  fgMuted:     "hsl(var(--muted-foreground))",
-  primary:     "hsl(var(--primary))",
-  primaryLow:  "hsl(var(--primary) / 0.12)",
-  primaryMid:  "hsl(var(--primary) / 0.5)",
-  primaryGlow: "hsl(var(--primary) / 0.25)",
-};
-
-function PodiumCard({
-  entry,
-  trophy,
-  center,
-  canClick,
-  isMe,
-}: {
-  entry: LeaderboardEntry;
-  trophy: TrophyKey;
-  center: boolean;
-  canClick: boolean;
-  isMe: boolean;
+function PodiumCard({ entry, trophy, center, canClick, isMe }: {
+  entry: LeaderboardEntry; trophy: TrophyKey; center: boolean; canClick: boolean; isMe: boolean;
 }) {
-  const t = TROPHY[trophy];
-
-  // All sizes are fluid: clamp(min, preferred-vw, max)
-  const avatarSz    = center ? "clamp(68px, 21vw, 110px)" : "clamp(52px, 16vw, 82px)";
-  const cardWidth   = center ? "clamp(108px, 32vw, 200px)" : "clamp(84px, 25vw, 155px)";
-  const nameFontSz  = center ? "clamp(12px, 3.6vw, 17px)" : "clamp(10px, 3vw, 13px)";
-  const trophySz    = center ? "clamp(34px, 10vw, 50px)"  : "clamp(26px, 8vw, 38px)";
-  const trophyIcon  = center ? "clamp(16px, 5vw, 24px)"   : "clamp(12px, 4vw, 18px)";
-  const streakFsz   = center ? "clamp(17px, 5vw, 24px)"   : "clamp(13px, 4vw, 18px)";
-  const padBox      = center ? "clamp(10px, 3vw, 18px) clamp(8px, 2vw, 14px)" : "8px 6px";
-  const marginTop   = center ? 0 : "clamp(20px, 7vw, 40px)";
+  const t = TROPHY_STYLES[trophy];
+  const avatarSize = center ? "h-28 w-28" : "h-20 w-20";
+  const cardWidth = center ? "w-[180px]" : "w-[140px]";
+  const marginTop = center ? "" : "mt-8";
 
   const inner = (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-      flex: `0 0 ${cardWidth}`,
-      width: cardWidth,
-      marginTop,
-      cursor: canClick ? "pointer" : "default",
-      minWidth: 0,
-    }}>
+    <div className={`flex flex-col items-center gap-2 ${cardWidth} ${marginTop} min-w-0`}>
       {/* Avatar */}
-      <div style={{
-        width: avatarSz, height: avatarSz,
-        borderRadius: center ? 16 : 12,
-        overflow: "hidden",
-        border: `2px solid ${center ? C.primaryMid : C.border}`,
-        boxShadow: center ? `0 0 28px ${C.primaryGlow}` : "none",
-        flexShrink: 0,
-      }}>
-        <img
-          src={entry.avatar_url || "/placeholder.svg"}
-          alt={entry.username || "User"}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      </div>
+      <Avatar className={`${avatarSize} border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A]`}>
+        <AvatarImage src={entry.avatar_url || undefined} />
+        <AvatarFallback className={`${DISPLAY} font-extrabold ${center ? 'text-2xl' : 'text-lg'}`} style={{ background: C.cyan, color: C.ink }}>
+          {entry.username?.[0]?.toUpperCase() || 'U'}
+        </AvatarFallback>
+      </Avatar>
 
       {/* Name */}
-      <div style={{
-        color: C.fg, fontSize: nameFontSz, fontWeight: 700,
-        textAlign: "center", lineHeight: 1.3,
-        wordBreak: "break-word", width: "100%",
-      }}>
-        {entry.username || "Anonymous"}
-        {isMe && <span style={{ fontSize: "10px", color: C.fgMuted, marginLeft: 4 }}>(you)</span>}
-      </div>
+      <p className={`${DISPLAY} font-extrabold text-center leading-tight w-full truncate ${center ? 'text-sm' : 'text-xs'}`}>
+        {entry.username || 'Anonymous'}
+        {isMe && <span className="text-[10px] font-semibold text-slate-400 ml-1">(you)</span>}
+      </p>
 
       {/* Stats box */}
-      <div style={{
-        width: "100%",
-        background: C.bgMuted,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
-        padding: padBox,
-        display: "flex", flexDirection: "column", alignItems: "center",
-        gap: center ? 6 : 4,
-      }}>
+      <div
+        className="w-full rounded-[14px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex flex-col items-center gap-1.5 py-3 px-2"
+        style={{ background: t.bg, borderColor: t.border }}
+      >
         {/* Trophy badge */}
-        <div style={{
-          width: trophySz, height: trophySz, borderRadius: 10,
-          background: t.bg, boxShadow: t.glow,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: trophyIcon,
-        }}>{t.icon}</div>
+        <div
+          className="rounded-[10px] border-[2px] flex items-center justify-center font-extrabold text-xs px-2 py-0.5"
+          style={{ background: t.bg, borderColor: t.border, color: t.color }}
+        >
+          <Trophy className="w-3 h-3 mr-1" /> {t.label}
+        </div>
 
         {/* Streak */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 4,
-          fontSize: streakFsz, fontWeight: 800, color: C.fg,
-        }}>
-          🔥 {entry.streak}
+        <div className={`${DISPLAY} font-extrabold flex items-center gap-1 ${center ? 'text-xl' : 'text-base'}`} style={{ color: C.pop }}>
+          <Flame className={`${center ? 'w-5 h-5' : 'w-4 h-4'}`} /> {entry.streak}
         </div>
-        <div style={{ color: C.fgMuted, fontSize: "10px" }}>day streak</div>
+        <p className="text-[10px] font-semibold text-slate-500">day streak</p>
 
         {!canClick && !isMe && (
-          <div style={{ color: C.fgMuted, fontSize: "9px", textAlign: "center", lineHeight: 1.4 }}>
-            🔒 Follow each other<br />to view profile
+          <div className="flex items-center gap-1 text-[9px] font-semibold text-slate-400 text-center leading-tight mt-0.5">
+            <Lock className="w-2.5 h-2.5" /> Follow each other
           </div>
         )}
       </div>
@@ -128,12 +81,10 @@ function PodiumCard({
   );
 
   return canClick ? (
-    <Link to={isMe ? "/profile" : `/profile/${entry.user_id}`} style={{ textDecoration: "none", minWidth: 0 }}>
+    <Link to={isMe ? "/profile" : `/profile/${entry.user_id}`} className="no-underline min-w-0">
       {inner}
     </Link>
-  ) : (
-    inner
-  );
+  ) : inner;
 }
 
 interface Props {
@@ -150,11 +101,7 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
     if (!currentUserId) return;
     const load = async () => {
       const [{ data }, mutuals] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("user_id, username, avatar_url, streak")
-          .order("streak", { ascending: false })
-          .limit(10),
+        supabase.from("profiles").select("user_id, username, avatar_url, streak").order("streak", { ascending: false }).limit(10),
         fetchMutualFollowIds(currentUserId),
       ]);
       setEntries(data ?? []);
@@ -167,50 +114,28 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
   if (loading || entries.length === 0) return null;
 
   const canClick = (uid: string) => uid === currentUserId || mutualIds.has(uid);
-
   const [gold, silver, bronze] = entries;
   const podium = [silver, gold, bronze].filter(Boolean) as LeaderboardEntry[];
   const podiumTrophy = (e: LeaderboardEntry): TrophyKey => {
-    if (e.user_id === gold?.user_id)   return "gold";
+    if (e.user_id === gold?.user_id) return "gold";
     if (e.user_id === silver?.user_id) return "silver";
     return "bronze";
   };
-
   const rest = entries.slice(3);
 
   return (
-    <div style={{
-      background: C.bg,
-      border: `1px solid ${C.border}`,
-      borderRadius: 16,
-      overflow: "hidden",
-      marginBottom: 32,
-      boxShadow: "var(--shadow-elegant)",
-    }}>
+    <div className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[3px_3px_0_0_#0F172A] bg-white overflow-hidden mb-6">
       {/* Header */}
-      <div style={{
-        background: "var(--gradient-primary)",
-        padding: "14px 20px",
-        display: "flex", alignItems: "center", gap: 8,
-      }}>
-        <span style={{ fontSize: 20 }}>🔥</span>
-        <span style={{ color: "#fff", fontSize: "clamp(15px, 4.5vw, 20px)", fontWeight: 700, letterSpacing: 0.4 }}>
-          Streak Leaderboard
-        </span>
+      <div className="flex items-center gap-3 px-5 py-4 border-b-[2.5px] border-[#0F172A]" style={{ background: C.indigoSoft }}>
+        <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.indigo }}>
+          <Flame className="w-4 h-4 text-white" />
+        </div>
+        <p className={`${DISPLAY} font-extrabold text-lg`}>Streak Leaderboard</p>
       </div>
 
-      <div style={{ padding: "20px 12px 24px", width: "100%", boxSizing: "border-box" }}>
-
-        {/* Podium — never overflows, gaps are fluid */}
-        <div style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-end",
-          gap: "clamp(6px, 2vw, 12px)",
-          marginBottom: 20,
-          width: "100%",
-          overflow: "hidden",
-        }}>
+      <div className="p-5">
+        {/* Podium */}
+        <div className="flex justify-center items-end gap-3 mb-5 overflow-hidden">
           {podium.map((entry) => (
             <PodiumCard
               key={entry.user_id}
@@ -224,35 +149,25 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
         </div>
 
         {/* Your streak pill */}
-        <div style={{
-          background: C.primaryLow,
-          border: `1px solid ${C.primaryMid}`,
-          borderRadius: 12, padding: "10px 16px",
-          textAlign: "center", fontSize: "clamp(12px, 3.5vw, 14px)",
-          color: C.fg, marginBottom: rest.length > 0 ? 20 : 0,
-        }}>
-          Your current streak: 🔥{" "}
-          <strong style={{ color: C.primary }}>{currentStreak}</strong>{" "}
-          day{currentStreak !== 1 ? "s" : ""}
+        <div
+          className="flex items-center justify-center gap-2 rounded-full border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] py-2.5 px-4 mb-4"
+          style={{ background: C.skySoft }}
+        >
+          <Flame className="w-4 h-4" style={{ color: C.pop }} />
+          <p className={`${DISPLAY} font-extrabold text-sm`}>
+            Your streak: <span style={{ color: C.pop }}>{currentStreak}</span> day{currentStreak !== 1 ? 's' : ''}
+          </p>
         </div>
 
-        {/* Table — ranks 4+ */}
+        {/* Ranks 4+ */}
         {rest.length > 0 && (
           <>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "40px 1fr 64px",
-              padding: "0 8px 8px",
-              color: C.fgMuted, fontSize: 11, fontWeight: 600,
-              borderBottom: `1px solid ${C.border}`,
-              textTransform: "uppercase", letterSpacing: 0.5,
-            }}>
-              {["Rank", "User", "Streak"].map((h, i) => (
-                <span key={h} style={{ textAlign: i === 2 ? "center" : "left" }}>{h}</span>
+            <div className="grid grid-cols-[36px_1fr_60px] px-2 pb-2 border-b-[2px] border-[#0F172A]/10 mb-2">
+              {['Rank', 'User', 'Streak'].map((h, i) => (
+                <span key={h} className={`text-[10px] font-extrabold uppercase tracking-wide text-slate-400 ${i === 2 ? 'text-center' : ''}`}>{h}</span>
               ))}
             </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
+            <div className="flex flex-col gap-2">
               {rest.map((entry, i) => {
                 const rank = i + 4;
                 const clickable = canClick(entry.user_id);
@@ -260,57 +175,41 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
 
                 const row = (
                   <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "40px 1fr 64px",
-                      alignItems: "center",
-                      padding: "9px 8px",
-                      background: C.bgMutedHalf,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 10,
-                      cursor: clickable ? "pointer" : "default",
-                      transition: "background .15s",
-                    }}
-                    onMouseEnter={e => { if (clickable) (e.currentTarget as HTMLDivElement).style.background = C.bgMuted; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = C.bgMutedHalf; }}
+                    className={`grid grid-cols-[36px_1fr_60px] items-center px-3 py-2.5 rounded-[12px] border-[2px] transition-all ${
+                      isMe
+                        ? 'border-[#2E2BE5]/40 shadow-[1px_1px_0_0_#2E2BE5]'
+                        : 'border-[#0F172A]/10 hover:border-[#0F172A]/30'
+                    } ${clickable ? 'cursor-pointer' : ''}`}
+                    style={{ background: isMe ? C.indigoSoft : '#F8FAFF' }}
                   >
-                    <span style={{ fontWeight: 700, color: C.fgMuted, fontSize: 13 }}>{rank}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                      <img
-                        src={entry.avatar_url || "/placeholder.svg"}
-                        alt={entry.username || "User"}
-                        style={{
-                          width: 32, height: 32, borderRadius: "50%",
-                          objectFit: "cover", flexShrink: 0,
-                          border: `1px solid ${C.border}`,
-                        }}
-                      />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{
-                          fontWeight: 600, fontSize: "clamp(12px, 3.2vw, 14px)",
-                          color: C.fg, overflow: "hidden",
-                          textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
-                          {entry.username || "Anonymous"}
-                          {isMe && <span style={{ fontSize: 10, color: C.fgMuted, marginLeft: 4 }}>(you)</span>}
-                        </div>
+                    <span className={`${DISPLAY} font-extrabold text-sm text-slate-500`}>{rank}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Avatar className="h-8 w-8 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A] flex-shrink-0">
+                        <AvatarImage src={entry.avatar_url || undefined} />
+                        <AvatarFallback className={`${DISPLAY} font-extrabold text-xs`} style={{ background: C.cyan, color: C.ink }}>
+                          {entry.username?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className={`${DISPLAY} font-extrabold text-sm truncate`}>
+                          {entry.username || 'Anonymous'}
+                          {isMe && <span className="text-[10px] font-semibold text-slate-400 ml-1">(you)</span>}
+                        </p>
                         {!clickable && !isMe && (
-                          <div style={{ fontSize: 10, color: C.fgMuted }}>🔒 Follow each other</div>
+                          <p className="text-[10px] font-semibold text-slate-400 flex items-center gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> Follow each other
+                          </p>
                         )}
                       </div>
                     </div>
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      gap: 3, fontWeight: 700, color: "#f97316",
-                      fontSize: "clamp(12px, 3.2vw, 14px)",
-                    }}>
-                      🔥 {entry.streak}
+                    <div className={`${DISPLAY} font-extrabold text-sm flex items-center justify-center gap-1`} style={{ color: C.pop }}>
+                      <Flame className="w-3.5 h-3.5" /> {entry.streak}
                     </div>
                   </div>
                 );
 
                 return clickable ? (
-                  <Link key={entry.user_id} to={isMe ? "/profile" : `/profile/${entry.user_id}`} style={{ textDecoration: "none" }}>
+                  <Link key={entry.user_id} to={isMe ? "/profile" : `/profile/${entry.user_id}`} className="no-underline">
                     {row}
                   </Link>
                 ) : (

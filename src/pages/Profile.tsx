@@ -4,13 +4,11 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useStreak } from '@/hooks/useStreak';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PostUpload } from '@/components/PostUpload';
 import { PostImageCarousel } from '@/components/PostImageCarousel';
 import { CommentSection } from '@/components/CommentSection';
@@ -18,10 +16,27 @@ import { LikeButton } from '@/components/LikeButton';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Camera, Heart, Trash2, Users, UserPlus, Flame, Trophy, Award, Target, Zap, Search, Lock, Settings, CheckCircle, XCircle, SkipForward, BarChart2 } from 'lucide-react';
+import {
+  Camera, Flame, Trash2, Users, Search, Lock,
+  Settings, CheckCircle, XCircle, SkipForward, BarChart2,
+  Zap, Target, PenLine, GraduationCap,
+} from 'lucide-react';
 import { NotificationsBell } from '@/components/NotificationsBell';
 import { useMutualFollow } from '@/hooks/useMutualFollow';
 import { StreakLeaderboard } from '@/components/StreakLeaderboard';
+
+/* ── brand ── */
+const C = {
+  cyan: '#3BD6F5', blue: '#2F7CFF', indigo: '#2E2BE5',
+  ink: '#0F172A', skySoft: '#DDF3FF', indigoSoft: '#D6D4FF',
+  pop: '#FF7A59', sun: '#FFD65C',
+  mintSoft: '#D1FAE5', lavender: '#EDE9FE', peach: '#FFE4D6', lemon: '#FEF9C3', rose: '#FFE4E6',
+};
+const DISPLAY = "font-['Baloo_2'] tracking-tight";
+const CARD = 'border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[3px_3px_0_0_#0F172A] bg-white overflow-hidden';
+const INPUT = 'w-full px-4 py-2.5 text-sm font-semibold border-[2px] border-[#0F172A] rounded-full shadow-[1px_1px_0_0_#0F172A] bg-white outline-none focus:shadow-[2px_2px_0_0_#0F172A] transition-shadow placeholder:text-slate-400';
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 font-extrabold font-[\'Baloo_2\'] text-sm border-[2.5px] border-[#0F172A] rounded-full px-5 py-2.5 shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#0F172A] transition-all text-white cursor-pointer disabled:opacity-50 disabled:pointer-events-none';
+const BTN_OUTLINE = 'inline-flex items-center justify-center gap-2 font-extrabold font-[\'Baloo_2\'] text-sm border-[2.5px] border-[#0F172A] rounded-full px-5 py-2.5 shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#0F172A] transition-all bg-white text-[#0F172A] cursor-pointer disabled:opacity-50 disabled:pointer-events-none';
 
 interface Post {
   id: string;
@@ -34,7 +49,6 @@ interface Post {
   images?: { id: string; file_url: string }[];
 }
 
-
 interface Profile {
   id: string;
   user_id: string;
@@ -44,15 +58,6 @@ interface Profile {
   bio: string | null;
   followers_count: number;
   following_count: number;
-}
-
-interface Achievement {
-  id: number;
-  title: string;
-  description: string;
-  icon: string;
-  earnedAt: string;
-  category: string;
 }
 
 export const Profile = () => {
@@ -74,7 +79,6 @@ export const Profile = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isCoverUploading, setIsCoverUploading] = useState(false);
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -84,38 +88,10 @@ export const Profile = () => {
   const [isFollowersOpen, setIsFollowersOpen] = useState(false);
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  
-  const [achievements] = useState<Achievement[]>([
-    {
-      id: 1,
-      title: "Welcome!",
-      description: "Joined the community",
-      icon: "Trophy",
-      earnedAt: "2024-01-01",
-      category: "milestone",
-    },
-    {
-      id: 2,
-      title: "First Post",
-      description: "Shared your first post",
-      icon: "Heart",
-      earnedAt: "2024-01-02",
-      category: "engagement",
-    },
-    {
-      id: 3,
-      title: "Consistent Creator",
-      description: "Posted for 5 days in a row",
-      icon: "Flame",
-      earnedAt: "2024-01-07",
-      category: "consistency",
-    },
-  ]);
 
   const profileUserId = userId || user?.id;
   const isOwnProfile = !userId || userId === user?.id;
 
-  // Mutual follow check — own profile is always "open"
   const { isMutual, isLoading: isMutualLoading } = useMutualFollow(
     isOwnProfile ? undefined : profileUserId
   );
@@ -129,389 +105,130 @@ export const Profile = () => {
     }
   }, [profileUserId]);
 
-
   const fetchProfile = async () => {
     if (!profileUserId) return;
-
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', profileUserId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-
+      const { data, error } = await supabase.from('profiles').select('*').eq('user_id', profileUserId).single();
+      if (error && error.code !== 'PGRST116') { console.error(error); return; }
       if (!data) {
-        // Only auto-create a profile for the currently logged-in user's own profile
         if (!user || profileUserId !== user.id) return;
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: profileUserId,
-            username: user.email?.split('@')[0] || 'Anonymous',
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating profile:', createError);
-          return;
-        }
-
+        const { data: newProfile, error: createError } = await supabase.from('profiles')
+          .insert({ user_id: profileUserId, username: user.email?.split('@')[0] || 'Anonymous' })
+          .select().single();
+        if (createError) { console.error(createError); return; }
         setProfile(newProfile);
       } else {
         setProfile(data);
         setEditUsername(data.username || '');
         setEditBio(data.bio || '');
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleUpdateProfile = async () => {
     if (!user || !profile) return;
-
     setIsUpdating(true);
     try {
       let avatarUrl = profile.avatar_url;
-
-      // Upload avatar if a new file is selected
       if (avatarFile) {
-        const fileExt = avatarFile.name.split('.').pop();
-        const filePath = `${user.id}/${Date.now()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('profile-images')
-          .upload(filePath, avatarFile, {
-            upsert: true
-          });
-
-        if (uploadError) {
-          console.error('Error uploading avatar:', uploadError);
-          toast({
-            title: 'Error',
-            description: 'Failed to upload profile picture',
-            variant: 'destructive',
-          });
-          setIsUpdating(false);
-          return;
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('profile-images')
-          .getPublicUrl(filePath);
-
-        avatarUrl = urlData.publicUrl;
+        const filePath = `${user.id}/${Date.now()}.${avatarFile.name.split('.').pop()}`;
+        const { error } = await supabase.storage.from('profile-images').upload(filePath, avatarFile, { upsert: true });
+        if (error) throw error;
+        avatarUrl = supabase.storage.from('profile-images').getPublicUrl(filePath).data.publicUrl;
       }
-
       let coverUrl = profile.cover_url;
-
-      // Upload cover if a new file is selected
       if (coverFile) {
-        const fileExt = coverFile.name.split('.').pop();
-        const filePath = `${user.id}/cover-${Date.now()}.${fileExt}`;
-
-        const { error: coverUploadError } = await supabase.storage
-          .from('profile-images')
-          .upload(filePath, coverFile, { upsert: true });
-
-        if (coverUploadError) {
-          console.error('Error uploading cover:', coverUploadError);
-          toast({
-            title: 'Error',
-            description: 'Failed to upload cover photo',
-            variant: 'destructive',
-          });
-          setIsUpdating(false);
-          return;
-        }
-
-        const { data: coverUrlData } = supabase.storage
-          .from('profile-images')
-          .getPublicUrl(filePath);
-
-        coverUrl = coverUrlData.publicUrl;
+        const filePath = `${user.id}/cover-${Date.now()}.${coverFile.name.split('.').pop()}`;
+        const { error } = await supabase.storage.from('profile-images').upload(filePath, coverFile, { upsert: true });
+        if (error) throw error;
+        coverUrl = supabase.storage.from('profile-images').getPublicUrl(filePath).data.publicUrl;
       }
-
-      // Update profile
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          username: editUsername,
-          bio: editBio,
-          avatar_url: avatarUrl,
-          cover_url: coverUrl,
-        })
-        .eq('user_id', user.id);
-
-      if (updateError) {
-        console.error('Error updating profile:', updateError);
-        toast({
-          title: 'Error',
-          description: 'Failed to update profile',
-          variant: 'destructive',
-        });
-        setIsUpdating(false);
-        return;
-      }
-
-      toast({
-        title: 'Success',
-        description: 'Profile updated successfully',
-      });
-
+      const { error } = await supabase.from('profiles').update({ username: editUsername, bio: editBio, avatar_url: avatarUrl, cover_url: coverUrl }).eq('user_id', user.id);
+      if (error) throw error;
+      toast({ title: 'Profile updated!' });
       setIsEditDialogOpen(false);
-      setAvatarFile(null);
-      setCoverFile(null);
+      setAvatarFile(null); setCoverFile(null);
       fetchProfile();
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update profile',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUpdating(false);
-    }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update profile', variant: 'destructive' });
+    } finally { setIsUpdating(false); }
   };
 
   const fetchFollowers = async () => {
     if (!profileUserId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('follows')
-        .select('follower_id')
-        .eq('followed_id', profileUserId);
-
-      if (error) {
-        console.error('Error fetching followers:', error);
-        return;
-      }
-
-      setFollowers(data?.map(f => f.follower_id) || []);
-    } catch (error) {
-      console.error('Error fetching followers:', error);
-    }
+    const { data } = await supabase.from('follows').select('follower_id').eq('followed_id', profileUserId);
+    setFollowers(data?.map(f => f.follower_id) || []);
   };
 
   const fetchFollowing = async () => {
     if (!profileUserId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('follows')
-        .select('followed_id')
-        .eq('follower_id', profileUserId);
-
-      if (error) {
-        console.error('Error fetching following:', error);
-        return;
-      }
-
-      setFollowing(data?.map(f => f.followed_id) || []);
-    } catch (error) {
-      console.error('Error fetching following:', error);
-    }
+    const { data } = await supabase.from('follows').select('followed_id').eq('follower_id', profileUserId);
+    setFollowing(data?.map(f => f.followed_id) || []);
   };
 
   const fetchPosts = async () => {
     if (!profileUserId) return;
-
     try {
-      const { data: postsData, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('user_id', profileUserId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching posts:', error);
-        return;
-      }
-
+      const { data: postsData, error } = await supabase.from('posts').select('*').eq('user_id', profileUserId).order('created_at', { ascending: false });
+      if (error) { console.error(error); return; }
       const basePosts = postsData || [];
-
-      // Fetch all images for these posts in one query
       const postIds = basePosts.map((p) => p.id);
       let imagesByPost = new Map<string, { id: string; file_url: string }[]>();
-
       if (postIds.length > 0) {
-        const { data: imagesData, error: imagesError } = await supabase
-          .from('post_images')
-          .select('id, post_id, file_url, position')
-          .in('post_id', postIds)
-          .order('position', { ascending: true });
-
-        if (imagesError) {
-          console.error('Error fetching post images:', imagesError);
-        } else {
-          imagesByPost = new Map();
-          (imagesData || []).forEach((img: any) => {
-            const arr = imagesByPost.get(img.post_id) || [];
-            arr.push({ id: img.id, file_url: img.file_url });
-            imagesByPost.set(img.post_id, arr);
-          });
-        }
+        const { data: imagesData } = await supabase.from('post_images').select('id, post_id, file_url, position').in('post_id', postIds).order('position', { ascending: true });
+        (imagesData || []).forEach((img: any) => {
+          const arr = imagesByPost.get(img.post_id) || [];
+          arr.push({ id: img.id, file_url: img.file_url });
+          imagesByPost.set(img.post_id, arr);
+        });
       }
-
-      const postsWithImages: Post[] = basePosts.map((post: any) => ({
-        ...post,
-        images: imagesByPost.get(post.id) || [],
-      }));
-
-      setPosts(postsWithImages);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-    } finally {
-      setIsLoading(false);
-    }
+      setPosts(basePosts.map((post: any) => ({ ...post, images: imagesByPost.get(post.id) || [] })));
+    } catch (e) { console.error(e); }
+    finally { setIsLoading(false); }
   };
-
 
   const searchUsers = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
+    if (!query.trim()) { setSearchResults([]); return; }
     setIsSearching(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .ilike('username', `%${query}%`)
-        .neq('user_id', user?.id || '')
-        .limit(10);
-
-      if (error) {
-        console.error('Error searching users:', error);
-        return;
-      }
-
+      const { data } = await supabase.from('profiles').select('*').ilike('username', `%${query}%`).neq('user_id', user?.id || '').limit(10);
       setSearchResults(data || []);
-    } catch (error) {
-      console.error('Error searching users:', error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    searchUsers(query);
+    } catch (e) { console.error(e); }
+    finally { setIsSearching(false); }
   };
 
   const deletePost = async (postId: string) => {
-    try {
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', postId);
-
-      if (error) {
-        console.error('Error deleting post:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to delete post',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      setPosts(posts.filter(post => post.id !== postId));
-      toast({
-        title: 'Success',
-        description: 'Post deleted successfully',
-      });
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete post',
-        variant: 'destructive',
-      });
-    }
+    const { error } = await supabase.from('posts').delete().eq('id', postId);
+    if (error) { toast({ title: 'Error', description: 'Failed to delete post', variant: 'destructive' }); return; }
+    setPosts(posts.filter(p => p.id !== postId));
+    toast({ title: 'Post deleted' });
   };
 
-  const openLightbox = (postId: string, index: number) => {
-    setLightboxPostId(postId);
-    setLightboxIndex(index);
-  };
-
-  const closeLightbox = () => {
-    setLightboxPostId(null);
-  };
+  const openLightbox = (postId: string, index: number) => { setLightboxPostId(postId); setLightboxIndex(index); };
+  const closeLightbox = () => setLightboxPostId(null);
 
   const showPrev = () => {
     const post = posts.find((p) => p.id === lightboxPostId);
-    if (!post || !post.images || post.images.length === 0) return;
-    setLightboxIndex((prev) =>
-      prev === 0 ? post.images!.length - 1 : prev - 1
-    );
+    if (!post?.images?.length) return;
+    setLightboxIndex((prev) => prev === 0 ? post.images!.length - 1 : prev - 1);
   };
-
   const showNext = () => {
     const post = posts.find((p) => p.id === lightboxPostId);
-    if (!post || !post.images || post.images.length === 0) return;
-    setLightboxIndex((prev) =>
-      prev === post.images!.length - 1 ? 0 : prev + 1
-    );
+    if (!post?.images?.length) return;
+    setLightboxIndex((prev) => prev === post.images!.length - 1 ? 0 : prev + 1);
   };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
-  };
-
+  const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX);
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX === null) return;
-    const diffX = e.changedTouches[0].clientX - touchStartX;
-    const threshold = 50; // px
-    if (diffX > threshold) {
-      showPrev();
-    } else if (diffX < -threshold) {
-      showNext();
-    }
+    const diff = e.changedTouches[0].clientX - touchStartX;
+    if (diff > 50) showPrev(); else if (diff < -50) showNext();
     setTouchStartX(null);
-  };
-
-
-  const handleCoverUpload = async (file: File) => {
-    if (!user) return;
-    setIsCoverUploading(true);
-    try {
-      const fileName = `${user.id}/cover_${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('profile-images')
-        .upload(fileName, file, { upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('profile-images').getPublicUrl(fileName);
-      await supabase.from('profiles').update({ cover_url: publicUrl }).eq('user_id', user.id);
-      setProfile((prev) => prev ? { ...prev, cover_url: publicUrl } : prev);
-      toast({ title: 'Cover photo updated!' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to upload cover photo', variant: 'destructive' });
-    } finally {
-      setIsCoverUploading(false);
-    }
   };
 
   const fetchQuizHistory = async () => {
     if (!user) return;
     setQuizHistoryLoading(true);
-    const { data, error } = await supabase
-      .from('quiz_performance_results' as any)
-      .select('*')
-      .eq('user_id', user.id)
-      .order('completed_at', { ascending: false })
-      .limit(50);
+    const { data, error } = await supabase.from('quiz_performance_results' as any).select('*').eq('user_id', user.id).order('completed_at', { ascending: false }).limit(50);
     if (!error) setQuizHistory(data ?? []);
     setQuizHistoryLoading(false);
   };
@@ -519,613 +236,463 @@ export const Profile = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-transparent flex items-center justify-center">
-        <Card className="p-8">
-          <CardContent>
-            <p className="text-center text-muted-foreground">Please sign in to view your profile.</p>
-          </CardContent>
-        </Card>
+        <div className={`${CARD} p-8 text-center`}>
+          <p className="font-semibold text-slate-400">Please sign in to view your profile.</p>
+        </div>
       </div>
     );
   }
 
+  const displayName = profile?.username || user?.email?.split('@')[0] || 'Anonymous';
+
   return (
     <div className="min-h-screen bg-transparent">
       <div className="container mx-auto px-4 pt-8 pb-20 lg:pb-8 max-w-4xl">
-        {/* Notifications bell — mobile only (desktop has it in the sidebar) */}
+
+        {/* Mobile notifications bell */}
         <div className="flex justify-end mb-4 lg:hidden">
           <NotificationsBell />
         </div>
-        {/* Profile Header — backdrop + overlapping avatar */}
-        <Card className="mb-8 overflow-hidden">
-          {/* ── Cover photo ── */}
-          <div className="relative h-[220px] w-full bg-gradient-to-br from-primary/40 via-primary/20 to-secondary/30">
-            {profile?.cover_url && (
-              <img
-                src={profile.cover_url}
-                alt="Cover"
-                className="absolute inset-0 w-full h-full object-cover cursor-zoom-in"
-                onClick={() => setLightboxImage(profile.cover_url!)}
-              />
+
+        {/* ── Profile Header ── */}
+        <div className={`${CARD} mb-6`}>
+          {/* Cover — avatar is absolutely centred on its bottom edge */}
+          <div className="relative h-[200px] w-full">
+            {profile?.cover_url ? (
+              <img src={profile.cover_url} alt="Cover" className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" onClick={() => setLightboxImage(profile.cover_url!)} />
+            ) : (
+              <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${C.indigo}, ${C.blue}, ${C.cyan})` }} />
             )}
-            {/* Bottom gradient so avatar/badge text stays readable */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-black/25 pointer-events-none" />
 
-
-            {/* Streak badge — overlapping cover, top-right */}
+            {/* Streak badge */}
             {streak > 0 && (
-              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm">
-                <Flame className="w-4 h-4 text-orange-400" />
-                <span className="text-white text-xs font-bold">{streak} day streak</span>
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[2px] border-white/60 font-extrabold text-xs text-white" style={{ background: C.pop }}>
+                <Flame className="w-3.5 h-3.5" /> {streak} day streak
               </div>
             )}
-          </div>
 
-          {/* ── Avatar overlapping the cover bottom edge ── */}
-          <div className="relative z-10 px-6 pb-6">
-            {/* Avatar sits -48px above this section so it crosses the cover border */}
-            <div className="flex flex-col items-center -mt-16">
+            {/* Cover upload button */}
+            {isOwnProfile && (
+              <label className="absolute bottom-3 right-3 w-8 h-8 rounded-full border-[2px] border-white bg-black/50 flex items-center justify-center cursor-pointer hover:bg-black/70 transition-colors">
+                <Camera className="w-4 h-4 text-white" />
+                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file || !user) return;
+                  const filePath = `${user.id}/cover_${Date.now()}_${file.name}`;
+                  const { error } = await supabase.storage.from('profile-images').upload(filePath, file, { upsert: true });
+                  if (error) { toast({ title: 'Error', description: 'Failed to upload cover', variant: 'destructive' }); return; }
+                  const { data: { publicUrl } } = supabase.storage.from('profile-images').getPublicUrl(filePath);
+                  await supabase.from('profiles').update({ cover_url: publicUrl }).eq('user_id', user.id);
+                  setProfile((prev) => prev ? { ...prev, cover_url: publicUrl } : prev);
+                  toast({ title: 'Cover photo updated!' });
+                }} />
+              </label>
+            )}
+
+            {/* Avatar — sits on the bottom edge, half inside cover half below */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10">
               <div className="relative">
                 <Avatar
-                  className="h-32 w-32 border-4 border-background ring-2 ring-primary/30 shadow-xl cursor-zoom-in"
+                  className="h-36 w-36 border-[4px] border-white cursor-zoom-in"
                   onClick={() => { if (profile?.avatar_url) setLightboxImage(profile.avatar_url); }}
                 >
-                  <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
-                  <AvatarFallback className="text-4xl">
-                    {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className={`${DISPLAY} font-extrabold text-4xl`} style={{ background: C.cyan, color: C.ink }}>
+                    {displayName[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                {/* "Student" badge below avatar */}
-                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold shadow">
+                <div
+                  className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-0.5 rounded-full border-[2px] border-[#0F172A] text-[11px] font-extrabold font-['Baloo_2'] text-white shadow-[1px_1px_0_0_#0F172A]"
+                  style={{ background: C.indigo }}
+                >
                   Student
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Name + bio */}
-              <div className="text-center mt-6 w-full max-w-md">
-                <h1 className="text-3xl font-bold mb-1">
-                  {profile?.username || user?.email?.split('@')[0] || 'Anonymous User'}
-                </h1>
-                <p className="text-muted-foreground mb-6 text-sm">
-                  {profile?.bio || 'No bio yet. Click edit to add one.'}
+          {/* Info — padding-top makes room for the half-avatar that hangs below cover */}
+          <div className="px-6 pb-6 pt-24">
+            <div className="flex flex-col items-center">
+              <div className="text-center w-full max-w-md">
+                <h1 className={`${DISPLAY} font-extrabold text-3xl leading-tight mb-1`}>{displayName}</h1>
+                <p className="text-sm font-semibold text-slate-400 mb-5">
+                  {profile?.bio || 'No bio yet.'}
                 </p>
 
-                {isOwnProfile && (
+                {isOwnProfile ? (
                   <div className="flex flex-col items-center gap-3 w-full">
-                  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full max-w-xs">
-                        Edit Profile
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Edit Profile</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="username">Username</Label>
-                          <Input
-                            id="username"
-                            value={editUsername}
-                            onChange={(e) => setEditUsername(e.target.value)}
-                            placeholder="Enter username"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="bio">Bio</Label>
-                          <Textarea
-                            id="bio"
-                            value={editBio}
-                            onChange={(e) => setEditBio(e.target.value)}
-                            placeholder="Tell us about yourself"
-                            rows={4}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="avatar">Profile Picture</Label>
-                          <div className="flex items-center gap-4">
-                            <Input
-                              id="avatar"
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-                            />
-                            {avatarFile && (
-                              <span className="text-sm text-muted-foreground">
-                                {avatarFile.name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="cover">Cover Photo</Label>
-                          <div className="flex items-center gap-4">
-                            <Input
-                              id="cover"
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                            />
-                            {coverFile && (
-                              <span className="text-sm text-muted-foreground">
-                                {coverFile.name}
-                              </span>
-                            )}
-                          </div>
-                          {profile?.cover_url && !coverFile && (
-                            <p className="text-xs text-muted-foreground">Current cover photo set. Upload a new one to replace it.</p>
-                          )}
-                        </div>
-                        <Button
-                          onClick={handleUpdateProfile} 
-                          disabled={isUpdating}
-                          className="w-full"
-                        >
-                          {isUpdating ? 'Updating...' : 'Save Changes'}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-
-                  {/* Quiz History Button */}
-                  <Dialog open={isQuizHistoryOpen} onOpenChange={(open) => { setIsQuizHistoryOpen(open); if (open) fetchQuizHistory(); }}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="w-full max-w-xs flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        Quiz Analysis History
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <BarChart2 className="h-5 w-5" />
-                          Quiz Analysis History
-                        </DialogTitle>
-                      </DialogHeader>
-                      {quizHistoryLoading ? (
-                        <p className="text-sm text-muted-foreground py-8 text-center">Loading...</p>
-                      ) : quizHistory.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-8 text-center">No quiz history yet. Complete a quiz to see your results here.</p>
-                      ) : (
+                    {/* Edit Profile */}
+                    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                      <DialogTrigger asChild>
+                        <button className={`${BTN_OUTLINE} w-full max-w-xs`}>
+                          <PenLine className="w-4 h-4" /> Edit Profile
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A]">
+                        <DialogHeader>
+                          <DialogTitle className={`${DISPLAY} font-extrabold text-lg`}>Edit Profile</DialogTitle>
+                        </DialogHeader>
                         <div className="space-y-4 py-2">
-                          {quizHistory.map((result: any) => {
-                            const ai = result.ai_analysis;
-                            return (
-                              <div key={result.id} className="rounded-lg border p-4 space-y-3">
-                                {/* Header */}
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <p className="font-semibold text-sm">{result.deck_name}</p>
-                                    <p className="text-xs text-muted-foreground">{result.category} · {new Date(result.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                                  </div>
-                                  <span className={`text-lg font-bold ${Number(result.score) >= 70 ? 'text-green-600' : Number(result.score) >= 40 ? 'text-orange-500' : 'text-red-500'}`}>
-                                    {Number(result.score).toFixed(1)}%
-                                  </span>
-                                </div>
-
-                                {/* Score breakdown */}
-                                <div className="flex gap-4 text-xs">
-                                  <span className="flex items-center gap-1 text-green-600">
-                                    <CheckCircle className="h-3 w-3" /> {result.correct_count} correct
-                                  </span>
-                                  <span className="flex items-center gap-1 text-red-500">
-                                    <XCircle className="h-3 w-3" /> {result.wrong_count} wrong
-                                  </span>
-                                  <span className="flex items-center gap-1 text-muted-foreground">
-                                    <SkipForward className="h-3 w-3" /> {result.skipped_count} skipped
-                                  </span>
-                                  <span className="text-muted-foreground ml-auto">{result.total_count} total</span>
-                                </div>
-
-                                {/* AI Analysis */}
-                                {ai ? (
-                                  <div className="bg-muted/40 rounded-lg p-3 space-y-2 text-xs">
-                                    <p className="font-semibold text-sm flex items-center gap-1">
-                                      <BarChart2 className="h-3.5 w-3.5 text-primary" /> AI Analysis
-                                      {ai.overall_trend && (
-                                        <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-medium ${
-                                          ai.overall_trend === 'improving' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' :
-                                          ai.overall_trend === 'declining' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' :
-                                          'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
-                                        }`}>
-                                          {ai.overall_trend.replace('_', ' ')}
-                                        </span>
-                                      )}
-                                    </p>
-                                    {ai.performance_summary && (
-                                      <p className="text-muted-foreground">{ai.performance_summary}</p>
-                                    )}
-                                    {ai.weak_areas?.length > 0 && (
-                                      <div>
-                                        <p className="font-medium text-red-600 dark:text-red-400 mb-1">Weak areas</p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {ai.weak_areas.map((a: string, i: number) => (
-                                            <span key={i} className="px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{a}</span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {ai.strong_areas?.length > 0 && (
-                                      <div>
-                                        <p className="font-medium text-green-600 dark:text-green-400 mb-1">Strong areas</p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {ai.strong_areas.map((a: string, i: number) => (
-                                            <span key={i} className="px-2 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">{a}</span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {ai.improvement_tips?.length > 0 && (
-                                      <div>
-                                        <p className="font-medium mb-1">Tips</p>
-                                        <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                                          {ai.improvement_tips.map((tip: string, i: number) => (
-                                            <li key={i}>{tip}</li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
-                                    {ai.comparison_note && (
-                                      <p className="text-muted-foreground italic">{ai.comparison_note}</p>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground italic">No AI analysis saved for this attempt.</p>
-                                )}
-                              </div>
-                            );
-                          })}
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Username</Label>
+                            <input className={INPUT} value={editUsername} onChange={(e) => setEditUsername(e.target.value)} placeholder="Enter username" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Bio</Label>
+                            <Textarea
+                              value={editBio}
+                              onChange={(e) => setEditBio(e.target.value)}
+                              placeholder="Tell us about yourself"
+                              rows={3}
+                              className="border-[2px] border-[#0F172A] rounded-[14px] shadow-[1px_1px_0_0_#0F172A] text-sm font-semibold focus-visible:ring-0 focus:shadow-[2px_2px_0_0_#0F172A] transition-shadow resize-none"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Profile Picture</Label>
+                            <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                              className="w-full text-sm font-semibold border-[2px] border-[#0F172A] rounded-[14px] px-3 py-2 bg-white cursor-pointer" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Cover Photo</Label>
+                            <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                              className="w-full text-sm font-semibold border-[2px] border-[#0F172A] rounded-[14px] px-3 py-2 bg-white cursor-pointer" />
+                          </div>
+                          <button className={`${BTN_PRIMARY} w-full`} style={{ background: C.indigo }} onClick={handleUpdateProfile} disabled={isUpdating}>
+                            {isUpdating ? 'Saving…' : 'Save Changes'}
+                          </button>
                         </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Quiz History */}
+                    <Dialog open={isQuizHistoryOpen} onOpenChange={(open) => { setIsQuizHistoryOpen(open); if (open) fetchQuizHistory(); }}>
+                      <DialogTrigger asChild>
+                        <button className={`${BTN_OUTLINE} w-full max-w-xs`}>
+                          <BarChart2 className="w-4 h-4" /> Quiz History
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A]">
+                        <DialogHeader>
+                          <DialogTitle className={`${DISPLAY} font-extrabold text-lg flex items-center gap-2`}>
+                            <BarChart2 className="h-5 w-5" style={{ color: C.indigo }} /> Quiz Analysis History
+                          </DialogTitle>
+                        </DialogHeader>
+                        {quizHistoryLoading ? (
+                          <div className="space-y-3 py-4">
+                            {[1,2,3].map(i => <Skeleton key={i} className="h-24 w-full rounded-[14px]" />)}
+                          </div>
+                        ) : quizHistory.length === 0 ? (
+                          <p className="text-sm font-semibold text-slate-400 py-8 text-center">No quiz history yet. Complete a quiz to see your results here.</p>
+                        ) : (
+                          <div className="space-y-3 py-2">
+                            {quizHistory.map((result: any) => {
+                              const ai = result.ai_analysis;
+                              const score = Number(result.score);
+                              return (
+                                <div key={result.id} className="border-[2px] border-[#0F172A] rounded-[16px] shadow-[2px_2px_0_0_#0F172A] p-4 space-y-3 bg-white">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className={`${DISPLAY} font-extrabold text-sm`}>{result.deck_name}</p>
+                                      <p className="text-xs font-semibold text-slate-400">{result.category} · {new Date(result.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                    </div>
+                                    <span className={`${DISPLAY} font-extrabold text-xl ${score >= 70 ? 'text-emerald-500' : score >= 40 ? 'text-orange-400' : 'text-red-500'}`}>
+                                      {score.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-4 text-xs font-semibold">
+                                    <span className="flex items-center gap-1 text-emerald-500"><CheckCircle className="h-3 w-3" /> {result.correct_count} correct</span>
+                                    <span className="flex items-center gap-1 text-red-400"><XCircle className="h-3 w-3" /> {result.wrong_count} wrong</span>
+                                    <span className="flex items-center gap-1 text-slate-400"><SkipForward className="h-3 w-3" /> {result.skipped_count} skipped</span>
+                                    <span className="text-slate-400 ml-auto">{result.total_count} total</span>
+                                  </div>
+                                  {ai && (
+                                    <div className="rounded-[12px] border-[2px] border-[#0F172A]/10 p-3 space-y-2 text-xs" style={{ background: C.skySoft }}>
+                                      <p className={`${DISPLAY} font-extrabold text-sm flex items-center gap-1`} style={{ color: C.indigo }}>
+                                        <BarChart2 className="h-3.5 w-3.5" /> AI Analysis
+                                        {ai.overall_trend && (
+                                          <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold border border-[#0F172A]/10 ${
+                                            ai.overall_trend === 'improving' ? 'bg-emerald-100 text-emerald-700' :
+                                            ai.overall_trend === 'declining' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                                          }`}>
+                                            {ai.overall_trend.replace('_', ' ')}
+                                          </span>
+                                        )}
+                                      </p>
+                                      {ai.performance_summary && <p className="text-slate-600 font-medium">{ai.performance_summary}</p>}
+                                      {ai.weak_areas?.length > 0 && (
+                                        <div>
+                                          <p className="font-bold text-red-500 mb-1">Weak areas</p>
+                                          <div className="flex flex-wrap gap-1">{ai.weak_areas.map((a: string, i: number) => <span key={i} className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold">{a}</span>)}</div>
+                                        </div>
+                                      )}
+                                      {ai.strong_areas?.length > 0 && (
+                                        <div>
+                                          <p className="font-bold text-emerald-600 mb-1">Strong areas</p>
+                                          <div className="flex flex-wrap gap-1">{ai.strong_areas.map((a: string, i: number) => <span key={i} className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 font-semibold">{a}</span>)}</div>
+                                        </div>
+                                      )}
+                                      {ai.improvement_tips?.length > 0 && (
+                                        <div>
+                                          <p className="font-bold mb-1">Tips</p>
+                                          <ul className="list-disc list-inside space-y-0.5 text-slate-600 font-medium">{ai.improvement_tips.map((tip: string, i: number) => <li key={i}>{tip}</li>)}</ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
                   </div>
-                )}
-                {!isOwnProfile && profileUserId && (
-                  <FollowButton targetUserId={profileUserId} />
+                ) : (
+                  profileUserId && <FollowButton targetUserId={profileUserId} />
                 )}
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* Profile Stats */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-6 justify-center">
-              <div className="text-center">
-                <div className="font-bold text-lg">{posts.length}</div>
-                <div className="text-sm text-muted-foreground">Posts</div>
+        {/* ── Stats ── */}
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          {[
+            { label: 'Posts', value: posts.length, bg: C.skySoft, color: C.blue, onClick: undefined },
+            { label: 'Followers', value: profile?.followers_count || 0, bg: C.indigoSoft, color: C.indigo, onClick: isOwnProfile ? () => setIsFollowersOpen(true) : undefined },
+            { label: 'Following', value: profile?.following_count || 0, bg: C.mintSoft, color: '#059669', onClick: isOwnProfile ? () => setIsFollowingOpen(true) : undefined },
+            { label: 'Streak', value: streak, bg: C.peach, color: C.pop, icon: <Flame className="w-4 h-4" />, onClick: undefined },
+          ].map(({ label, value, bg, color, icon, onClick }) => (
+            <div
+              key={label}
+              className={`border-[2.5px] border-[#0F172A] rounded-[18px] shadow-[3px_3px_0_0_#0F172A] text-center py-4 px-2 ${onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#0F172A] transition-all' : ''}`}
+              style={{ background: bg }}
+              onClick={onClick}
+            >
+              {icon ? (
+                <div className="flex items-center justify-center gap-1 mb-0.5" style={{ color }}>
+                  {icon}
+                  <span className={`${DISPLAY} font-extrabold text-xl`}>{value}</span>
+                </div>
+              ) : (
+                <div className={`${DISPLAY} font-extrabold text-xl mb-0.5`} style={{ color }}>{value}</div>
+              )}
+              <div className="text-xs font-bold text-slate-500">{label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Streak Statistics ── */}
+        <div className={`${CARD} mb-6`} style={{ background: C.lemon }}>
+          <div className="p-5">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.pop }}>
+                <Flame className="w-4 h-4 text-white" />
               </div>
-              <div
-                className={`text-center ${isOwnProfile ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
-                onClick={() => isOwnProfile && setIsFollowersOpen(true)}
-              >
-                <div className="font-bold text-lg">{profile?.followers_count || 0}</div>
-                <div className="text-sm text-muted-foreground">Followers</div>
+              <p className={`${DISPLAY} font-extrabold text-lg`}>Streak Statistics</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border-[2px] border-[#0F172A] rounded-[16px] shadow-[2px_2px_0_0_#0F172A] p-5 text-center bg-white">
+                <Zap className="w-10 h-10 mx-auto mb-2" style={{ color: C.pop }} />
+                <p className={`${DISPLAY} font-extrabold text-4xl`} style={{ color: C.pop }}>{streak}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1">Current Streak</p>
               </div>
-              <div
-                className={`text-center ${isOwnProfile ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
-                onClick={() => isOwnProfile && setIsFollowingOpen(true)}
-              >
-                <div className="font-bold text-lg">{profile?.following_count || 0}</div>
-                <div className="text-sm text-muted-foreground">Following</div>
+              <div className="border-[2px] border-[#0F172A] rounded-[16px] shadow-[2px_2px_0_0_#0F172A] p-5 text-center bg-white">
+                <Target className="w-10 h-10 mx-auto mb-2" style={{ color: C.blue }} />
+                <p className={`${DISPLAY} font-extrabold text-4xl`} style={{ color: C.blue }}>{streak}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1">Best Streak</p>
               </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center mb-1">
-                  <div className="relative">
-                    <Flame className="w-6 h-6 text-orange-500" />
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                      <span className="text-xs font-bold text-primary-foreground">{streak}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Streak Leaderboard ── */}
+        <div className="mb-6">
+          <StreakLeaderboard currentUserId={user?.id} currentStreak={streak} />
+        </div>
+
+        {/* ── User Search ── */}
+        <div className={`${CARD} mb-6`} style={{ background: C.lavender }}>
+          <div className="p-5">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.cyan }}>
+                <Search className="w-4 h-4" style={{ color: C.ink }} />
+              </div>
+              <p className={`${DISPLAY} font-extrabold text-lg`}>Search Users</p>
+            </div>
+            <div className="relative mb-3">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                placeholder="Search by username…"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); searchUsers(e.target.value); }}
+                className={`${INPUT} pl-10`}
+              />
+            </div>
+            {isSearching && <p className="text-xs font-semibold text-slate-400 px-1">Searching…</p>}
+            {searchResults.length > 0 && (
+              <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-hide">
+                {searchResults.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between p-3 border-[2px] border-[#0F172A]/20 rounded-[14px] bg-white hover:border-[#0F172A]/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A]">
+                        <AvatarImage src={u.avatar_url || undefined} />
+                        <AvatarFallback className={`${DISPLAY} font-extrabold text-sm`} style={{ background: C.cyan, color: C.ink }}>
+                          {u.username?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className={`${DISPLAY} font-extrabold text-sm`}>{u.username || 'Anonymous'}</p>
+                        {u.bio && <p className="text-xs font-semibold text-slate-400 truncate max-w-48">{u.bio}</p>}
+                      </div>
                     </div>
+                    <FollowButton targetUserId={u.user_id} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {searchQuery && !isSearching && searchResults.length === 0 && (
+              <p className="text-xs font-semibold text-slate-400 px-1">No users found for "{searchQuery}"</p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Posts ── */}
+        <div className="space-y-5">
+          {!isOwnProfile && !isMutual && !isMutualLoading ? (
+            <div className={`${CARD} py-16 flex flex-col items-center gap-4 text-center px-6`}>
+              <div className="w-14 h-14 rounded-[18px] border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A] flex items-center justify-center" style={{ background: C.indigoSoft }}>
+                <Lock className="w-6 h-6" style={{ color: C.indigo }} />
+              </div>
+              <div>
+                <p className={`${DISPLAY} font-extrabold text-lg`}>Posts are private</p>
+                <p className="text-sm font-semibold text-slate-400 mt-1 max-w-xs">
+                  Follow each other to see <span className="font-bold text-[#0F172A]">{profile?.username || 'this user'}</span>'s posts.
+                </p>
+              </div>
+              {profileUserId && <FollowButton targetUserId={profileUserId} />}
+            </div>
+          ) : (
+            <>
+              {isOwnProfile && <PostUpload onPostCreated={fetchPosts} />}
+
+              {isLoading ? (
+                <div className={CARD}>
+                  <div className="p-5 space-y-3">
+                    {[1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-[14px]" />)}
                   </div>
                 </div>
-                <div className="text-sm text-muted-foreground">Streak</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Streak Statistics Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Flame className="h-5 w-5 text-orange-500" />
-              Streak Statistics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/50 rounded-lg">
-                <div className="flex items-center justify-center mb-3">
-                  <Zap className="w-12 h-12 text-orange-600" />
+              ) : posts.length === 0 ? (
+                <div className={`${CARD} py-12 flex flex-col items-center gap-3 text-center px-6`}>
+                  <div className="w-12 h-12 rounded-[14px] border-[2.5px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center" style={{ background: C.skySoft }}>
+                    <GraduationCap className="w-5 h-5" style={{ color: C.indigo }} />
+                  </div>
+                  <p className={`${DISPLAY} font-extrabold text-base`}>No posts yet</p>
+                  {isOwnProfile && <p className="text-sm font-semibold text-slate-400">Create your first post above!</p>}
                 </div>
-                <p className="text-4xl font-bold text-orange-600 mb-2">{streak}</p>
-                <p className="text-sm text-muted-foreground">Current Streak</p>
-              </div>
-              <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/50 rounded-lg">
-                <div className="flex items-center justify-center mb-3">
-                  <Target className="w-12 h-12 text-blue-600" />
-                </div>
-                <p className="text-4xl font-bold text-blue-600 mb-2">{streak}</p>
-                <p className="text-sm text-muted-foreground">Best Streak</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Streak Leaderboard */}
-        <StreakLeaderboard currentUserId={user?.id} currentStreak={streak} />
-
-        {/* User Search Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
-              Search Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search for users by username..."
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  className="pl-10"
-                />
-              </div>
-              
-              {isSearching && (
-                <p className="text-sm text-muted-foreground">Searching...</p>
-              )}
-              
-              {searchResults.length > 0 && (
-                <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {searchResults.map((userProfile) => (
-                    <div key={userProfile.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={userProfile.avatar_url || "/placeholder.svg"} />
-                          <AvatarFallback>
-                            {userProfile.username?.[0]?.toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{userProfile.username || 'Anonymous'}</p>
-                          {userProfile.bio && (
-                            <p className="text-sm text-muted-foreground truncate max-w-48">
-                              {userProfile.bio}
+              ) : (
+                <div className="space-y-4">
+                  {posts.map((post) => {
+                    const hasGalleryImages = !!(post.images && post.images.length);
+                    const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(!hasGalleryImages && post.image_url ? [post.image_url] : []);
+                    return (
+                      <article key={post.id} className={`${CARD}`}>
+                        {/* Header */}
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A] flex-shrink-0">
+                            <AvatarImage src={profile?.avatar_url || undefined} />
+                            <AvatarFallback className={`${DISPLAY} font-extrabold text-sm`} style={{ background: C.cyan, color: C.ink }}>
+                              {displayName[0]?.toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className={`${DISPLAY} font-extrabold text-sm leading-tight truncate`}>{displayName}</p>
+                            <p className="text-[11px] font-semibold text-slate-500">
+                              {new Date(post.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </p>
+                          </div>
+                          {isOwnProfile && (
+                            <button
+                              onClick={() => deletePost(post.id)}
+                              className="h-8 w-8 rounded-full border-[2px] border-[#0F172A]/20 bg-white/70 flex items-center justify-center hover:border-red-300 hover:bg-red-50 transition-colors flex-shrink-0"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-slate-400" />
+                            </button>
                           )}
                         </div>
-                      </div>
-                      <FollowButton targetUserId={userProfile.user_id} />
-                    </div>
-                  ))}
+
+                        {gallery.length > 0 && (
+                          <div className="border-y-[2px] border-[#0F172A]/10">
+                            <PostImageCarousel images={gallery} onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined} />
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
+                          <LikeButton postId={post.id} likesCount={post.likes_count} onLikeChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, likes_count: n } : p))} />
+                          <CommentSection postId={post.id} commentsCount={post.comments_count} onCommentChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: n } : p))} />
+                        </div>
+
+                        {post.content && (
+                          <p className="px-4 pb-2 text-sm font-medium leading-snug">
+                            <span className={`${DISPLAY} font-extrabold mr-1.5`}>{displayName}</span>
+                            {post.content}
+                          </p>
+                        )}
+
+                        {post.tags.length > 0 && (
+                          <div className="px-4 pb-3 flex flex-wrap gap-x-2 gap-y-1">
+                            {post.tags.map((tag, i) => (
+                              <span key={i} className="text-xs font-bold" style={{ color: C.indigo }}>#{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
-              
-              {searchQuery && !isSearching && searchResults.length === 0 && (
-                <p className="text-sm text-muted-foreground">No users found matching "{searchQuery}"</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </>
+          )}
+        </div>
 
-        {/* Followers Dialog */}
+        {/* Followers / Following dialogs */}
         <Dialog open={isFollowersOpen} onOpenChange={setIsFollowersOpen}>
-          <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Followers</DialogTitle>
-            </DialogHeader>
+          <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[4px_4px_0_0_#0F172A]">
+            <DialogHeader><DialogTitle className={`${DISPLAY} font-extrabold`}>Followers</DialogTitle></DialogHeader>
             <UsersList title="" userIds={followers} showAll />
           </DialogContent>
         </Dialog>
-
-        {/* Following Dialog */}
         <Dialog open={isFollowingOpen} onOpenChange={setIsFollowingOpen}>
-          <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Following</DialogTitle>
-            </DialogHeader>
+          <DialogContent className="max-w-sm max-h-[70vh] overflow-y-auto border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[4px_4px_0_0_#0F172A]">
+            <DialogHeader><DialogTitle className={`${DISPLAY} font-extrabold`}>Following</DialogTitle></DialogHeader>
             <UsersList title="" userIds={following} showAll />
           </DialogContent>
         </Dialog>
-
-        {/* Posts Section */}
-        <div className="space-y-6">
-            {/* Lock posts for non-mutual follows when viewing another user's profile */}
-            {!isOwnProfile && !isMutual && !isMutualLoading ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-                  <div className="rounded-full bg-muted p-4">
-                    <Lock className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-base">Posts are private</p>
-                    <p className="mt-1 text-sm text-muted-foreground max-w-xs">
-                      Follow each other to see{' '}
-                      <span className="font-medium text-foreground">
-                        {profile?.username || 'this user'}
-                      </span>
-                      's posts.
-                    </p>
-                  </div>
-                  {profileUserId && <FollowButton targetUserId={profileUserId} />}
-                </CardContent>
-              </Card>
-            ) : (
-            <>
-            {isOwnProfile && <PostUpload onPostCreated={fetchPosts} />}
-            
-            {isLoading ? (
-              <Card>
-                <CardContent className="p-6 text-muted-foreground">Loading posts…</CardContent>
-              </Card>
-            ) : posts.length === 0 ? (
-              <Card>
-                <CardContent className="p-6 text-muted-foreground">No posts yet. Create your first post above!</CardContent>
-              </Card>
-            ) : (
-              <div className="rounded-2xl overflow-hidden border border-border/60 bg-card divide-y divide-border/40">
-                {posts.map((post) => {
-                  const hasGalleryImages = !!(post.images && post.images.length);
-                  const gallery = (post.images?.map((img) => img.file_url) ?? []).concat(
-                    !hasGalleryImages && post.image_url ? [post.image_url] : []
-                  );
-                  return (
-                    <article key={post.id}>
-                      {/* Header */}
-                      <div className="flex items-center gap-3 px-4 py-3">
-                        <Avatar className="h-9 w-9 ring-2 ring-primary/15 flex-shrink-0">
-                          <AvatarImage src={profile?.avatar_url || undefined} />
-                          <AvatarFallback className="text-sm font-bold">
-                            {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm leading-tight truncate">
-                            {profile?.username || user?.email?.split('@')[0] || 'Anonymous'}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {new Date(post.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </p>
-                        </div>
-                        {isOwnProfile && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deletePost(post.id)}
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Image — edge-to-edge, natural aspect */}
-                      {gallery.length > 0 && (
-                        <PostImageCarousel
-                          images={gallery}
-                          onImageClick={hasGalleryImages ? (idx) => openLightbox(post.id, idx) : undefined}
-                        />
-                      )}
-
-                      {/* Action bar */}
-                      <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
-                        <LikeButton
-                          postId={post.id}
-                          likesCount={post.likes_count}
-                          onLikeChange={(newCount) =>
-                            setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, likes_count: newCount } : p))
-                          }
-                        />
-                        <CommentSection
-                          postId={post.id}
-                          commentsCount={post.comments_count}
-                          onCommentChange={(newCount) =>
-                            setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: newCount } : p))
-                          }
-                        />
-                      </div>
-
-                      {/* Caption */}
-                      {post.content && (
-                        <p className="px-4 pb-2 text-sm leading-snug">
-                          <span className="font-semibold mr-1.5">
-                            {profile?.username || 'Anonymous'}
-                          </span>
-                          {post.content}
-                        </p>
-                      )}
-
-                      {/* Tags */}
-                      {post.tags.length > 0 && (
-                        <div className="px-4 pb-3 flex flex-wrap gap-x-2 gap-y-1">
-                          {post.tags.map((tag, i) => (
-                            <span key={i} className="text-xs font-medium text-primary">#{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-            </>
-            )}
-        </div>
       </div>
 
-      {/* ── Profile image lightbox (avatar / cover) ── */}
+      {/* ── Profile image lightbox ── */}
       {lightboxImage && createPortal(
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)" }}
-          onClick={() => setLightboxImage(null)}
-        >
-          <button
-            type="button"
-            className="absolute top-4 right-5 text-white/70 hover:text-white text-2xl leading-none z-10 transition-colors"
-            onClick={() => setLightboxImage(null)}
-            aria-label="Close"
-          >
-            ✕
-          </button>
-          <img
-            src={lightboxImage}
-            alt="Full size"
-            className="max-w-[92vw] max-h-[88vh] object-contain rounded-2xl shadow-2xl lb-zoom-in"
-            onClick={(e) => e.stopPropagation()}
-          />
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(8px)' }} onClick={() => setLightboxImage(null)}>
+          <button type="button" className="absolute top-4 right-5 text-white/70 hover:text-white text-2xl leading-none z-10 transition-colors" onClick={() => setLightboxImage(null)} aria-label="Close">✕</button>
+          <img src={lightboxImage} alt="Full size" className="max-w-[92vw] max-h-[88vh] object-contain rounded-2xl shadow-2xl lb-zoom-in" onClick={(e) => e.stopPropagation()} />
         </div>,
         document.body
       )}
 
-      {/* Fullscreen lightbox for this profile's post images */}
+      {/* ── Post image lightbox ── */}
       {lightboxPostId && (() => {
         const post = posts.find((p) => p.id === lightboxPostId);
-        if (!post || !post.images || post.images.length === 0) return null;
+        if (!post?.images?.length) return null;
         const currentImage = post.images[lightboxIndex];
         if (!currentImage) return null;
-
         return createPortal(
           <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
-            <button
-              type="button"
-              className="absolute top-4 right-4 text-white text-xl md:text-2xl"
-              onClick={closeLightbox}
-            >
-              ✕
-            </button>
-
-            <button
-              type="button"
-              className="absolute left-4 md:left-8 text-white text-3xl md:text-4xl"
-              onClick={showPrev}
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="absolute right-4 md:right-8 text-white text-3xl md:text-4xl"
-              onClick={showNext}
-            >
-              ›
-            </button>
-
-            <div
-              className="max-w-5xl w-full px-4"
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-            >
-              <img
-                src={currentImage.file_url}
-                alt="Post image"
-                className="w-full max-h-[80vh] object-contain mx-auto"
-              />
+            <button type="button" className="absolute top-4 right-4 text-white text-2xl" onClick={closeLightbox}>✕</button>
+            <button type="button" className="absolute left-4 md:left-8 text-white text-4xl" onClick={showPrev}>‹</button>
+            <button type="button" className="absolute right-4 md:right-8 text-white text-4xl" onClick={showNext}>›</button>
+            <div className="max-w-5xl w-full px-4" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+              <img src={currentImage.file_url} alt="Post image" className="w-full max-h-[80vh] object-contain mx-auto" />
             </div>
           </div>,
           document.body

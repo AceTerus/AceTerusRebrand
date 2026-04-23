@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Target, Clock, Plus } from "lucide-react";
+import { X, Target, Clock, Plus, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, parseISO, differenceInMinutes, differenceInHours, isPast } from "date-fns";
@@ -20,6 +20,7 @@ interface Goal {
 
 interface TodayGoalBannerProps {
   onSetGoal?: () => void;
+  inline?: boolean;
 }
 
 const P_BG: Record<string, string> = { low: C.cyan, medium: C.sun, high: C.pop };
@@ -35,10 +36,12 @@ function timeLeft(deadline: string): { label: string; overdue: boolean } {
   return { label: `${Math.floor(hrs / 24)}d left`, overdue: false };
 }
 
-export const TodayGoalBanner = ({ onSetGoal }: TodayGoalBannerProps) => {
+export const TodayGoalBanner = ({ onSetGoal, inline = false }: TodayGoalBannerProps) => {
   const { user } = useAuth();
   const [goal, setGoal] = useState<Goal | null | "empty">(null);
   const [dismissed, setDismissed] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -69,11 +72,8 @@ export const TodayGoalBanner = ({ onSetGoal }: TodayGoalBannerProps) => {
 
   /* ── No goals today ── */
   if (goal === "empty") {
-    return (
-      <div
-        className="border-[2.5px] border-[#0F172A] rounded-[18px] shadow-[3px_3px_0_0_#0F172A] p-3.5 flex items-center gap-3"
-        style={{ background: C.indigoSoft ?? "#D6D4FF" }}
-      >
+    const inner = (
+      <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.indigo }}>
           <Target className="w-4 h-4 text-white" />
         </div>
@@ -81,7 +81,7 @@ export const TodayGoalBanner = ({ onSetGoal }: TodayGoalBannerProps) => {
           <p className={`${DISPLAY} font-extrabold text-sm`} style={{ color: C.ink }}>No goals set for today</p>
           <p className="text-xs font-semibold text-slate-500 mt-0.5">Plan your study session and stay on track.</p>
         </div>
-        {onSetGoal && (
+        {onSetGoal && !inline && (
           <button
             onClick={onSetGoal}
             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[2px] border-[#0F172A] bg-white font-extrabold font-['Baloo_2'] text-xs shadow-[2px_2px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#0F172A] transition-all cursor-pointer"
@@ -91,43 +91,82 @@ export const TodayGoalBanner = ({ onSetGoal }: TodayGoalBannerProps) => {
         )}
       </div>
     );
+    if (inline) return <>{inner}</>;
+    return (
+      <div className="border-[2.5px] border-[#0F172A] rounded-[18px] shadow-[3px_3px_0_0_#0F172A] p-3.5" style={{ background: C.indigoSoft ?? "#D6D4FF" }}>
+        {inner}
+      </div>
+    );
   }
 
   /* ── Has a goal ── */
   const tl = goal.deadline ? timeLeft(goal.deadline) : null;
 
-  return (
-    <div
-      className="border-[2.5px] border-[#0F172A] rounded-[18px] shadow-[3px_3px_0_0_#0F172A] p-3.5 flex items-center gap-3"
-      style={{ background: tl?.overdue ? "#FFF0ED" : C.skySoft }}
-    >
+  const handleComplete = async () => {
+    if (completing || goal === "empty" || goal === null) return;
+    setCompleting(true);
+    setJustCompleted(true);
+    await supabase.from("goals" as any).update({ completed: true }).eq("id", goal.id);
+    setTimeout(() => setGoal("empty"), 1200);
+    setCompleting(false);
+  };
+
+  const inner = (
+    <div className="flex items-center gap-3">
       <div
         className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0"
-        style={{ background: P_BG[goal.priority] }}
+        style={{ background: justCompleted ? "#22c55e" : P_BG[goal.priority] }}
       >
-        <Target className="w-4 h-4" style={{ color: P_TC[goal.priority] }} />
+        {justCompleted
+          ? <CheckCircle2 className="w-4 h-4 text-white" />
+          : <Target className="w-4 h-4" style={{ color: P_TC[goal.priority] }} />
+        }
       </div>
-
       <div className="flex-1 min-w-0">
-        <p className={`${DISPLAY} font-extrabold text-sm leading-snug truncate`} style={{ color: C.ink }}>
+        <p className={cn(`${DISPLAY} font-extrabold text-sm leading-snug truncate`, justCompleted && "line-through opacity-60")} style={{ color: C.ink }}>
           {goal.text}
         </p>
-        <p className={cn("text-xs font-bold mt-0.5 flex items-center gap-1", tl?.overdue ? "text-[#FF7A59]" : "text-slate-500")}>
-          {tl ? (
+        <p className={cn("text-xs font-bold mt-0.5 flex items-center gap-1", justCompleted ? "text-emerald-500" : tl?.overdue ? "text-[#FF7A59]" : "text-slate-500")}>
+          {justCompleted ? (
+            <><CheckCircle2 className="w-3 h-3 shrink-0" /> Completed!</>
+          ) : tl ? (
             <><Clock className="w-3 h-3 shrink-0" />{tl.label}</>
           ) : (
             <span className="text-slate-400">Today's goal · {goal.priority} priority</span>
           )}
         </p>
       </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={handleComplete}
+          disabled={completing || justCompleted}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border-[2px] border-[#0F172A] font-extrabold font-['Baloo_2'] text-[11px] shadow-[2px_2px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#0F172A] transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none text-white"
+          style={{ background: justCompleted ? "#22c55e" : "#22c55e" }}
+          aria-label="Mark as completed"
+        >
+          <CheckCircle2 className="w-3 h-3" />
+          {justCompleted ? "Done!" : "Done"}
+        </button>
+        {!inline && (
+          <button
+            onClick={() => setDismissed(true)}
+            className="w-7 h-7 rounded-[10px] border-[1.5px] border-[#0F172A]/20 bg-white/70 flex items-center justify-center hover:bg-white transition-colors cursor-pointer"
+            aria-label="Dismiss"
+          >
+            <X className="w-3 h-3 text-slate-400" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
-      <button
-        onClick={() => setDismissed(true)}
-        className="w-7 h-7 rounded-[10px] border-[1.5px] border-[#0F172A]/20 bg-white/70 flex items-center justify-center shrink-0 hover:bg-white transition-colors cursor-pointer"
-        aria-label="Dismiss"
-      >
-        <X className="w-3 h-3 text-slate-400" />
-      </button>
+  if (inline) return <>{inner}</>;
+  return (
+    <div
+      className="border-[2.5px] border-[#0F172A] rounded-[18px] shadow-[3px_3px_0_0_#0F172A] p-3.5"
+      style={{ background: tl?.overdue ? "#FFF0ED" : C.skySoft }}
+    >
+      {inner}
     </div>
   );
 };
