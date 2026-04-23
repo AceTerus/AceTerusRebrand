@@ -31,26 +31,66 @@ import { PomodoroFloatingWidget } from "./components/PomodoroFloatingWidget";
 
 const queryClient = new QueryClient();
 
+const PageTransitionBar = () => {
+  const location = useLocation();
+  const [progress, setProgress] = React.useState(0);
+  const [visible, setVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    setVisible(true);
+    setProgress(30);
+
+    const fastTimer = setInterval(() => {
+      setProgress((p) => Math.min(p + Math.random() * 20, 85));
+    }, 100);
+
+    const finishTimer = setTimeout(() => {
+      clearInterval(fastTimer);
+      setProgress(100);
+      setTimeout(() => setVisible(false), 200);
+    }, 400);
+
+    return () => {
+      clearInterval(fastTimer);
+      clearTimeout(finishTimer);
+    };
+  }, [location.pathname]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed top-0 left-0 w-full z-[9999] pointer-events-none">
+      <div 
+        className="h-1 bg-blue-500 transition-all duration-200 ease-out shadow-[0_0_10px_rgba(59,130,246,0.8)]" 
+        style={{ width: `${progress}%` }} 
+      />
+    </div>
+  );
+};
+
 const AnimatedRoutes = () => {
   const location = useLocation();
   return (
-    <div key={location.pathname} className="page-enter">
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/feed" element={<Feed />} />
-        <Route path="/quiz" element={<Quiz />} />
-        <Route path="/omr-scan" element={<OmrScanner />} />
-        <Route path="/ar-scanner" element={<ArScanner />} />
-        <Route path="/admin" element={<AdminQuiz />} />
-        <Route path="/materials" element={<Materials />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/profile/:userId" element={<Profile />} />
-        <Route path="/discover" element={<Discover />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </div>
+    <>
+      <PageTransitionBar />
+      <div key={location.pathname} className="page-enter">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/feed" element={<Feed />} />
+          <Route path="/quiz" element={<Quiz />} />
+          <Route path="/omr-scan" element={<OmrScanner />} />
+          <Route path="/ar-scanner" element={<ArScanner />} />
+          <Route path="/admin" element={<AdminQuiz />} />
+          <Route path="/materials" element={<Materials />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/:userId" element={<Profile />} />
+          <Route path="/discover" element={<Discover />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+    </>
   );
 };
 
