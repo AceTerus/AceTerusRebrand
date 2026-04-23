@@ -68,7 +68,7 @@ const AppContent = () => {
 
   return (
     <BrowserRouter>
-      <div className="flex min-h-screen w-full overflow-x-hidden">
+      <div className="flex min-h-screen w-full [overflow-x:clip]">
         {user && <AppSidebar collapsed={sidebarCollapsed} onCollapseToggle={handleSidebarCollapse} />}
         {user && <MobileNav />}
         {user && <MascotGreeter />}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,10 +59,48 @@ export const Feed = () => {
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (user) { fetchFeed(); fetchSuggestedUsers(); }
   }, [user]);
+
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+
+    const gap = 16;
+    // virtualTop = the sidebar's current distance (px) from the viewport top.
+    // It starts at the element's natural rendered position, then drifts with
+    // each scroll tick — scroll down shrinks it (sidebar moves up), scroll up
+    // grows it (sidebar moves down). Clamping to the two edges creates the
+    // "trapped" effect on both sides.
+    let virtualTop = sidebar.getBoundingClientRect().top;
+    let lastScrollY = window.scrollY;
+
+    sidebar.style.top = `${virtualTop}px`;
+
+    const onScroll = () => {
+      const s = sidebarRef.current;
+      if (!s) return;
+
+      const scrollY = window.scrollY;
+      const delta = scrollY - lastScrollY;
+      lastScrollY = scrollY;
+
+      const viewportH = window.innerHeight;
+      const sidebarH = s.offsetHeight;
+
+      virtualTop -= delta;                                        // follow scroll direction
+      virtualTop = Math.max(virtualTop, gap);                     // top edge trap
+      virtualTop = Math.min(virtualTop, viewportH - sidebarH - gap); // bottom edge trap
+
+      s.style.top = `${virtualTop}px`;
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const fetchFeed = async () => {
     if (!user) return;
@@ -404,7 +442,8 @@ export const Feed = () => {
         </div>
 
         {/* ── Right sidebar (desktop only) ── */}
-        <aside className="hidden lg:flex flex-col gap-4 sticky top-4">
+        <aside className="hidden lg:block self-stretch">
+          <div ref={sidebarRef} className="sticky flex flex-col gap-4">
 
           {/* Today's goal — top of sidebar */}
           <TodayGoalBanner />
@@ -460,6 +499,7 @@ export const Feed = () => {
                 </Link>
               ))}
             </div>
+          </div>
           </div>
         </aside>
       </div>

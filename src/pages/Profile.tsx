@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -82,6 +83,7 @@ export const Profile = () => {
   const [quizHistoryLoading, setQuizHistoryLoading] = useState(false);
   const [isFollowersOpen, setIsFollowersOpen] = useState(false);
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   
   const [achievements] = useState<Achievement[]>([
     {
@@ -541,7 +543,8 @@ export const Profile = () => {
               <img
                 src={profile.cover_url}
                 alt="Cover"
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover cursor-zoom-in"
+                onClick={() => setLightboxImage(profile.cover_url!)}
               />
             )}
             {/* Bottom gradient so avatar/badge text stays readable */}
@@ -562,7 +565,10 @@ export const Profile = () => {
             {/* Avatar sits -48px above this section so it crosses the cover border */}
             <div className="flex flex-col items-center -mt-16">
               <div className="relative">
-                <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-primary/30 shadow-xl">
+                <Avatar
+                  className="h-32 w-32 border-4 border-background ring-2 ring-primary/30 shadow-xl cursor-zoom-in"
+                  onClick={() => { if (profile?.avatar_url) setLightboxImage(profile.avatar_url); }}
+                >
                   <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} />
                   <AvatarFallback className="text-4xl">
                     {profile?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
@@ -1053,6 +1059,31 @@ export const Profile = () => {
         </div>
       </div>
 
+      {/* ── Profile image lightbox (avatar / cover) ── */}
+      {lightboxImage && createPortal(
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)" }}
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-5 text-white/70 hover:text-white text-2xl leading-none z-10 transition-colors"
+            onClick={() => setLightboxImage(null)}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Full size"
+            className="max-w-[92vw] max-h-[88vh] object-contain rounded-2xl shadow-2xl lb-zoom-in"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>,
+        document.body
+      )}
+
       {/* Fullscreen lightbox for this profile's post images */}
       {lightboxPostId && (() => {
         const post = posts.find((p) => p.id === lightboxPostId);
@@ -1060,7 +1091,7 @@ export const Profile = () => {
         const currentImage = post.images[lightboxIndex];
         if (!currentImage) return null;
 
-        return (
+        return createPortal(
           <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
             <button
               type="button"
@@ -1096,7 +1127,8 @@ export const Profile = () => {
                 className="w-full max-h-[80vh] object-contain mx-auto"
               />
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
     </div>
