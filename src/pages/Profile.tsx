@@ -290,7 +290,7 @@ export const Profile = () => {
                   className="h-36 w-36 border-[4px] border-white cursor-zoom-in"
                   onClick={() => { if (profile?.avatar_url) setLightboxImage(profile.avatar_url); }}
                 >
-                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
                   <AvatarFallback className={`${DISPLAY} font-extrabold text-4xl`} style={{ background: C.cyan, color: C.ink }}>
                     {displayName[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
@@ -531,7 +531,7 @@ export const Profile = () => {
                   <div key={u.id} className="flex items-center justify-between p-3 border-[2px] border-[#0F172A]/20 rounded-[14px] bg-white hover:border-[#0F172A]/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A]">
-                        <AvatarImage src={u.avatar_url || undefined} />
+                        <AvatarImage src={u.avatar_url || undefined} className="object-cover" />
                         <AvatarFallback className={`${DISPLAY} font-extrabold text-sm`} style={{ background: C.cyan, color: C.ink }}>
                           {u.username?.[0]?.toUpperCase() || 'U'}
                         </AvatarFallback>
@@ -667,7 +667,7 @@ export const Profile = () => {
               {/* Header */}
               <div className="flex items-center gap-3 px-4 py-3 border-b-[2px] border-[#0F172A]/10 sticky top-0 bg-white z-10">
                 <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A] flex-shrink-0">
-                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
                   <AvatarFallback className={`${DISPLAY} font-extrabold text-sm`} style={{ background: C.cyan, color: C.ink }}>
                     {displayName[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>

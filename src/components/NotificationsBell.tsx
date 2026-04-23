@@ -102,7 +102,7 @@ const NotificationItem = ({ notif, onMarkRead }: NotificationItemProps) => {
         ) : (
           <>
             <Avatar className="h-9 w-9">
-              <AvatarImage src={avatarUrl} />
+              <AvatarImage src={avatarUrl} className="object-cover" />
               <AvatarFallback>{actorName[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
             <span className="absolute -bottom-0.5 -right-0.5 bg-background rounded-full p-0.5 border border-border">

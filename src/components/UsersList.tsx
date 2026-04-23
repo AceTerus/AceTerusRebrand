@@ -95,7 +95,7 @@ export const UsersList = ({ title, userIds, showAll = false }: UsersListProps) =
           <div key={user.id} className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Avatar className="h-10 w-10">
-                <AvatarImage src={user.avatar_url || ''} />
+                <AvatarImage src={user.avatar_url || ''} className="object-cover" />
                 <AvatarFallback>
                   {user.username?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>

@@ -135,7 +135,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               {/* Profile avatar — links to profile */}
               <Link to="/profile" title={displayName}>
                 <Avatar className={`h-9 w-9 border-2 border-[#0F172A]/20 transition-all hover:border-[#0F172A]/50 ${isActive("/profile") ? "ring-2 ring-primary ring-offset-1" : ""}`}>
-                  <AvatarImage src={avatarSrc} />
+                  <AvatarImage src={avatarSrc} className="object-cover" />
                   <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">{initials}</AvatarFallback>
                 </Avatar>
               </Link>
@@ -161,7 +161,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               >
                 <Avatar className={`h-9 w-9 shrink-0 border-2 transition-all
                   ${isActive("/profile") ? "border-white/40" : "border-[#0F172A]/20 group-hover:border-[#0F172A]/40"}`}>
-                  <AvatarImage src={avatarSrc} />
+                  <AvatarImage src={avatarSrc} className="object-cover" />
                   <AvatarFallback className={`font-bold text-sm ${isActive("/profile") ? "bg-white/20 text-white" : "bg-primary/10 text-primary"}`}>
                     {initials}
                   </AvatarFallback>

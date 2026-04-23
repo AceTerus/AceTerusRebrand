@@ -144,7 +144,7 @@ export const Discover = () => {
                   {/* Avatar overlapping the bottom edge */}
                   <div className="absolute -bottom-6 left-4">
                     <Avatar className="h-12 w-12 border-[2.5px] border-white shadow-[2px_2px_0_0_#0F172A]">
-                      <AvatarImage src={profile.avatar_url || ''} />
+                      <AvatarImage src={profile.avatar_url || ''} className="object-cover" />
                       <AvatarFallback
                         className={`${DISPLAY} font-extrabold text-base`}
                         style={{ background: C.cyan, color: C.ink }}

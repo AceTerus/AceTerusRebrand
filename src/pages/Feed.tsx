@@ -247,7 +247,7 @@ export const Feed = () => {
                     <div key={profile.id} className="flex items-center justify-between gap-3">
                       <Link to={`/profile/${profile.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
                         <Avatar className="h-9 w-9 flex-shrink-0 border-[2px] border-[#0F172A]">
-                          <AvatarImage src={profile.avatar_url} />
+                          <AvatarImage src={profile.avatar_url} className="object-cover" />
                           <AvatarFallback className={`${DISPLAY} font-extrabold text-xs`} style={{ background: C.cyan }}>
                             {profile.username?.[0]?.toUpperCase() || "U"}
                           </AvatarFallback>
@@ -281,7 +281,7 @@ export const Feed = () => {
                   <div key={u.id} className="flex items-center justify-between gap-3">
                     <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar className="h-10 w-10 flex-shrink-0 border-[2px] border-[#0F172A]">
-                        <AvatarImage src={u.avatar_url} />
+                        <AvatarImage src={u.avatar_url} className="object-cover" />
                         <AvatarFallback className={`${DISPLAY} font-extrabold text-xs`} style={{ background: C.cyan }}>
                           {u.username?.[0]?.toUpperCase() || "U"}
                         </AvatarFallback>
@@ -357,7 +357,7 @@ export const Feed = () => {
                     <div className="flex items-center gap-3 px-4 py-3">
                       <Link to={`/profile/${post.user_id}`} className="flex-shrink-0">
                         <Avatar className="h-10 w-10 border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A]">
-                          <AvatarImage src={post.profiles?.avatar_url} />
+                          <AvatarImage src={post.profiles?.avatar_url} className="object-cover" />
                           <AvatarFallback
                             className={`${DISPLAY} font-extrabold text-sm`}
                             style={{ background: C.cyan, color: C.ink }}
@@ -452,7 +452,7 @@ export const Feed = () => {
                   <div key={u.id} className="flex items-center justify-between gap-3">
                     <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar className="h-9 w-9 flex-shrink-0 border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A]">
-                        <AvatarImage src={u.avatar_url} />
+                        <AvatarImage src={u.avatar_url} className="object-cover" />
                         <AvatarFallback
                           className={`${DISPLAY} font-extrabold text-xs`}
                           style={{ background: C.cyan, color: C.ink }}

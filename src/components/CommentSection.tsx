@@ -204,7 +204,7 @@ export const CommentSection = ({
               comments.map((comment) => (
                 <div key={comment.id} className="flex space-x-3">
                   <Avatar className="w-8 h-8">
-                    <AvatarImage src={comment.profiles?.avatar_url} />
+                    <AvatarImage src={comment.profiles?.avatar_url} className="object-cover" />
                     <AvatarFallback>
                       {comment.profiles?.username?.[0]?.toUpperCase() || "U"}
                     </AvatarFallback>
