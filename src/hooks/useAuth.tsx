@@ -8,6 +8,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   isNewUser: boolean;
+  setIsNewUser: React.Dispatch<React.SetStateAction<boolean>>;
   aceCoins: number;
   setAceCoins: React.Dispatch<React.SetStateAction<number>>;
   signOut: () => Promise<void>;
@@ -110,6 +111,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isLoading,
     isAdmin,
     isNewUser,
+    setIsNewUser,
     aceCoins,
     setAceCoins,
     signOut,

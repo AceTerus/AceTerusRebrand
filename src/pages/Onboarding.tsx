@@ -26,7 +26,7 @@ const STEPS = [
 ];
 
 export default function Onboarding() {
-  const { user, isNewUser } = useAuth();
+  const { user, isNewUser, setIsNewUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -88,6 +88,7 @@ export default function Onboarding() {
         }, { onConflict: "user_id" });
       }
 
+      setIsNewUser(false);
       toast({ title: "Welcome to AceTerus! 🎉", description: "Your profile is all set." });
       navigate("/");
     } catch {
@@ -314,7 +315,7 @@ export default function Onboarding() {
           {/* Skip */}
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => { setIsNewUser(false); navigate("/"); }}
             className="text-center text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
           >
             Skip for now →
