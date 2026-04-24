@@ -333,7 +333,7 @@ export const Profile = () => {
       if (error) { console.error(error); return; }
       const basePosts = postsData || [];
       const postIds = basePosts.map((p) => p.id);
-      let imagesByPost = new Map<string, { id: string; file_url: string }[]>();
+      const imagesByPost = new Map<string, { id: string; file_url: string }[]>();
       if (postIds.length > 0) {
         const { data: imagesData } = await supabase.from('post_images').select('id, post_id, file_url, position').in('post_id', postIds).order('position', { ascending: true });
         (imagesData || []).forEach((img: any) => {

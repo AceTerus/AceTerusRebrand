@@ -382,7 +382,7 @@ const Quiz = () => {
       const { data: historyRows } = await supabase.from("quiz_performance_results" as any).select("deck_name, category, score, correct_count, total_count, completed_at").eq("user_id", session.user.id).order("completed_at", { ascending: false }).limit(10);
       const current = { deck_name: activeDeck.name, category: deckCategory, score, correct_count: correct, wrong_count: wrong, skipped_count: skipped, total_count: total, questions_data: questionsData };
       const { data: resData, error: fnError } = await supabase.functions.invoke("quiz-performance-analyzer", { body: { current, history: historyRows ?? [] } });
-      if (fnError) { let msg = fnError.message ?? "Edge function error"; try { const body = await (fnError as any).context?.json(); if (body?.error) msg = body.error; } catch {} throw new Error(msg); }
+      if (fnError) { let msg = fnError.message ?? "Edge function error"; try { const body = await (fnError as any).context?.json(); if (body?.error) msg = body.error; } catch { /* ignore parse error, keep original message */ } throw new Error(msg); }
       const analysis = resData.analysis;
       setAnalysisResult(analysis);
       if (analysis?.weak_areas?.length > 0) pushMessage(`Ace AI spotted it: you can improve on "${analysis.weak_areas[0]}". Check your analysis! 🧠`, 'normal', 'happy');
