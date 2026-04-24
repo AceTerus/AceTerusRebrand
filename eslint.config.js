@@ -28,6 +28,7 @@ export default tseslint.config(
       "@typescript-eslint/no-empty-object-type": "warn",
       "@typescript-eslint/no-require-imports": "warn",
       "react-hooks/exhaustive-deps": "warn",
+      "no-empty": "warn",
     },
   }
 );

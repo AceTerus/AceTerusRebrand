@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function vibrate(pattern: number | number[] = 50) {
   if (typeof window !== 'undefined' && 'navigator' in window && window.navigator.vibrate) {
-    try { window.navigator.vibrate(pattern); } catch (e) {}
+    try { window.navigator.vibrate(pattern); } catch { /* vibrate not supported */ }
   }
 }
 
