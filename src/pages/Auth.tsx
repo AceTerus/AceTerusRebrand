@@ -261,6 +261,17 @@ const Auth = () => {
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                     {isLoading ? "Signing in…" : "Let's go!"}
                   </button>
+
+                  <div className="relative my-4 flex items-center justify-center">
+                    <div className="border-t-[2px] border-slate-200 w-full"></div>
+                    <span className="bg-white px-3 font-bold text-sm text-slate-400 uppercase tracking-widest absolute">Or</span>
+                  </div>
+
+                  <button type="button" disabled={isLoading} onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+                    className={`${DISPLAY} w-full py-3.5 rounded-full border-[3px] border-[#0F172A] font-extrabold text-[#0F172A] bg-white shadow-[5px_5px_0_0_#0F172A] transition-all hover:-translate-y-0.5 hover:shadow-[7px_7px_0_0_#0F172A] active:translate-y-0.5 active:shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center gap-3`}>
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                    Sign in with Google
+                  </button>
                 </form>
               ) : (
                 <form onSubmit={handleSignUp} className="flex flex-col gap-4">
@@ -295,6 +306,17 @@ const Auth = () => {
                     style={{ background: C.indigo }}>
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     {isLoading ? "Creating account…" : "Join the squad!"}
+                  </button>
+
+                  <div className="relative my-4 flex items-center justify-center">
+                    <div className="border-t-[2px] border-slate-200 w-full"></div>
+                    <span className="bg-white px-3 font-bold text-sm text-slate-400 uppercase tracking-widest absolute">Or</span>
+                  </div>
+
+                  <button type="button" disabled={isLoading} onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })}
+                    className={`${DISPLAY} w-full py-3.5 rounded-full border-[3px] border-[#0F172A] font-extrabold text-[#0F172A] bg-white shadow-[5px_5px_0_0_#0F172A] transition-all hover:-translate-y-0.5 hover:shadow-[7px_7px_0_0_#0F172A] active:translate-y-0.5 active:shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center gap-3`}>
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                    Sign up with Google
                   </button>
                 </form>
               )}

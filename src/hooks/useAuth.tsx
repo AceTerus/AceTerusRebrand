@@ -7,6 +7,8 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAdmin: boolean;
+  aceCoins: number;
+  setAceCoins: React.Dispatch<React.SetStateAction<number>>;
   signOut: () => Promise<void>;
 }
 
@@ -29,16 +31,43 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [aceCoins, setAceCoins] = useState<number>(0);
 
   useEffect(() => {
-    const syncProfile = (userId: string | undefined) => {
-      if (!userId) { setIsAdmin(false); return; }
-      supabase
+    const syncProfile = async (userId: string | undefined) => {
+      if (!userId) { setIsAdmin(false); setAceCoins(0); return; }
+      
+      const { data, error } = await supabase
         .from("profiles")
-        .select("is_admin")
+        .select("is_admin, ace_coins")
         .eq("user_id", userId)
-        .single()
-        .then(({ data }) => setIsAdmin((data as any)?.is_admin ?? false));
+        .single();
+        
+      if (error && error.code === 'PGRST116') {
+        // Profile does not exist yet! We MUST insert it, otherwise updates will silently fail.
+        try {
+          await (supabase as any).from('profiles').insert([{ user_id: userId, ace_coins: 1000 }]);
+          setIsAdmin(false);
+          setAceCoins(1000);
+        } catch (e) {
+          console.error("Failed to create default profile:", e);
+        }
+        return;
+      }
+      
+      setIsAdmin((data as any)?.is_admin ?? false);
+      
+      let coins = (data as any)?.ace_coins ?? 0;
+      if (coins < 1000) {
+        // Auto-grant 1000 ACE Coins for new players or those stuck at 0 
+        try {
+          await (supabase as any).from('profiles').update({ ace_coins: 1000 }).eq('user_id', userId);
+          coins = 1000;
+        } catch (e) {
+          console.error("Failed to airdrop default coins:", e);
+        }
+      }
+      setAceCoins(coins);
     };
 
     // Set up auth state listener
@@ -76,6 +105,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     session,
     isLoading,
     isAdmin,
+    aceCoins,
+    setAceCoins,
     signOut,
   };
 

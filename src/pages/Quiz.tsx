@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   BarChart2, Bookmark, BookmarkCheck, BookOpen, BookOpenCheck, CalendarDays,
   CheckCircle2, ChevronLeft, ChevronRight, Flame, GraduationCap,
-  Layers, Loader2, PenLine, ScanLine, Search, Sparkles, Star, Target, Trophy, X, XCircle, Zap,
+  Layers, Loader2, PenLine, ScanLine, Search, Sparkles, Star, Target, Trophy, X, XCircle, Zap, Coins,
 } from "lucide-react";
 import StreakFireOverlay from "@/components/StreakFireOverlay";
 import { GoalSheet } from "@/components/GoalSheet";
@@ -14,14 +14,16 @@ import QuizAnalysis from "@/components/QuizAnalysis";
 import type { PerformanceAnalysis } from "@/components/QuizAnalysis";
 import PerformanceTracker from "@/components/PerformanceTracker";
 import type { SubjectAttempt } from "@/components/PerformanceTracker";
+import { BossRaidArena } from "@/components/BossRaidArena";
 import Logo from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useStreak } from "@/hooks/useStreak";
 import { useMascot } from "@/context/MascotContext";
 import { fetchCategories, fetchDecks, fetchQuiz } from "@/lib/quiz-client";
 import type { Category, Deck, Question, QuizPayload } from "@/types/quiz";
-import { cn } from "@/lib/utils";
+import { cn, vibrate, triggerConfetti } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 
 type QuizView = "categories" | "decks" | "taking";
 
@@ -59,7 +61,7 @@ const getCategoryImage = (name: string): string | null => {
 };
 
 const Quiz = () => {
-  const { user, isLoading: authLoading, isAdmin } = useAuth();
+  const { user, isLoading: authLoading, isAdmin, aceCoins, setAceCoins } = useAuth();
   const { streak, updateStreak } = useStreak();
   const { pushMessage } = useMascot();
   const navigate = useNavigate();
@@ -98,6 +100,14 @@ const Quiz = () => {
   const [categorySearch, setCategorySearch] = useState("");
   const [categorySort, setCategorySort] = useState<"az" | "questions" | "quizzes">("az");
   const [deckSearch, setDeckSearch] = useState("");
+  const [mode, setMode] = useState<"standard" | "boss_raid">("standard");
+  const raidIdParam = searchParams.get("raid");
+
+  useEffect(() => {
+    if (raidIdParam) {
+      setMode("boss_raid");
+    }
+  }, [raidIdParam]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const refAiAnalysis   = useRef<HTMLDivElement>(null);
   const refAnswerReview = useRef<HTMLDivElement>(null);
@@ -166,6 +176,26 @@ const Quiz = () => {
     if (showBookmarkPanel) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showBookmarkPanel]);
+
+  useEffect(() => {
+    if (view !== "taking" || sessionComplete) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in a textarea or input
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        vibrate(30);
+        setCurrentIndex((p) => Math.min((quizPayload?.questions?.length ?? 1) - 1, p + 1));
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        vibrate(30);
+        setCurrentIndex((p) => Math.max(0, p - 1));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [view, sessionComplete, quizPayload?.questions?.length]);
 
   /* ── derived ── */
   const deckCount = decks.length;
@@ -257,6 +287,7 @@ const Quiz = () => {
 
   const handleAnswerSelect = (choiceId: string) => {
     if (sessionComplete) return;
+    vibrate(30);
     setAnsweredMap((prev) => { const n = new Map(prev); n.set(currentIndex, choiceId); return n; });
     setSubmitConfirmPending(false);
   };
@@ -276,13 +307,16 @@ const Quiz = () => {
     });
   };
 
-  const handleNextQuestion = () => { if (!isLastQuestion) setCurrentIndex((p) => p + 1); };
-  const handlePrevQuestion = () => { setCurrentIndex((p) => Math.max(0, p - 1)); };
+  const handleNextQuestion = () => { vibrate(30); if (!isLastQuestion) setCurrentIndex((p) => p + 1); };
+  const handlePrevQuestion = () => { vibrate(30); setCurrentIndex((p) => Math.max(0, p - 1)); };
 
   const handleSubmitQuiz = async () => {
+    vibrate([40, 50, 40]);
+    setSessionComplete(true); setShowBookmarkPanel(false); setSubmitConfirmPending(false);
     setSessionComplete(true); setShowBookmarkPanel(false); setSubmitConfirmPending(false); setActiveReviewTab("review");
     const snapshotQuestions = quizPayload?.questions ?? [];
     const snapshotAnsweredMap = new Map(answeredMap);
+    const { data: { session } } = await supabase.auth.getSession();
 
     if (activeDeck) {
       const result = await updateStreak(activeDeck.id);
@@ -290,7 +324,8 @@ const Quiz = () => {
         setFireOverlay({ show: true, newStreak: result.newStreak });
         const milestones = [7, 14, 30, 60, 100];
         if (milestones.includes(result.newStreak)) {
-          pushMessage(`🎉 ${result.newStreak}-day streak! You're on fire — I'm so proud of you! ⭐`, 'high', 'celebrating');
+           triggerConfetti();
+           pushMessage(`🎉 ${result.newStreak}-day streak! You're on fire — I'm so proud of you! ⭐`, 'high', 'celebrating');
         } else {
           pushMessage(`Great job finishing the quiz! Your streak is now ${result.newStreak} days! 🔥`, 'normal', 'happy');
         }
@@ -330,6 +365,21 @@ const Quiz = () => {
         } catch { /* non-fatal */ } finally { setSubjectiveGrading(false); }
       }
       setSubjectiveResults(resultsMap);
+
+      // Reward ACE Coins based on correct answers
+      const correctSubjCount = Array.from(resultsMap.values()).filter(r => r.isCorrect).length;
+      if (correctSubjCount > 0 && session) {
+         const coinsEarned = correctSubjCount * 5;
+         try {
+            const { data: profile, error: selectError } = await (supabase as any).from('profiles').select('*').eq('user_id', session.user.id).single();
+            if (selectError) throw selectError;
+            const currentCoins = (profile as any)?.ace_coins || 0;
+            const { error: updateError } = await (supabase as any).from('profiles').update({ ace_coins: currentCoins + coinsEarned }).eq('user_id', session.user.id);
+            if (updateError) throw updateError;
+            setAceCoins(prev => prev + coinsEarned);
+            pushMessage(`You earned ${coinsEarned} ACE Coins for your correct answers! 💰`, 'normal', 'happy');
+         } catch (e) { console.error("Coin error", e); }
+      }
       return;
     }
 
@@ -347,16 +397,49 @@ const Quiz = () => {
     const snapshotScore = snapshotTotal > 0 ? Math.round((snapshotCorrect / snapshotTotal) * 100 * 100) / 100 : 0;
     const deckCategory = activeDeck?.subject ?? "General";
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session && activeDeck) {
-      await supabase.from("quiz_performance_results" as any).insert({ user_id: session.user.id, deck_id: activeDeck.id, deck_name: activeDeck.name, category: deckCategory, score: snapshotScore, correct_count: snapshotCorrect, wrong_count: snapshotWrong, skipped_count: snapshotSkipped, total_count: snapshotTotal, questions_data: questionsData });
+    const { data: { session: authSession2 } } = await supabase.auth.getSession();
+    if (authSession2 && activeDeck) {
+      await supabase.from("quiz_performance_results" as any).insert({ user_id: authSession2.user.id, deck_id: activeDeck.id, deck_name: activeDeck.name, category: deckCategory, score: snapshotScore, correct_count: snapshotCorrect, wrong_count: snapshotWrong, skipped_count: snapshotSkipped, total_count: snapshotTotal, questions_data: questionsData });
+      
+      if (snapshotTotal > 0 && snapshotScore === 1) {
+         triggerConfetti();
+      }
+
+      if (snapshotCorrect > 0) {
+         const coinsEarned = snapshotCorrect * 5;
+         try {
+            const { data: profile, error: selectError } = await (supabase as any).from('profiles').select('*').eq('user_id', authSession2.user.id).single();
+            if (selectError) throw selectError;
+            const currentCoins = (profile as any)?.ace_coins || 0;
+            const { error: updateError } = await (supabase as any).from('profiles').update({ ace_coins: currentCoins + coinsEarned }).eq('user_id', authSession2.user.id);
+            if (updateError) throw updateError;
+            setAceCoins(prev => prev + coinsEarned);
+            pushMessage(`You earned ${coinsEarned} ACE Coins for your correct answers! 💰`, 'normal', 'happy');
+         } catch (e) { console.error("Coin error", e); }
+      }
     }
-    if (session && activeDeck) {
-      const { data: subjectRows } = await supabase.from("quiz_performance_results" as any).select("score, completed_at, deck_name").eq("user_id", session.user.id).eq("category", deckCategory).order("completed_at", { ascending: false }).limit(10);
+    if (authSession2 && activeDeck) {
+      const { data: subjectRows } = await supabase.from("quiz_performance_results" as any).select("score, completed_at, deck_name").eq("user_id", authSession2.user.id).eq("category", deckCategory).order("completed_at", { ascending: false }).limit(10);
       const pastRows = (subjectRows ?? []).slice(1);
-      setSubjectHistory(pastRows as SubjectAttempt[]);
+      setSubjectHistory(pastRows as unknown as SubjectAttempt[]);
       setCurrentQuizScore(snapshotScore);
       setCurrentQuizCategory(deckCategory);
+    }
+    if (authSession2 && activeDeck) {
+      setAnalysisLoading(true); setAnalysisError(null);
+      try {
+        const { data: historyRows } = await supabase.from("quiz_performance_results" as any).select("deck_name, category, score, correct_count, total_count, completed_at").eq("user_id", authSession2.user.id).order("completed_at", { ascending: false }).limit(10);
+        const current = { deck_name: activeDeck.name, category: deckCategory, score: snapshotScore, correct_count: snapshotCorrect, wrong_count: snapshotWrong, skipped_count: snapshotSkipped, total_count: snapshotTotal, questions_data: questionsData };
+        const { data: resData, error: fnError } = await supabase.functions.invoke("quiz-performance-analyzer", { body: { current, history: historyRows ?? [] } });
+        if (fnError) { let msg = fnError.message ?? "Edge function error"; try { const body = await (fnError as any).context?.json(); if (body?.error) msg = body.error; } catch {} throw new Error(msg); }
+        const analysis = resData.analysis;
+        setAnalysisResult(analysis);
+        if (analysis?.weak_areas?.length > 0) pushMessage(`Ace AI spotted it: you can improve on "${analysis.weak_areas[0]}". Check your analysis below! 🧠`, 'normal', 'happy');
+        else if (analysis?.trend === 'improving') pushMessage(`AI says you're improving! Keep up this momentum — you're getting sharper every quiz! 📈`, 'normal', 'happy');
+        const { data: latestRow, error: selectError } = await supabase.from("quiz_performance_results" as any).select("id").eq("user_id", authSession2.user.id).eq("deck_id", activeDeck.id).order("completed_at", { ascending: false }).limit(1).single();
+        if (!selectError && latestRow) await supabase.from("quiz_performance_results" as any).update({ ai_analysis: analysis }).eq("id", (latestRow as any).id);
+      } catch (e: any) { setAnalysisError(e.message ?? "Could not generate analysis."); }
+      finally { setAnalysisLoading(false); }
     }
   };
 
@@ -469,6 +552,13 @@ const Quiz = () => {
           {/* Right: streak badge + mobile Goals button */}
           <div className="flex items-center gap-2 shrink-0">
             <div
+              className="flex items-center gap-2 px-4 py-2 rounded-full border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A] font-extrabold text-sm bg-white"
+              style={{ color: C.ink }}
+            >
+              <Coins className="w-4 h-4 text-amber-500" />
+              <span className={`${DISPLAY}`}><AnimatedNumber value={aceCoins} /> ACE</span>
+            </div>
+            <div
               className="flex items-center gap-2 px-4 py-2 rounded-full border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A] font-extrabold text-sm"
               style={{ background: C.pop, color: "#fff" }}
             >
@@ -485,8 +575,39 @@ const Quiz = () => {
           </div>
         </div>
 
-        {/* ── TWO-COLUMN LAYOUT — starts right after header ── */}
-        <div className="lg:grid lg:grid-cols-[1fr_272px] lg:gap-6 lg:items-start">
+        {/* ── MODE TABS ── */}
+        <div className="flex items-center gap-3 mb-8 atl-fade-up" style={{ animationDelay: '50ms' }}>
+          <button
+            onClick={() => setMode("standard")}
+            className={cn(
+              "flex-1 md:flex-none px-6 py-3 rounded-full border-[3px] border-[#0F172A] shadow-[4px_4px_0_0_#0F172A] font-extrabold font-['Baloo_2'] text-base transition-all hover:-translate-y-1 hover:shadow-[6px_7px_0_0_#0F172A]",
+              mode === "standard" ? "text-white" : "bg-white text-[#0F172A]"
+            )}
+            style={mode === "standard" ? { background: C.blue } : {}}
+          >
+            📚 Standard Quizzes
+          </button>
+          <button
+            onClick={() => setMode("boss_raid")}
+            className={cn(
+              "flex-1 md:flex-none px-6 py-3 rounded-full border-[3px] border-[#0F172A] shadow-[4px_4px_0_0_#0F172A] font-extrabold font-['Baloo_2'] text-base transition-all hover:-translate-y-1 hover:shadow-[6px_7px_0_0_#0F172A]",
+              mode === "boss_raid" ? "text-white" : "bg-white text-[#0F172A]"
+            )}
+            style={mode === "boss_raid" ? { background: "#9333ea" } : {}}
+          >
+            💀 Boss Raids
+          </button>
+        </div>
+
+        {mode === "boss_raid" ? (
+          <BossRaidArena
+            initialRaidId={raidIdParam}
+            aceCoins={aceCoins}
+            onCoinsChanged={(newAmount) => setAceCoins(newAmount)}
+            onNavigate={(path) => navigate(path)}
+          />
+        ) : (
+          <div className="lg:grid lg:grid-cols-[1fr_272px] lg:gap-6 lg:items-start">
 
           {/* ════════════════════════════════════════════════════════════
               LEFT: MAIN CONTENT
@@ -1517,6 +1638,7 @@ const Quiz = () => {
 
           </aside>
         </div>
+        )}
       </div>
 
       {/* ── STREAK OVERLAY ── */}
