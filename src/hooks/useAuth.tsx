@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAdmin: boolean;
+  isNewUser: boolean;
   aceCoins: number;
   setAceCoins: React.Dispatch<React.SetStateAction<number>>;
   signOut: () => Promise<void>;
@@ -31,6 +32,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
   const [aceCoins, setAceCoins] = useState<number>(0);
 
   useEffect(() => {
@@ -39,23 +41,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       const { data, error } = await supabase
         .from("profiles")
-        .select("is_admin, ace_coins")
+        .select("is_admin, ace_coins, username")
         .eq("user_id", userId)
         .single();
-        
+
       if (error && error.code === 'PGRST116') {
-        // Profile does not exist yet! We MUST insert it, otherwise updates will silently fail.
+        // Profile does not exist yet — brand new user.
         try {
           await (supabase as any).from('profiles').insert([{ user_id: userId, ace_coins: 1000 }]);
           setIsAdmin(false);
           setAceCoins(1000);
+          setIsNewUser(true);
         } catch (e) {
           console.error("Failed to create default profile:", e);
         }
         return;
       }
-      
+
       setIsAdmin((data as any)?.is_admin ?? false);
+      setIsNewUser(!(data as any)?.username);
       
       let coins = (data as any)?.ace_coins ?? 0;
       if (coins < 1000) {
@@ -105,6 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     session,
     isLoading,
     isAdmin,
+    isNewUser,
     aceCoins,
     setAceCoins,
     signOut,

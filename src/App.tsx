@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { AppSidebar } from "./components/AppSidebar";
 import { MobileNav } from "./components/MobileNav";
@@ -17,6 +17,7 @@ import OmrScanner from "./pages/OmrScanner";
 import ArScanner from "./pages/ArScanner";
 import AdminQuiz from "./pages/AdminQuiz";
 import Auth from "./pages/Auth";
+import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import { Chat } from "./pages/Chat";
 import { ChatNotificationsProvider } from "./context/ChatNotificationsContext";
@@ -68,11 +69,22 @@ const PageTransitionBar = () => {
   );
 };
 
+const OnboardingGuard = () => {
+  const { user, isNewUser, isLoading } = useAuth();
+  const location = useLocation();
+  if (isLoading) return null;
+  if (user && isNewUser && location.pathname !== "/onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
+  return null;
+};
+
 const AnimatedRoutes = () => {
   const location = useLocation();
   return (
     <>
       <PageTransitionBar />
+      <OnboardingGuard />
       <div key={location.pathname} className="page-enter">
         <Routes>
           <Route path="/" element={<Index />} />
@@ -87,6 +99,7 @@ const AnimatedRoutes = () => {
           <Route path="/discover" element={<Discover />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
