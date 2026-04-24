@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Camera, X, Plus, Film, Tag } from "lucide-react";
+import { ImageCropper } from "@/components/ImageCropper";
 
 const C = {
   cyan: '#3BD6F5', blue: '#2F7CFF', indigo: '#2E2BE5',
@@ -22,11 +23,14 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
   const [content, setContent] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState("");
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [selectedImages, setSelectedImages] = useState<Blob[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // crop queue: raw object URLs waiting to be cropped
+  const [cropQueue, setCropQueue]   = useState<string[]>([]);
+  const [cropIndex, setCropIndex]   = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -39,15 +43,34 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
       return;
     }
     setSelectedVideo(null); setVideoPreview(null);
-    setSelectedImages(files);
-    const readers: Promise<string>[] = files.map(
-      (file) => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => resolve((ev.target?.result as string) || "");
-        reader.readAsDataURL(file);
-      })
-    );
-    Promise.all(readers).then(setImagePreviews);
+    setSelectedImages([]); setImagePreviews([]);
+    const urls = files.map(f => URL.createObjectURL(f));
+    setCropQueue(urls);
+    setCropIndex(0);
+    e.target.value = '';
+  };
+
+  const handlePostCropConfirm = (blob: Blob, previewUrl: string) => {
+    setSelectedImages(prev => [...prev, blob]);
+    setImagePreviews(prev => [...prev, previewUrl]);
+    const next = cropIndex + 1;
+    const total = cropQueue.length;
+    if (next < total) {
+      setCropIndex(next);
+      toast({ title: `Photo ${cropIndex + 1} of ${total} added`, description: `Cropping next photo…` });
+    } else {
+      setCropQueue([]); setCropIndex(0);
+      toast({ title: total > 1 ? `${total} photos ready` : "Photo ready", description: "Click Post to share." });
+    }
+  };
+
+  const handlePostCropSkip = () => {
+    const next = cropIndex + 1;
+    if (next < cropQueue.length) {
+      setCropIndex(next);
+    } else {
+      setCropQueue([]); setCropIndex(0);
+    }
   };
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,9 +102,10 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
     setIsUploading(true);
     try {
       const mediaUrls: string[] = [];
-      for (const file of selectedImages) {
-        const fileName = `${user.id}/${Date.now()}_${file.name}`;
-        const { error: uploadError } = await supabase.storage.from("profile-images").upload(fileName, file);
+      for (let i = 0; i < selectedImages.length; i++) {
+        const blob = selectedImages[i];
+        const fileName = `${user.id}/${Date.now()}_${i}.jpg`;
+        const { error: uploadError } = await supabase.storage.from("profile-images").upload(fileName, blob, { contentType: 'image/jpeg' });
         if (uploadError) throw uploadError;
         mediaUrls.push(supabase.storage.from("profile-images").getPublicUrl(fileName).data.publicUrl);
       }
@@ -130,6 +154,7 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
   }
 
   return (
+    <>
     <div className={CARD}>
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b-[2.5px] border-[#0F172A]" style={{ background: C.indigoSoft }}>
@@ -233,5 +258,17 @@ export const PostUpload = ({ onPostCreated }: PostUploadProps) => {
         </div>
       </div>
     </div>
+
+    {/* ── Per-image crop modal (queued) ── */}
+    {cropQueue.length > 0 && cropIndex < cropQueue.length && (
+      <ImageCropper
+        imageSrc={cropQueue[cropIndex]}
+        aspect={undefined}
+        title={cropQueue.length > 1 ? `Crop Image ${cropIndex + 1} of ${cropQueue.length}` : "Crop Image"}
+        onConfirm={handlePostCropConfirm}
+        onCancel={handlePostCropSkip}
+      />
+    )}
+    </>
   );
 };

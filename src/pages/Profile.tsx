@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SignInGate } from '@/components/SignInGate';
 import { createPortal } from 'react-dom';
+import { ImageCropper } from '@/components/ImageCropper';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,15 +15,19 @@ import { PostUpload } from '@/components/PostUpload';
 import { PostImageCarousel } from '@/components/PostImageCarousel';
 import { CommentSection } from '@/components/CommentSection';
 import { LikeButton } from '@/components/LikeButton';
+import { CommentPreview } from '@/components/CommentPreview';
 import { UsersList } from '@/components/UsersList';
 import { FollowButton } from '@/components/FollowButton';
 import { useToast } from '@/hooks/use-toast';
 import {
   Camera, Flame, Trash2, Users, Search, Lock,
   Settings, CheckCircle, XCircle, SkipForward, BarChart2,
-  Zap, Target, PenLine, GraduationCap,
+  Zap, Target, PenLine, GraduationCap, MapPin,
+  BookOpen, BookMarked, Compass, Award, Building2, Microscope,
 } from 'lucide-react';
 import { NotificationsBell } from '@/components/NotificationsBell';
+import { SchoolPicker } from '@/components/SchoolPicker';
+import type { SchoolResult } from '@/components/SchoolPicker';
 import { useMutualFollow } from '@/hooks/useMutualFollow';
 import { StreakLeaderboard } from '@/components/StreakLeaderboard';
 
@@ -33,11 +38,115 @@ const C = {
   pop: '#FF7A59', sun: '#FFD65C',
   mintSoft: '#D1FAE5', lavender: '#EDE9FE', peach: '#FFE4D6', lemon: '#FEF9C3', rose: '#FFE4E6',
 };
+
+const SCHOOL_TYPE_STYLE: Record<string, { bg: string; color: string }> = {
+  'SMK':                  { bg: '#DDF3FF',  color: '#2F7CFF' },
+  'SMJK':                 { bg: '#E0F2FE',  color: '#0369a1' },
+  'SBP':                  { bg: '#D6D4FF',  color: '#2E2BE5' },
+  'MRSM':                 { bg: '#FEF3C7',  color: '#92400e' },
+  'SAM':                  { bg: '#D1FAE5',  color: '#065f46' },
+  'SABK':                 { bg: '#D1FAE5',  color: '#065f46' },
+  'SK':                   { bg: '#F0FDF4',  color: '#16a34a' },
+  'SJK(C)':               { bg: '#FFF7ED',  color: '#c2410c' },
+  'SJK(T)':               { bg: '#FDF4FF',  color: '#7e22ce' },
+  'Sekolah Swasta':       { bg: '#FFE4E6',  color: '#FF7A59' },
+  'Sekolah Antarabangsa': { bg: '#FFE4D6',  color: '#FF7A59' },
+  'Universiti Awam':      { bg: '#DBEAFE',  color: '#1D4ED8' },
+  'Universiti Swasta':    { bg: '#EDE9FE',  color: '#6D28D9' },
+  'Politeknik':           { bg: '#D1FAE5',  color: '#065f46' },
+  'Kolej Komuniti':       { bg: '#FEF3C7',  color: '#92400e' },
+  'Kolej Matrikulasi':    { bg: '#D6D4FF',  color: '#2E2BE5' },
+};
 const DISPLAY = "font-['Baloo_2'] tracking-tight";
 const CARD = 'border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[3px_3px_0_0_#0F172A] bg-white overflow-hidden';
 const INPUT = 'w-full px-4 py-2.5 text-sm font-semibold border-[2px] border-[#0F172A] rounded-full shadow-[1px_1px_0_0_#0F172A] bg-white outline-none focus:shadow-[2px_2px_0_0_#0F172A] transition-shadow placeholder:text-slate-400';
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 font-extrabold font-[\'Baloo_2\'] text-sm border-[2.5px] border-[#0F172A] rounded-full px-5 py-2.5 shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#0F172A] transition-all text-white cursor-pointer disabled:opacity-50 disabled:pointer-events-none';
 const BTN_OUTLINE = 'inline-flex items-center justify-center gap-2 font-extrabold font-[\'Baloo_2\'] text-sm border-[2.5px] border-[#0F172A] rounded-full px-5 py-2.5 shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#0F172A] transition-all bg-white text-[#0F172A] cursor-pointer disabled:opacity-50 disabled:pointer-events-none';
+
+/* ── school grade picker constants ── */
+type EducationLevel = 'primary' | 'secondary' | 'preuni' | 'diploma' | 'degree' | 'postgrad';
+
+interface LevelConfig {
+  value: EducationLevel;
+  label: string;
+  sub: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Icon: any;
+  idleBg: string;
+  idleColor: string;
+  activeBg: string;
+  activeShadow: string;
+}
+
+const EDUCATION_LEVELS: LevelConfig[] = [
+  { value: 'primary',   label: 'Primary',    sub: 'Std 1 – 6',   Icon: BookOpen,      idleBg: '#F0FDF4', idleColor: '#16a34a', activeBg: '#16a34a', activeShadow: '#14532d' },
+  { value: 'secondary', label: 'Secondary',  sub: 'Form 1 – 5',  Icon: BookMarked,    idleBg: '#DDF3FF', idleColor: '#2F7CFF', activeBg: '#2F7CFF', activeShadow: '#1D4ED8' },
+  { value: 'preuni',    label: 'Pre-U',      sub: 'Form 6 / Found.', Icon: Compass,   idleBg: '#D6D4FF', idleColor: '#2E2BE5', activeBg: '#2E2BE5', activeShadow: '#1e1b8e' },
+  { value: 'diploma',   label: 'Diploma',    sub: 'Year 1 – 3',  Icon: Award,         idleBg: '#FEF3C7', idleColor: '#d97706', activeBg: '#d97706', activeShadow: '#92400e' },
+  { value: 'degree',    label: 'Degree',     sub: 'Year 1 – 5',  Icon: Building2,     idleBg: '#E0F2FE', idleColor: '#0369a1', activeBg: '#0369a1', activeShadow: '#075985' },
+  { value: 'postgrad',  label: 'Postgrad',   sub: "Master's / PhD", Icon: Microscope, idleBg: '#EDE9FE', idleColor: '#6D28D9', activeBg: '#6D28D9', activeShadow: '#4C1D95' },
+];
+
+const YEAR_OPTIONS: Record<EducationLevel, string[]> = {
+  primary:   ['Standard 1','Standard 2','Standard 3','Standard 4','Standard 5','Standard 6'],
+  secondary: ['Form 1','Form 2','Form 3','Form 4','Form 5'],
+  preuni:    ['Form 6 (Lower)','Form 6 (Upper)','Foundation','Matrikulasi'],
+  diploma:   ['Diploma Year 1','Diploma Year 2','Diploma Year 3'],
+  degree:    ['Degree Year 1','Degree Year 2','Degree Year 3','Degree Year 4','Degree Year 5'],
+  postgrad:  ["Master's",'PhD'],
+};
+
+const YEAR_PILL_LABEL: Record<EducationLevel, (g: string) => string> = {
+  primary:   g => g.replace('Standard ', 'Std '),
+  secondary: g => g,
+  preuni:    g => g.replace('Form 6 (Lower)', 'Form 6 Lower').replace('Form 6 (Upper)', 'Form 6 Upper'),
+  diploma:   g => g.replace('Diploma ', ''),
+  degree:    g => g.replace('Degree ', ''),
+  postgrad:  g => g,
+};
+
+function deriveLevelFromGrade(grade: string): EducationLevel | '' {
+  if (!grade) return '';
+  if (grade.startsWith('Standard')) return 'primary';
+  if (/^Form [1-5]$/.test(grade)) return 'secondary';
+  if (grade.startsWith('Form 6') || grade === 'Foundation' || grade === 'Matrikulasi') return 'preuni';
+  if (grade.startsWith('Diploma')) return 'diploma';
+  if (grade.startsWith('Degree')) return 'degree';
+  if (grade === "Master's" || grade === 'PhD') return 'postgrad';
+  return '';
+}
+
+function schoolDBLevel(grade: string) {
+  if (!grade) return undefined;
+  if (grade.startsWith('Standard')) return 'primary';
+  if (grade.startsWith('Form')) return 'secondary';
+  return 'tertiary';
+}
+
+function schoolTypeFilter(grade: string): string[] | undefined {
+  if (!grade) return undefined;
+  if (grade.startsWith('Standard'))
+    return ['SK','SJK(C)','SJK(T)','Sekolah Swasta','Sekolah Antarabangsa'];
+  if (grade === 'Form 6 (Lower)' || grade === 'Form 6 (Upper)')
+    return ['SMK','SBP','MRSM','Sekolah Swasta'];
+  if (grade.startsWith('Form'))
+    return ['SMK','SMJK','SBP','MRSM','SAM','SABK','Sekolah Swasta','Sekolah Antarabangsa'];
+  if (grade === 'Foundation' || grade === 'Matrikulasi')
+    return ['Universiti Awam','Universiti Swasta','Kolej Matrikulasi'];
+  return ['Universiti Awam','Universiti Swasta','Politeknik','Kolej Komuniti','Kolej Swasta'];
+}
+
+function streamOptions(grade: string): string[] {
+  if (!grade) return [];
+  if (grade.startsWith('Standard') || ['Form 1','Form 2','Form 3'].includes(grade)) return [];
+  if (grade === 'Form 4' || grade === 'Form 5')
+    return ['Science','Arts','Commerce','Technical','Vocational','Agama (Religious)'];
+  if (grade.startsWith('Form 6'))
+    return ['Science (Sains)','Arts (Sastera)','Accounting (Perakaunan)'];
+  if (grade === 'Foundation' || grade === 'Matrikulasi')
+    return ['Sciences','Social Science','Engineering','Business'];
+  return ['Engineering','Computer Science','Business','Medicine','Dentistry','Pharmacy','Law','Education','Architecture','Science','Arts & Humanities','Nursing','Social Science'];
+}
 
 interface Post {
   id: string;
@@ -48,6 +157,17 @@ interface Post {
   created_at: string;
   tags: string[];
   images?: { id: string; file_url: string }[];
+}
+
+interface StudentSchool {
+  id: string;
+  school_id: string | null;
+  school_name: string | null;
+  grade: string | null;
+  curricular: string | null;
+  school_type: string | null;
+  school_location: string | null;
+  class_name: string | null;
 }
 
 interface Profile {
@@ -77,8 +197,12 @@ export const Profile = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editUsername, setEditUsername] = useState('');
   const [editBio, setEditBio] = useState('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [avatarBlob, setAvatarBlob]       = useState<Blob | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [coverBlob, setCoverBlob]         = useState<Blob | null>(null);
+  const [coverPreview, setCoverPreview]   = useState<string | null>(null);
+  const [cropSrc, setCropSrc]             = useState<string | null>(null);
+  const [cropTarget, setCropTarget]       = useState<'avatar' | 'cover-edit' | 'cover-live' | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -90,6 +214,12 @@ export const Profile = () => {
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+  const [schoolInfo, setSchoolInfo] = useState<StudentSchool | null>(null);
+  const [isSchoolDialogOpen, setIsSchoolDialogOpen] = useState(false);
+  const [schoolForm, setSchoolForm] = useState({ educationLevel: '' as EducationLevel | '', grade: '', curricular: '', class_name: '' });
+  const [selectedSchool, setSelectedSchool] = useState<SchoolResult | null>(null);
+  const [isSavingSchool, setIsSavingSchool] = useState(false);
 
   const profileUserId = userId || user?.id;
   const isOwnProfile = !userId || userId === user?.id;
@@ -104,6 +234,7 @@ export const Profile = () => {
       fetchPosts();
       fetchFollowers();
       fetchFollowing();
+      fetchSchoolInfo();
     }
   }, [profileUserId]);
 
@@ -132,16 +263,16 @@ export const Profile = () => {
     setIsUpdating(true);
     try {
       let avatarUrl = profile.avatar_url;
-      if (avatarFile) {
-        const filePath = `${user.id}/${Date.now()}.${avatarFile.name.split('.').pop()}`;
-        const { error } = await supabase.storage.from('profile-images').upload(filePath, avatarFile, { upsert: true });
+      if (avatarBlob) {
+        const filePath = `${user.id}/avatar_${Date.now()}.jpg`;
+        const { error } = await supabase.storage.from('profile-images').upload(filePath, avatarBlob, { upsert: true, contentType: 'image/jpeg' });
         if (error) throw error;
         avatarUrl = supabase.storage.from('profile-images').getPublicUrl(filePath).data.publicUrl;
       }
       let coverUrl = profile.cover_url;
-      if (coverFile) {
-        const filePath = `${user.id}/cover-${Date.now()}.${coverFile.name.split('.').pop()}`;
-        const { error } = await supabase.storage.from('profile-images').upload(filePath, coverFile, { upsert: true });
+      if (coverBlob) {
+        const filePath = `${user.id}/cover_${Date.now()}.jpg`;
+        const { error } = await supabase.storage.from('profile-images').upload(filePath, coverBlob, { upsert: true, contentType: 'image/jpeg' });
         if (error) throw error;
         coverUrl = supabase.storage.from('profile-images').getPublicUrl(filePath).data.publicUrl;
       }
@@ -149,11 +280,36 @@ export const Profile = () => {
       if (error) throw error;
       toast({ title: 'Profile updated!' });
       setIsEditDialogOpen(false);
-      setAvatarFile(null); setCoverFile(null);
+      setAvatarBlob(null); setAvatarPreview(null);
+      setCoverBlob(null);  setCoverPreview(null);
       fetchProfile();
     } catch {
       toast({ title: 'Error', description: 'Failed to update profile', variant: 'destructive' });
     } finally { setIsUpdating(false); }
+  };
+
+  const handleCropConfirm = async (blob: Blob, previewUrl: string) => {
+    if (cropTarget === 'avatar') {
+      setAvatarBlob(blob); setAvatarPreview(previewUrl);
+      setCropSrc(null); setCropTarget(null);
+      toast({ title: 'Photo ready', description: 'Click Save Changes to apply it to your profile.' });
+    } else if (cropTarget === 'cover-edit') {
+      setCoverBlob(blob); setCoverPreview(previewUrl);
+      setCropSrc(null); setCropTarget(null);
+      toast({ title: 'Cover ready', description: 'Click Save Changes to apply it to your profile.' });
+    } else if (cropTarget === 'cover-live' && user) {
+      const filePath = `${user.id}/cover_${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from('profile-images').upload(filePath, blob, { upsert: true, contentType: 'image/jpeg' });
+      if (error) {
+        toast({ title: 'Upload failed', description: 'Could not save cover photo. Please try again.', variant: 'destructive' });
+      } else {
+        const publicUrl = supabase.storage.from('profile-images').getPublicUrl(filePath).data.publicUrl;
+        await (supabase.from('profiles') as any).update({ cover_url: publicUrl }).eq('user_id', user.id);
+        setProfile(prev => prev ? { ...prev, cover_url: publicUrl } : prev);
+        toast({ title: 'Cover photo updated!', description: 'Your new cover photo is live.' });
+      }
+      setCropSrc(null); setCropTarget(null);
+    }
   };
 
   const fetchFollowers = async () => {
@@ -227,6 +383,44 @@ export const Profile = () => {
     setTouchStartX(null);
   };
 
+  const fetchSchoolInfo = async () => {
+    if (!profileUserId) return;
+    const { data } = await (supabase.from('student_schools') as any)
+      .select('*, schools(id, name, type, level, state, district, city)')
+      .eq('user_id', profileUserId).maybeSingle();
+    if (data) {
+      setSchoolInfo(data as StudentSchool);
+      setSchoolForm({ educationLevel: deriveLevelFromGrade(data.grade ?? ''), grade: data.grade ?? '', curricular: data.curricular ?? '', class_name: data.class_name ?? '' });
+      if (data.schools) setSelectedSchool(data.schools as SchoolResult);
+    }
+  };
+
+  const handleSaveSchool = async () => {
+    if (!user) return;
+    if (!selectedSchool) { toast({ title: 'Please select a school', variant: 'destructive' }); return; }
+    if (!schoolForm.grade) { toast({ title: 'Please select your grade/form', variant: 'destructive' }); return; }
+    setIsSavingSchool(true);
+    try {
+      const payload = {
+        user_id: user.id,
+        school_id: selectedSchool.id,
+        school_name: selectedSchool.name,
+        school_type: selectedSchool.type,
+        school_location: selectedSchool.city ? `${selectedSchool.city}, ${selectedSchool.state}` : selectedSchool.state,
+        grade: schoolForm.grade,
+        curricular: schoolForm.curricular || null,
+        class_name: schoolForm.class_name || null,
+      };
+      const { error } = await (supabase.from('student_schools') as any).upsert(payload, { onConflict: 'user_id' });
+      if (error) throw error;
+      toast({ title: 'School info saved!' });
+      setIsSchoolDialogOpen(false);
+      fetchSchoolInfo();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to save school info', variant: 'destructive' });
+    } finally { setIsSavingSchool(false); }
+  };
+
   const fetchQuizHistory = async () => {
     if (!user) return;
     setQuizHistoryLoading(true);
@@ -236,6 +430,148 @@ export const Profile = () => {
   };
 
   if (!user) return <SignInGate message="Please sign in to view your profile." />;
+
+  // ── school dialog derived values ──
+  const isTertiary    = schoolDBLevel(schoolForm.grade) === 'tertiary';
+  const curStreams     = streamOptions(schoolForm.grade);
+  const curTypes      = schoolTypeFilter(schoolForm.grade);
+  const curLevel      = schoolDBLevel(schoolForm.grade);
+  const activeEduLevel = schoolForm.educationLevel as EducationLevel | '';
+
+  const handleLevelChange = (level: EducationLevel) => {
+    const oldDBLevel = schoolDBLevel(schoolForm.grade);
+    const newDBLevel = level === 'primary' ? 'primary' : level === 'secondary' || level === 'preuni' ? 'secondary' : 'tertiary';
+    if (newDBLevel !== oldDBLevel) setSelectedSchool(null);
+    setSchoolForm(f => ({ ...f, educationLevel: level, grade: '', curricular: '' }));
+  };
+
+  const handleYearChange = (grade: string) => {
+    setSchoolForm(f => ({ ...f, grade, curricular: '' }));
+  };
+
+  // active level config for colored year pills
+  const activeLevelCfg = activeEduLevel ? EDUCATION_LEVELS.find(l => l.value === activeEduLevel) : null;
+
+  const schoolDialog = (
+    <DialogContent className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A] max-w-md">
+      <DialogHeader>
+        <DialogTitle className={`${DISPLAY} font-extrabold text-lg`}>School Information</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 py-2">
+
+        {/* Step 1 — Education level cards */}
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Education Level</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {EDUCATION_LEVELS.map(l => {
+              const active = activeEduLevel === l.value;
+              return (
+                <button
+                  key={l.value}
+                  type="button"
+                  onClick={() => handleLevelChange(l.value)}
+                  className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-[14px] border-[2px] border-[#0F172A] font-['Baloo_2'] transition-all cursor-pointer select-none"
+                  style={active
+                    ? { background: l.activeBg, color: '#fff', boxShadow: `3px 3px 0 0 ${l.activeShadow}`, transform: 'translateY(-1px)' }
+                    : { background: l.idleBg,   color: l.idleColor, boxShadow: '2px 2px 0 0 #0F172A' }
+                  }
+                >
+                  <l.Icon className="w-5 h-5 shrink-0" style={{ color: active ? '#fff' : l.idleColor }} />
+                  <span className="text-[11px] font-extrabold leading-none">{l.label}</span>
+                  <span className="text-[9px] font-semibold opacity-70 leading-none text-center">{l.sub}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Step 2 — Year pills (colored to match selected level) */}
+        {activeEduLevel && activeLevelCfg && (
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              {activeEduLevel === 'primary' ? 'Standard' : activeEduLevel === 'secondary' ? 'Form' : 'Year / Programme'}
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {YEAR_OPTIONS[activeEduLevel].map(y => {
+                const active = schoolForm.grade === y;
+                return (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => handleYearChange(y)}
+                    className="px-3 py-1.5 rounded-full border-[2px] border-[#0F172A] text-xs font-extrabold font-['Baloo_2'] transition-all cursor-pointer select-none"
+                    style={active
+                      ? { background: activeLevelCfg.activeBg, color: '#fff', boxShadow: `2px 2px 0 0 ${activeLevelCfg.activeShadow}`, transform: 'translateY(-1px)' }
+                      : { background: '#fff', color: activeLevelCfg.idleColor, boxShadow: `1px 1px 0 0 ${activeLevelCfg.idleColor}`, borderColor: activeLevelCfg.idleColor }
+                    }
+                  >
+                    {YEAR_PILL_LABEL[activeEduLevel](y)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Step 3 — School picker (filtered once grade chosen) */}
+        {schoolForm.grade && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              {isTertiary ? 'University / College' : 'School'}
+            </Label>
+            <SchoolPicker
+              value={selectedSchool}
+              onChange={setSelectedSchool}
+              filterLevel={curLevel}
+              filterTypes={curTypes}
+              placeholder={isTertiary ? 'Search universities…' : 'Search for your school…'}
+            />
+            {selectedSchool ? (
+              <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                Location auto-filled: {selectedSchool.city ? `${selectedSchool.city}, ` : ''}{selectedSchool.state}
+              </p>
+            ) : (
+              <p className="text-[11px] font-semibold text-slate-400">
+                Showing {curTypes ? `${curTypes.slice(0,3).join(', ')}${curTypes.length > 3 ? '…' : ''}` : 'all'} — location auto-fills on selection
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Step 4 — Stream / Field (hidden for lower secondary & primary) */}
+        {schoolForm.grade && curStreams.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              {isTertiary ? 'Field of Study' : 'Stream'}
+            </Label>
+            <select className={INPUT} value={schoolForm.curricular} onChange={(e) => setSchoolForm(f => ({ ...f, curricular: e.target.value }))}>
+              <option value="">Select {isTertiary ? 'field' : 'stream'}</option>
+              {curStreams.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Step 5 — Class / Programme name */}
+        {schoolForm.grade && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              {isTertiary ? 'Programme / Major' : 'Class Name'}
+            </Label>
+            <input
+              className={INPUT}
+              value={schoolForm.class_name}
+              onChange={(e) => setSchoolForm(f => ({ ...f, class_name: e.target.value }))}
+              placeholder={isTertiary ? 'e.g. Computer Science' : 'e.g. 5 Amanah'}
+            />
+          </div>
+        )}
+
+        <button className={`${BTN_PRIMARY} w-full`} style={{ background: C.blue }} onClick={handleSaveSchool} disabled={isSavingSchool || !schoolForm.grade || !selectedSchool}>
+          {isSavingSchool ? 'Saving…' : 'Save Info'}
+        </button>
+      </div>
+    </DialogContent>
+  );
 
   const displayName = profile?.username || user?.email?.split('@')[0] || 'Anonymous';
 
@@ -270,15 +606,11 @@ export const Profile = () => {
             {isOwnProfile && (
               <label className="absolute bottom-3 right-3 w-8 h-8 rounded-full border-[2px] border-white bg-black/50 flex items-center justify-center cursor-pointer hover:bg-black/70 transition-colors">
                 <Camera className="w-4 h-4 text-white" />
-                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0]; if (!file || !user) return;
-                  const filePath = `${user.id}/cover_${Date.now()}_${file.name}`;
-                  const { error } = await supabase.storage.from('profile-images').upload(filePath, file, { upsert: true });
-                  if (error) { toast({ title: 'Error', description: 'Failed to upload cover', variant: 'destructive' }); return; }
-                  const { data: { publicUrl } } = supabase.storage.from('profile-images').getPublicUrl(filePath);
-                  await (supabase.from('profiles') as any).update({ cover_url: publicUrl }).eq('user_id', user.id);
-                  setProfile((prev) => prev ? { ...prev, cover_url: publicUrl } : prev);
-                  toast({ title: 'Cover photo updated!' });
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  setCropSrc(URL.createObjectURL(file));
+                  setCropTarget('cover-live');
+                  e.target.value = '';
                 }} />
               </label>
             )}
@@ -323,7 +655,12 @@ export const Profile = () => {
                           <PenLine className="w-4 h-4" /> Edit Profile
                         </button>
                       </DialogTrigger>
-                      <DialogContent className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A]">
+                      <DialogContent
+                        className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A]"
+                        onInteractOutside={(e) => e.preventDefault()}
+                        onPointerDownOutside={(e) => e.preventDefault()}
+                        onFocusOutside={(e) => e.preventDefault()}
+                      >
                         <DialogHeader>
                           <DialogTitle className={`${DISPLAY} font-extrabold text-lg`}>Edit Profile</DialogTitle>
                         </DialogHeader>
@@ -342,15 +679,35 @@ export const Profile = () => {
                               className="border-[2px] border-[#0F172A] rounded-[14px] shadow-[1px_1px_0_0_#0F172A] text-sm font-semibold focus-visible:ring-0 focus:shadow-[2px_2px_0_0_#0F172A] transition-shadow resize-none"
                             />
                           </div>
+                          {/* Avatar crop */}
                           <div className="space-y-1.5">
                             <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Profile Picture</Label>
-                            <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-                              className="w-full text-sm font-semibold border-[2px] border-[#0F172A] rounded-[14px] px-3 py-2 bg-white cursor-pointer" />
+                            <label className="flex items-center gap-3 w-full px-3 py-2 border-[2px] border-[#0F172A] rounded-[14px] bg-white cursor-pointer hover:bg-slate-50 transition-colors">
+                              {avatarPreview
+                                ? <img src={avatarPreview} className="w-8 h-8 rounded-full object-cover border-[1.5px] border-[#0F172A] shrink-0" />
+                                : <div className="w-8 h-8 rounded-full bg-slate-100 border-[1.5px] border-[#0F172A] flex items-center justify-center shrink-0"><Camera className="w-4 h-4 text-slate-400" /></div>
+                              }
+                              <span className="text-sm font-semibold text-slate-500">{avatarPreview ? 'Change photo' : 'Choose photo'}</span>
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                const f = e.target.files?.[0]; if (!f) return;
+                                setCropSrc(URL.createObjectURL(f)); setCropTarget('avatar'); e.target.value = '';
+                              }} />
+                            </label>
                           </div>
+                          {/* Cover crop */}
                           <div className="space-y-1.5">
                             <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Cover Photo</Label>
-                            <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                              className="w-full text-sm font-semibold border-[2px] border-[#0F172A] rounded-[14px] px-3 py-2 bg-white cursor-pointer" />
+                            <label className="flex items-center gap-3 w-full px-3 py-2 border-[2px] border-[#0F172A] rounded-[14px] bg-white cursor-pointer hover:bg-slate-50 transition-colors overflow-hidden">
+                              {coverPreview
+                                ? <img src={coverPreview} className="w-12 h-8 rounded-[6px] object-cover border-[1.5px] border-[#0F172A] shrink-0" />
+                                : <div className="w-12 h-8 rounded-[6px] bg-slate-100 border-[1.5px] border-[#0F172A] flex items-center justify-center shrink-0"><Camera className="w-4 h-4 text-slate-400" /></div>
+                              }
+                              <span className="text-sm font-semibold text-slate-500">{coverPreview ? 'Change cover' : 'Choose cover'}</span>
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                const f = e.target.files?.[0]; if (!f) return;
+                                setCropSrc(URL.createObjectURL(f)); setCropTarget('cover-edit'); e.target.value = '';
+                              }} />
+                            </label>
                           </div>
                           <button className={`${BTN_PRIMARY} w-full`} style={{ background: C.indigo }} onClick={handleUpdateProfile} disabled={isUpdating}>
                             {isUpdating ? 'Saving…' : 'Save Changes'}
@@ -449,6 +806,86 @@ export const Profile = () => {
             </div>
           </div>
         </div>
+
+        {/* ── School Information (LinkedIn-style) ── */}
+        {(isOwnProfile || schoolInfo) && (
+          <div className={`${CARD} mb-6 overflow-hidden`}>
+            {/* header bar */}
+            <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${C.blue}, ${C.cyan})` }} />
+            <div className="p-5">
+              <div className="flex items-start gap-4">
+                {/* school icon */}
+                <div className="w-14 h-14 rounded-[16px] border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.skySoft }}>
+                  <GraduationCap className="w-7 h-7" style={{ color: C.blue }} />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {schoolInfo ? (
+                    <>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`${DISPLAY} font-extrabold text-lg leading-tight`}>{schoolInfo.school_name ?? "Unknown School"}</p>
+                          <p className="text-sm font-semibold text-slate-600 mt-0.5">
+                            {(() => {
+                              const isTert = schoolInfo.school_type && ['Universiti Awam','Universiti Swasta','Politeknik','Kolej Komuniti','Kolej Matrikulasi'].includes(schoolInfo.school_type);
+                              return [
+                                schoolInfo.grade,
+                                schoolInfo.curricular ? (isTert ? schoolInfo.curricular : `${schoolInfo.curricular} Stream`) : null,
+                                schoolInfo.class_name ? (isTert ? schoolInfo.class_name : `Class ${schoolInfo.class_name}`) : null,
+                              ].filter(Boolean).join(' · ') || 'No details added';
+                            })()}
+                          </p>
+                        </div>
+                        {isOwnProfile && (
+                          <Dialog open={isSchoolDialogOpen} onOpenChange={setIsSchoolDialogOpen}>
+                            <DialogTrigger asChild>
+                              <button className="w-8 h-8 rounded-full border-[2px] border-[#0F172A] bg-white flex items-center justify-center hover:-translate-y-0.5 hover:shadow-[2px_2px_0_0_#0F172A] transition-all shrink-0 shadow-[1px_1px_0_0_#0F172A]">
+                                <PenLine className="w-3.5 h-3.5 text-slate-500" />
+                              </button>
+                            </DialogTrigger>
+                            {schoolDialog}
+                          </Dialog>
+                        )}
+                      </div>
+                      <div className="flex items-center flex-wrap gap-2 mt-2.5">
+                        {schoolInfo.school_type && (() => {
+                          const s = SCHOOL_TYPE_STYLE[schoolInfo.school_type!] ?? { bg: '#f1f5f9', color: '#64748b' };
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border-[2px] border-[#0F172A] text-[11px] font-extrabold shadow-[1px_1px_0_0_#0F172A]" style={{ background: s.bg, color: s.color }}>
+                              {schoolInfo.school_type}
+                            </span>
+                          );
+                        })()}
+                        {schoolInfo.school_location && (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" />{schoolInfo.school_location}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className={`${DISPLAY} font-extrabold text-base`}>Add your school info</p>
+                        <p className="text-xs font-semibold text-slate-400 mt-0.5">Let others know where you study</p>
+                      </div>
+                      {isOwnProfile && (
+                        <Dialog open={isSchoolDialogOpen} onOpenChange={setIsSchoolDialogOpen}>
+                          <DialogTrigger asChild>
+                            <button className={`${BTN_PRIMARY} text-xs px-4 py-2 shrink-0`} style={{ background: C.blue }}>
+                              + Add
+                            </button>
+                          </DialogTrigger>
+                          {schoolDialog}
+                        </Dialog>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Stats ── */}
         <div className="grid grid-cols-4 gap-3 mb-6">
@@ -705,7 +1142,14 @@ export const Profile = () => {
               {/* Actions */}
               <div className="flex items-center gap-0.5 px-3 pt-2 pb-1">
                 <LikeButton postId={post.id} likesCount={post.likes_count} onLikeChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, likes_count: n } : p))} />
-                <CommentSection postId={post.id} commentsCount={post.comments_count} onCommentChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: n } : p))} />
+                <CommentSection
+                  mode="trigger"
+                  postId={post.id}
+                  commentsCount={post.comments_count}
+                  open={!!openComments[post.id]}
+                  onOpenChange={(v) => setOpenComments((prev) => ({ ...prev, [post.id]: v }))}
+                  onCommentChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: n } : p))}
+                />
               </div>
 
               {/* Caption */}
@@ -718,11 +1162,29 @@ export const Profile = () => {
 
               {/* Tags */}
               {post.tags.length > 0 && (
-                <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">
+                <div className="px-4 pb-2 flex flex-wrap gap-x-2 gap-y-1">
                   {post.tags.map((tag, i) => (
                     <span key={i} className="text-xs font-bold" style={{ color: C.indigo }}>#{tag}</span>
                   ))}
                 </div>
+              )}
+
+              {/* Comment preview (collapsed) or full panel (expanded) — both below caption */}
+              {openComments[post.id] ? (
+                <CommentSection
+                  mode="panel"
+                  postId={post.id}
+                  commentsCount={post.comments_count}
+                  open={true}
+                  onOpenChange={(v) => setOpenComments((prev) => ({ ...prev, [post.id]: v }))}
+                  onCommentChange={(n) => setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: n } : p))}
+                />
+              ) : (
+                <CommentPreview
+                  postId={post.id}
+                  commentsCount={post.comments_count}
+                  onViewAll={() => setOpenComments((prev) => ({ ...prev, [post.id]: true }))}
+                />
               )}
             </div>
           </div>,
@@ -748,6 +1210,17 @@ export const Profile = () => {
           document.body
         );
       })()}
+
+      {/* ── Image cropper modal ── */}
+      {cropSrc && cropTarget && (
+        <ImageCropper
+          imageSrc={cropSrc}
+          aspect={cropTarget === 'avatar' ? 1 : cropTarget.startsWith('cover') ? 3 : undefined}
+          title={cropTarget === 'avatar' ? 'Crop Profile Photo' : 'Crop Cover Photo'}
+          onConfirm={handleCropConfirm}
+          onCancel={() => { setCropSrc(null); setCropTarget(null); }}
+        />
+      )}
     </div>
   );
 };

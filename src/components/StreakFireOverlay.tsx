@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import Lottie from "lottie-react";
 import fireAnimation from "@/assets/fire-animation.json";
 import { Flame } from "lucide-react";
@@ -14,7 +15,7 @@ const StreakFireOverlay = ({ streak, onDismiss }: StreakFireOverlayProps) => {
     return () => clearTimeout(timer);
   }, [onDismiss]);
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer"
       onClick={onDismiss}
@@ -38,7 +39,8 @@ const StreakFireOverlay = ({ streak, onDismiss }: StreakFireOverlayProps) => {
         </p>
         <p className="text-sm text-white/60 mt-1">Tap anywhere to continue</p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

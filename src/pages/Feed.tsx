@@ -14,6 +14,7 @@ import { CommentSection } from "@/components/CommentSection";
 import { PostUpload } from "@/components/PostUpload";
 import { TodayGoalBanner } from "@/components/TodayGoalBanner";
 import { PostImageCarousel } from "@/components/PostImageCarousel";
+import { CommentPreview } from "@/components/CommentPreview";
 
 /* ── brand ────────────────────────────────────────────────────────────────── */
 const C = {
@@ -60,6 +61,7 @@ export const Feed = () => {
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -397,8 +399,11 @@ export const Feed = () => {
                         }
                       />
                       <CommentSection
+                        mode="trigger"
                         postId={post.id}
                         commentsCount={post.comments_count}
+                        open={!!openComments[post.id]}
+                        onOpenChange={(v) => setOpenComments((prev) => ({ ...prev, [post.id]: v }))}
                         onCommentChange={(newCount) =>
                           setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: newCount } : p))
                         }
@@ -417,7 +422,7 @@ export const Feed = () => {
 
                     {/* Tags */}
                     {post.tags && post.tags.length > 0 && (
-                      <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">
+                      <div className="px-4 pb-2 flex flex-wrap gap-x-2 gap-y-1">
                         {post.tags.map((tag, i) => (
                           <span
                             key={i}
@@ -428,6 +433,26 @@ export const Feed = () => {
                           </span>
                         ))}
                       </div>
+                    )}
+
+                    {/* Comment preview (collapsed) or full panel (expanded) — both below caption */}
+                    {openComments[post.id] ? (
+                      <CommentSection
+                        mode="panel"
+                        postId={post.id}
+                        commentsCount={post.comments_count}
+                        open={true}
+                        onOpenChange={(v) => setOpenComments((prev) => ({ ...prev, [post.id]: v }))}
+                        onCommentChange={(newCount) =>
+                          setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: newCount } : p))
+                        }
+                      />
+                    ) : (
+                      <CommentPreview
+                        postId={post.id}
+                        commentsCount={post.comments_count}
+                        onViewAll={() => setOpenComments((prev) => ({ ...prev, [post.id]: true }))}
+                      />
                     )}
                   </article>
                 );
