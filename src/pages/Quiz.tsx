@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Bookmark, BookmarkCheck, BookOpen, BookOpenCheck, CalendarDays,
+  BarChart2, Bookmark, BookmarkCheck, BookOpen, BookOpenCheck, CalendarDays,
   CheckCircle2, ChevronLeft, ChevronRight, Flame, GraduationCap,
   Layers, Loader2, PenLine, ScanLine, Search, Sparkles, Star, Target, Trophy, X, XCircle, Zap, Coins,
 } from "lucide-react";
@@ -108,6 +108,12 @@ const Quiz = () => {
       setMode("boss_raid");
     }
   }, [raidIdParam]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const refAiAnalysis   = useRef<HTMLDivElement>(null);
+  const refAnswerReview = useRef<HTMLDivElement>(null);
+  const [activeReviewTab, setActiveReviewTab] = useState<"ai" | "tracker" | "review" | null>(null);
+  const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
+    setTimeout(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -259,6 +265,8 @@ const Quiz = () => {
     setAnalysisResult(null); setAnalysisError(null); setAnalysisLoading(false);
     setSubjectiveAnswerMap(new Map()); setCheckboxAnswerMap(new Map());
     setSubjectiveGrading(false); setSubjectiveResults(new Map());
+    setReviewIndex(0);
+    setActiveReviewTab(null);
   };
 
   const handleStartQuiz = async (deck: Deck) => {
@@ -305,6 +313,7 @@ const Quiz = () => {
   const handleSubmitQuiz = async () => {
     vibrate([40, 50, 40]);
     setSessionComplete(true); setShowBookmarkPanel(false); setSubmitConfirmPending(false);
+    setSessionComplete(true); setShowBookmarkPanel(false); setSubmitConfirmPending(false); setActiveReviewTab("review");
     const snapshotQuestions = quizPayload?.questions ?? [];
     const snapshotAnsweredMap = new Map(answeredMap);
     const { data: { session } } = await supabase.auth.getSession();
@@ -432,6 +441,38 @@ const Quiz = () => {
       } catch (e: any) { setAnalysisError(e.message ?? "Could not generate analysis."); }
       finally { setAnalysisLoading(false); }
     }
+  };
+
+  const runAiAnalysis = async () => {
+    if (analysisLoading || analysisResult) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session || !activeDeck) return;
+    const deckCategory = activeDeck.subject ?? "General";
+    const questionsData = questions.map((q, idx) => {
+      const selectedId = answeredMap.get(idx) ?? null;
+      const correctAnswer = q.answers.find((a) => a.is_correct);
+      const wasSkipped = selectedId === null;
+      const isCorrect = !wasSkipped && selectedId === correctAnswer?.id;
+      return { text: q.text, is_correct: isCorrect, was_skipped: wasSkipped };
+    });
+    const correct  = questionsData.filter((q) => q.is_correct).length;
+    const wrong    = questionsData.filter((q) => !q.is_correct && !q.was_skipped).length;
+    const skipped  = questionsData.filter((q) => q.was_skipped).length;
+    const total    = questions.length;
+    const score    = total > 0 ? Math.round((correct / total) * 10000) / 100 : 0;
+    setAnalysisLoading(true); setAnalysisError(null);
+    try {
+      const { data: historyRows } = await supabase.from("quiz_performance_results" as any).select("deck_name, category, score, correct_count, total_count, completed_at").eq("user_id", session.user.id).order("completed_at", { ascending: false }).limit(10);
+      const current = { deck_name: activeDeck.name, category: deckCategory, score, correct_count: correct, wrong_count: wrong, skipped_count: skipped, total_count: total, questions_data: questionsData };
+      const { data: resData, error: fnError } = await supabase.functions.invoke("quiz-performance-analyzer", { body: { current, history: historyRows ?? [] } });
+      if (fnError) { let msg = fnError.message ?? "Edge function error"; try { const body = await (fnError as any).context?.json(); if (body?.error) msg = body.error; } catch {} throw new Error(msg); }
+      const analysis = resData.analysis;
+      setAnalysisResult(analysis);
+      if (analysis?.weak_areas?.length > 0) pushMessage(`Ace AI spotted it: you can improve on "${analysis.weak_areas[0]}". Check your analysis! 🧠`, 'normal', 'happy');
+      const { data: latestRow } = await supabase.from("quiz_performance_results" as any).select("id").eq("user_id", session.user.id).eq("deck_id", activeDeck.id).order("completed_at", { ascending: false }).limit(1).single();
+      if (latestRow?.id) await supabase.from("quiz_performance_results" as any).update({ ai_analysis: analysis }).eq("id", latestRow.id);
+    } catch (e: any) { setAnalysisError(e.message ?? "Could not generate analysis."); }
+    finally { setAnalysisLoading(false); }
   };
 
   const handleToggleFlag = (index: number) => {
@@ -935,22 +976,55 @@ const Quiz = () => {
                       </div>
                     )}
 
-                    <QuizAnalysis analysis={analysisResult} loading={analysisLoading} error={analysisError} />
+                    {/* ── Active section (controlled by sidebar tabs) ── */}
+                    {activeReviewTab === null && (
+                      <div className="rounded-[20px] border-[2px] border-[#0F172A]/10 p-6 text-center" style={{ background: C.cloud }}>
+                        <p className={`${DISPLAY} font-extrabold text-base text-slate-500`}>Select a section from the sidebar →</p>
+                        <p className="text-sm font-semibold text-slate-400 mt-1">AI Analysis · Score Tracker · Answer Review</p>
+                      </div>
+                    )}
 
-                    {currentQuizScore !== null && currentQuizCategory && (
+                    {activeReviewTab === "ai" && (
+                      <div ref={refAiAnalysis}>
+                        <QuizAnalysis analysis={analysisResult} loading={analysisLoading} error={analysisError} />
+                      </div>
+                    )}
+
+                    {activeReviewTab === "tracker" && currentQuizScore !== null && currentQuizCategory && (
                       <PerformanceTracker category={currentQuizCategory} currentScore={currentQuizScore} history={subjectHistory} />
                     )}
 
-                    {/* Goals CTA — mobile only (sidebar has it on desktop) */}
-                    <button onClick={() => setShowGoalSheet(true)} className={`${BTN} w-full justify-center text-white lg:hidden`} style={{ background: C.blue }}>
-                      <CalendarDays className="w-5 h-5" /> Set Goals — Plan your study sprint
-                    </button>
+                    {activeReviewTab === "review" && (
+                      <div ref={refAnswerReview}>
+                        {/* Header with prev/next always at the top */}
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className={`${DISPLAY} font-extrabold text-2xl`}>Answer Review 📋</h4>
+                          <div className="flex items-center gap-2">
+                            <button
+                              className={BTN_SM}
+                              disabled={reviewIndex === 0}
+                              onClick={() => setReviewIndex(i => i - 1)}
+                            >
+                              <ChevronLeft className="w-4 h-4" /> Prev
+                            </button>
+                            <span className="text-sm font-extrabold font-['Baloo_2'] text-slate-500 px-1">
+                              {reviewIndex + 1} / {questions.length}
+                            </span>
+                            <button
+                              className={BTN_SM}
+                              disabled={reviewIndex === questions.length - 1}
+                              onClick={() => setReviewIndex(i => i + 1)}
+                            >
+                              Next <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
 
-                    {/* Answer review */}
-                    <div>
-                      <h4 className={`${DISPLAY} font-extrabold text-2xl mb-5`}>Answer Review 📋</h4>
-                      <div className="space-y-4">
-                        {questions.map((q, idx) => {
+                        {/* Single question card */}
+                        {(() => {
+                          const idx = reviewIndex;
+                          const q = questions[idx];
+                          if (!q) return null;
                           const isBookmarked = flaggedQuestions.has(idx);
 
                           if (isSubjective) {
@@ -961,11 +1035,10 @@ const Quiz = () => {
                             const modelAnswers = q.answers.filter((a) => a.is_correct);
                             const isSkipped = isCheckbox ? selectedIds.size === 0 : !userAnswer.trim();
                             const accentColor = isSkipped ? "#94a3b8" : result?.isCorrect ? "#22c55e" : C.pop;
-
                             return (
-                              <div key={idx} className={`${STICKER} p-6`} style={{ borderLeft: `6px solid ${accentColor}` }}>
+                              <div className={`${STICKER} p-6`} style={{ borderLeft: `6px solid ${accentColor}` }}>
                                 <div className="flex items-center gap-3 flex-wrap mb-3">
-                                  <span className={`${TAG}`} style={{ background: C.skySoft }}>Q{idx + 1}</span>
+                                  <span className={`${TAG}`} style={{ background: C.skySoft }}>Q{idx + 1} / {questions.length}</span>
                                   {subjectiveGrading ? (
                                     <span className={`${TAG} gap-1`}><Loader2 className="w-3 h-3 animate-spin" /> Grading…</span>
                                   ) : isSkipped ? (
@@ -1026,17 +1099,16 @@ const Quiz = () => {
                             );
                           }
 
-                          // Objective review
+                          // Objective
                           const selected = answeredMap.get(idx) ?? null;
                           const correctAnswer = q.answers.find((a) => a.is_correct);
                           const isCorrect = selected === correctAnswer?.id;
                           const isSkipped = selected === null;
                           const accentColor = isSkipped ? "#94a3b8" : isCorrect ? "#22c55e" : C.pop;
-
                           return (
-                            <div key={idx} className={`${STICKER} p-6`} style={{ borderLeft: `6px solid ${accentColor}` }}>
+                            <div className={`${STICKER} p-6`} style={{ borderLeft: `6px solid ${accentColor}` }}>
                               <div className="flex items-center gap-3 flex-wrap mb-3">
-                                <span className={`${TAG}`} style={{ background: C.skySoft }}>Q{idx + 1}</span>
+                                <span className={`${TAG}`} style={{ background: C.skySoft }}>Q{idx + 1} / {questions.length}</span>
                                 {isSkipped ? (
                                   <span className={`${TAG}`} style={{ background: "#f1f5f9" }}>Skipped</span>
                                 ) : isCorrect ? (
@@ -1078,44 +1150,76 @@ const Quiz = () => {
                               )}
                             </div>
                           );
-                        })}
-                      </div>
-                    </div>
+                        })()}
 
-                    {/* Bookmarked questions summary */}
-                    {flaggedQuestions.size > 0 && (
-                      <div className={`${STICKER} p-6`}>
-                        <h4 className={`${DISPLAY} font-extrabold text-xl flex items-center gap-2 mb-4`}>
-                          <BookmarkCheck className="w-5 h-5" style={{ color: C.sun }} /> Bookmarked ({flaggedQuestions.size})
-                        </h4>
-                        <div className="space-y-2">
-                          {sortedBookmarks.map((idx) => {
-                            const q = questions[idx];
-                            if (!q) return null;
-                            const correctAnswer = q.answers.find((a) => a.is_correct);
-                            const wasCorrect = answeredMap.get(idx) === correctAnswer?.id;
-                            const wasSkipped = !answeredMap.has(idx);
-                            const statusBg = wasSkipped ? "#f1f5f9" : wasCorrect ? "#dcfce7" : "#fee2e2";
-                            const statusColor = wasSkipped ? C.ink : wasCorrect ? "#16a34a" : C.pop;
-                            return (
-                              <div key={idx} className="flex items-center gap-3 p-3 rounded-[16px] border-[2px] border-[#0F172A]/10 bg-slate-50">
-                                <span className={`${TAG}`} style={{ background: C.skySoft }}>Q{idx + 1}</span>
-                                <p className="text-sm font-medium text-slate-600 line-clamp-2 flex-1">{q.text}</p>
-                                <span className="px-2.5 py-1 rounded-full text-xs font-bold border-[2px] border-current" style={{ background: statusBg, color: statusColor }}>
-                                  {wasSkipped ? "Skipped" : wasCorrect ? "Correct" : "Wrong"}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        {/* Bookmarked questions summary */}
+                        {flaggedQuestions.size > 0 && (
+                          <div className={`${STICKER} p-6 mt-4`}>
+                            <h4 className={`${DISPLAY} font-extrabold text-xl flex items-center gap-2 mb-4`}>
+                              <BookmarkCheck className="w-5 h-5" style={{ color: C.sun }} /> Bookmarked ({flaggedQuestions.size})
+                            </h4>
+                            <div className="space-y-2">
+                              {sortedBookmarks.map((idx) => {
+                                const q = questions[idx];
+                                if (!q) return null;
+                                const correctAnswer = q.answers.find((a) => a.is_correct);
+                                const wasCorrect = answeredMap.get(idx) === correctAnswer?.id;
+                                const wasSkipped = !answeredMap.has(idx);
+                                const statusBg = wasSkipped ? "#f1f5f9" : wasCorrect ? "#dcfce7" : "#fee2e2";
+                                const statusColor = wasSkipped ? C.ink : wasCorrect ? "#16a34a" : C.pop;
+                                return (
+                                  <div key={idx} className="flex items-center gap-3 p-3 rounded-[16px] border-[2px] border-[#0F172A]/10 bg-slate-50">
+                                    <span className={`${TAG}`} style={{ background: C.skySoft }}>Q{idx + 1}</span>
+                                    <p className="text-sm font-medium text-slate-600 line-clamp-2 flex-1">{q.text}</p>
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold border-[2px] border-current" style={{ background: statusBg, color: statusColor }}>
+                                      {wasSkipped ? "Skipped" : wasCorrect ? "Correct" : "Wrong"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Action buttons */}
-                    <div className="flex flex-wrap gap-3">
-                      <button className={`${BTN} text-white`} style={{ background: C.blue }} onClick={resetSessionState}>Retake deck</button>
-                      <button className={`${BTN} bg-white`} disabled={!activeDeck} onClick={() => activeDeck && handleStartQuiz(activeDeck)}>Fresh order</button>
-                      <button className={`${BTN} bg-white`} onClick={() => { resetSessionState(); setView("decks"); }}>Back to category</button>
+                    {/* Mobile section tabs (hidden on lg — sidebar handles desktop) */}
+                    <div className="lg:hidden flex flex-col gap-2 mt-2 p-4 rounded-[20px] border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A] bg-white">
+                      <p className={`${DISPLAY} font-extrabold text-xs uppercase tracking-widest mb-1`} style={{ color: C.indigo }}>Review Sections</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([
+                          { tab: "review" as const,  icon: PenLine,   label: "Answer Review",  activeBg: "#92400e", bg: "#FEF9C3" },
+                          { tab: "ai" as const,      icon: Sparkles,  label: "AI Analysis",    activeBg: C.indigo,  bg: C.indigoSoft },
+                          { tab: "tracker" as const, icon: BarChart2, label: "Score Tracker",  activeBg: C.blue,    bg: C.skySoft },
+                        ] as const).map(({ tab, icon: Icon, label, bg, activeBg }) => {
+                          const isActive = activeReviewTab === tab;
+                          return (
+                            <button
+                              key={tab}
+                              onClick={() => {
+                                if (tab === "ai" && activeReviewTab !== "ai") runAiAnalysis();
+                                setActiveReviewTab(isActive ? null : tab);
+                              }}
+                              className="flex flex-col items-center gap-1 rounded-[14px] border-[2.5px] border-[#0F172A] p-3 text-center font-bold text-xs transition-all cursor-pointer"
+                              style={{ background: isActive ? activeBg : bg, color: isActive ? "#fff" : C.ink, boxShadow: "2px 2px 0 0 #0F172A" }}
+                            >
+                              <Icon className="w-4 h-4" />
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t-[2px] border-[#0F172A]/10">
+                        <button className="flex flex-col items-center gap-1 rounded-[14px] border-[2.5px] border-[#0F172A] p-3 font-bold text-xs bg-white transition-all cursor-pointer hover:-translate-y-0.5" style={{ boxShadow: "2px 2px 0 0 #0F172A", color: C.blue }} onClick={resetSessionState}>
+                          <Target className="w-4 h-4" /> Retake
+                        </button>
+                        <button className="flex flex-col items-center gap-1 rounded-[14px] border-[2.5px] border-[#0F172A] p-3 font-bold text-xs bg-white transition-all cursor-pointer hover:-translate-y-0.5 disabled:opacity-40" style={{ boxShadow: "2px 2px 0 0 #0F172A" }} disabled={!activeDeck} onClick={() => activeDeck && handleStartQuiz(activeDeck)}>
+                          <Zap className="w-4 h-4" /> Fresh Order
+                        </button>
+                        <button className="flex flex-col items-center gap-1 rounded-[14px] border-[2.5px] border-[#0F172A] p-3 font-bold text-xs bg-white transition-all cursor-pointer hover:-translate-y-0.5" style={{ boxShadow: "2px 2px 0 0 #0F172A" }} onClick={() => { resetSessionState(); setView("decks"); }}>
+                          <ChevronLeft className="w-4 h-4" /> Back
+                        </button>
+                      </div>
                     </div>
 
                     <GoalSheet open={showGoalSheet} onClose={() => setShowGoalSheet(false)}
@@ -1358,6 +1462,132 @@ const Quiz = () => {
               </div>
             )}
 
+            {/* Results navigator — visible after quiz completion */}
+            {view === "taking" && sessionComplete && (
+              <div className={SIDE_CARD}>
+                {/* Section tabs */}
+                <p className={`${DISPLAY} font-extrabold text-xs uppercase tracking-widest mb-3`} style={{ color: C.indigo }}>
+                  Review Sections
+                </p>
+                <div className="flex flex-col gap-2 mb-4">
+                  {([
+                    { tab: "review" as const,  icon: PenLine,   label: "Answer Review",  bg: "#FEF9C3",    activeBg: "#92400e" },
+                    { tab: "ai" as const,      icon: Sparkles,  label: "AI Analysis",    bg: C.indigoSoft, activeBg: C.indigo },
+                    { tab: "tracker" as const, icon: BarChart2, label: "Score Tracker",  bg: C.skySoft,    activeBg: C.blue },
+                  ] as const).map(({ tab, icon: Icon, label, bg, activeBg }) => {
+                    const isActive = activeReviewTab === tab;
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => {
+                          if (tab === "ai" && activeReviewTab !== "ai") { runAiAnalysis(); }
+                          setActiveReviewTab(isActive ? null : tab);
+                        }}
+                        className="w-full flex items-center gap-3 rounded-[14px] border-[2.5px] border-[#0F172A] px-3 py-2.5 text-left font-bold text-sm transition-all cursor-pointer hover:-translate-y-0.5"
+                        style={{
+                          background: isActive ? activeBg : bg,
+                          color: isActive ? "#fff" : C.ink,
+                          boxShadow: isActive ? `3px 3px 0 0 #0F172A` : "2px 2px 0 0 #0F172A",
+                        }}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" style={{ color: isActive ? "#fff" : activeBg }} />
+                        <span className={DISPLAY}>{label}</span>
+                        {isActive && <span className="ml-auto text-[10px] font-bold opacity-70">▲ Hide</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Jump-to-question grid — only when answer review active */}
+                {activeReviewTab === "review" && questions.length > 0 && (
+                  <>
+                    <p className={`${DISPLAY} font-extrabold text-xs uppercase tracking-widest mb-2`} style={{ color: C.ink }}>
+                      Jump to Question
+                    </p>
+                    <div className="max-h-52 overflow-y-auto mb-3 -mx-1">
+                    <div className="grid grid-cols-5 gap-2 px-1 py-1">
+                      {questions.map((_, idx) => {
+                        const isActive = idx === reviewIndex;
+                        const isBookmarked = flaggedQuestions.has(idx);
+                        let dotBg = "#e2e8f0";
+                        let dotColor = C.ink;
+                        if (isSubjective) {
+                          const r = subjectiveResults.get(idx);
+                          const isCheckbox = questions[idx].answers.some((a) => !a.is_correct);
+                          const skipped = isCheckbox ? (checkboxAnswerMap.get(idx)?.size ?? 0) === 0 : !(subjectiveAnswerMap.get(idx) ?? "").trim();
+                          if (subjectiveGrading) { dotBg = "#fef9c3"; dotColor = "#92400e"; }
+                          else if (skipped) { dotBg = "#e2e8f0"; dotColor = "#64748b"; }
+                          else if (r?.isCorrect) { dotBg = "#22c55e"; dotColor = "#fff"; }
+                          else if (r) { dotBg = C.pop; dotColor = "#fff"; }
+                        } else {
+                          const sel = answeredMap.get(idx) ?? null;
+                          const correct = questions[idx].answers.find((a) => a.is_correct);
+                          if (sel === null) { dotBg = "#e2e8f0"; dotColor = "#64748b"; }
+                          else if (sel === correct?.id) { dotBg = "#22c55e"; dotColor = "#fff"; }
+                          else { dotBg = C.pop; dotColor = "#fff"; }
+                        }
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => setReviewIndex(idx)}
+                            className="relative aspect-square rounded-[10px] border-[2px] border-[#0F172A] font-['Baloo_2'] font-extrabold text-xs cursor-pointer transition-all"
+                            style={{
+                              background: isActive ? C.indigo : dotBg,
+                              color: isActive ? "#fff" : dotColor,
+                              boxShadow: isActive ? "2px 2px 0 0 #0F172A" : "1px 1px 0 0 #0F172A",
+                              transform: isActive ? "scale(1.1)" : "scale(1)",
+                            }}
+                          >
+                            {idx + 1}
+                            {isBookmarked && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white" style={{ background: C.sun }} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mb-4">
+                      {[
+                        { bg: "#22c55e", label: "Correct" },
+                        { bg: C.pop,    label: "Wrong" },
+                        { bg: "#e2e8f0", label: "Skipped" },
+                      ].map(({ bg, label }) => (
+                        <div key={label} className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-[3px] border border-[#0F172A]/20 shrink-0" style={{ background: bg }} />
+                          <span className="text-[10px] font-semibold text-slate-500">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex flex-col gap-2 pt-3 border-t-[2px] border-[#0F172A]/10">
+                  <button
+                    className="w-full inline-flex items-center justify-center gap-2 font-extrabold font-['Baloo_2'] text-sm border-[2.5px] border-[#0F172A] rounded-full py-2.5 shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#0F172A] transition-all text-white cursor-pointer"
+                    style={{ background: C.blue }}
+                    onClick={resetSessionState}
+                  >
+                    <Target className="w-4 h-4" /> Retake
+                  </button>
+                  <button
+                    className="w-full inline-flex items-center justify-center gap-2 font-extrabold font-['Baloo_2'] text-sm border-[2.5px] border-[#0F172A] rounded-full py-2.5 shadow-[2px_2px_0_0_#0F172A] hover:-translate-y-0.5 transition-all cursor-pointer bg-white"
+                    disabled={!activeDeck}
+                    onClick={() => activeDeck && handleStartQuiz(activeDeck)}
+                  >
+                    <Zap className="w-4 h-4" /> Fresh Order
+                  </button>
+                  <button
+                    className="w-full inline-flex items-center justify-center gap-2 font-extrabold font-['Baloo_2'] text-sm border-[2.5px] border-[#0F172A] rounded-full py-2.5 shadow-[2px_2px_0_0_#0F172A] hover:-translate-y-0.5 transition-all cursor-pointer bg-white"
+                    onClick={() => { resetSessionState(); setView("decks"); }}
+                  >
+                    <ChevronLeft className="w-4 h-4" /> Back to Category
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Question navigator — visible during active quiz */}
             {view === "taking" && !sessionComplete && questions.length > 0 && (
               <div className={SIDE_CARD}>
@@ -1405,27 +1635,6 @@ const Quiz = () => {
               </div>
             )}
 
-            {/* Results sidebar: Goals CTA */}
-            {view === "taking" && sessionComplete && (
-              <div className={SIDE_CARD}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.blue }}>
-                    <Trophy className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className={`${DISPLAY} font-extrabold text-sm`}>Plan your next sprint</p>
-                    <p className="text-xs font-semibold text-slate-400">Set a goal for your next session</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowGoalSheet(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 font-extrabold font-['Baloo_2'] text-sm border-[2.5px] border-[#0F172A] rounded-full py-2.5 shadow-[3px_3px_0_0_#0F172A] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_#0F172A] transition-all text-white cursor-pointer"
-                  style={{ background: C.blue }}
-                >
-                  <CalendarDays className="w-4 h-4" /> Set Goals
-                </button>
-              </div>
-            )}
 
           </aside>
         </div>

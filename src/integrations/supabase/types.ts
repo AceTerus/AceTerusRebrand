@@ -302,6 +302,80 @@ export type Database = {
         }
         Relationships: []
       }
+      schools: {
+        Row: {
+          id: string
+          name: string
+          type: string
+          level: string
+          state: string
+          district: string | null
+          city: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          type: string
+          level: string
+          state: string
+          district?: string | null
+          city?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          type?: string
+          level?: string
+          state?: string
+          district?: string | null
+          city?: string | null
+        }
+        Relationships: []
+      }
+      student_schools: {
+        Row: {
+          id: string
+          user_id: string
+          school_id: string | null
+          school_name: string | null
+          grade: string | null
+          curricular: string | null
+          school_type: string | null
+          school_location: string | null
+          class_name: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          school_id?: string | null
+          school_name?: string | null
+          grade?: string | null
+          curricular?: string | null
+          school_type?: string | null
+          school_location?: string | null
+          class_name?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          school_id?: string | null
+          school_name?: string | null
+          grade?: string | null
+          curricular?: string | null
+          school_type?: string | null
+          school_location?: string | null
+          class_name?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "student_schools_school_id_fkey"; columns: ["school_id"]; referencedRelation: "schools"; referencedColumns: ["id"] }
+        ]
+      }
       quiz_completions: {
         Row: {
           completed_at: string

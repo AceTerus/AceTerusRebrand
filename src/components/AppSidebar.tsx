@@ -89,12 +89,12 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
           const Icon = item.icon;
           const active = isActive(item.href);
           return (
-            <Link
+            <button
               key={item.href}
-              to={item.href}
               title={collapsed ? item.label : undefined}
+              onClick={() => active ? navigate(0) : navigate(item.href)}
               className={`
-                relative flex items-center rounded-xl transition-all duration-150 group
+                relative flex items-center rounded-xl transition-all duration-150 group cursor-pointer
                 ${collapsed ? "justify-center px-0 py-4" : "px-5 py-4 space-x-4"}
                 ${active
                   ? "bg-primary text-white font-bold shadow-[3px_3px_0_0_#0F172A] border-2 border-[#0F172A] -translate-y-0.5"
@@ -111,7 +111,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
                 )}
               </div>
               {!collapsed && <span className="text-[17px] flex-1">{item.label}</span>}
-            </Link>
+            </button>
           );
         })}
       </nav>
@@ -135,7 +135,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               {/* Profile avatar — links to profile */}
               <Link to="/profile" title={displayName}>
                 <Avatar className={`h-9 w-9 border-2 border-[#0F172A]/20 transition-all hover:border-[#0F172A]/50 ${isActive("/profile") ? "ring-2 ring-primary ring-offset-1" : ""}`}>
-                  <AvatarImage src={avatarSrc} />
+                  <AvatarImage src={avatarSrc} className="object-cover" />
                   <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">{initials}</AvatarFallback>
                 </Avatar>
               </Link>
@@ -161,7 +161,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
               >
                 <Avatar className={`h-9 w-9 shrink-0 border-2 transition-all
                   ${isActive("/profile") ? "border-white/40" : "border-[#0F172A]/20 group-hover:border-[#0F172A]/40"}`}>
-                  <AvatarImage src={avatarSrc} />
+                  <AvatarImage src={avatarSrc} className="object-cover" />
                   <AvatarFallback className={`font-bold text-sm ${isActive("/profile") ? "bg-white/20 text-white" : "bg-primary/10 text-primary"}`}>
                     {initials}
                   </AvatarFallback>

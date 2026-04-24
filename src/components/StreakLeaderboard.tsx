@@ -40,7 +40,7 @@ function PodiumCard({ entry, trophy, center, canClick, isMe }: {
     <div className={`flex flex-col items-center gap-2 ${cardWidth} ${marginTop} min-w-0`}>
       {/* Avatar */}
       <Avatar className={`${avatarSize} border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A]`}>
-        <AvatarImage src={entry.avatar_url || undefined} />
+        <AvatarImage src={entry.avatar_url || undefined} className="object-cover" />
         <AvatarFallback className={`${DISPLAY} font-extrabold ${center ? 'text-2xl' : 'text-lg'}`} style={{ background: C.cyan, color: C.ink }}>
           {entry.username?.[0]?.toUpperCase() || 'U'}
         </AvatarFallback>
@@ -185,7 +185,7 @@ export function StreakLeaderboard({ currentUserId, currentStreak }: Props) {
                     <span className={`${DISPLAY} font-extrabold text-sm text-slate-500`}>{rank}</span>
                     <div className="flex items-center gap-2 min-w-0">
                       <Avatar className="h-8 w-8 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A] flex-shrink-0">
-                        <AvatarImage src={entry.avatar_url || undefined} />
+                        <AvatarImage src={entry.avatar_url || undefined} className="object-cover" />
                         <AvatarFallback className={`${DISPLAY} font-extrabold text-xs`} style={{ background: C.cyan, color: C.ink }}>
                           {entry.username?.[0]?.toUpperCase() || 'U'}
                         </AvatarFallback>

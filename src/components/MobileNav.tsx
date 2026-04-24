@@ -1,9 +1,10 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { BookOpen, User, Compass, FileText, MessageCircle, ScanLine } from "lucide-react";
 import { useChatNotifications } from "@/context/ChatNotificationsContext";
 
 export const MobileNav = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { totalSenders } = useChatNotifications();
 
   const isActive = (path: string) => location.pathname === path;
@@ -29,10 +30,10 @@ export const MobileNav = () => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
-              <Link
+              <button
                 key={item.href}
-                to={item.href}
-                className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-colors relative min-w-0 flex-1 ${
+                onClick={() => active ? navigate(0) : navigate(item.href)}
+                className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-colors relative min-w-0 flex-1 cursor-pointer ${
                   active ? "text-primary" : "text-muted-foreground"
                 }`}
               >
@@ -47,7 +48,7 @@ export const MobileNav = () => {
                 <span className={`text-[10px] font-medium truncate w-full text-center ${active ? "text-primary" : ""}`}>
                   {item.label}
                 </span>
-              </Link>
+              </button>
             );
           })}
 

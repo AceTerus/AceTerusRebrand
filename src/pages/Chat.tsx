@@ -364,7 +364,7 @@ export const Chat = () => {
                     className="relative flex-shrink-0"
                   >
                     <Avatar className="h-10 w-10 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A]">
-                      <AvatarImage src={contact.avatar_url || undefined} />
+                      <AvatarImage src={contact.avatar_url || undefined} className="object-cover" />
                       <AvatarFallback
                         className={`${DISPLAY} font-extrabold text-sm`}
                         style={{ background: C.cyan, color: C.ink }}
@@ -435,7 +435,7 @@ export const Chat = () => {
                 </button>
                 <Link to={`/profile/${selectedContact.user_id}`} className="relative flex-shrink-0">
                   <Avatar className="h-9 w-9 border-[2px] border-[#0F172A] shadow-[1px_1px_0_0_#0F172A]">
-                    <AvatarImage src={selectedContact.avatar_url || undefined} />
+                    <AvatarImage src={selectedContact.avatar_url || undefined} className="object-cover" />
                     <AvatarFallback
                       className={`${DISPLAY} font-extrabold text-sm`}
                       style={{ background: C.cyan, color: C.ink }}
@@ -518,7 +518,7 @@ export const Chat = () => {
                               <div className={cn("w-7 flex-shrink-0", !isLastInRun && "invisible")}>
                                 <Link to={`/profile/${isOwn ? userId : selectedContact.user_id}`} className="block">
                                   <Avatar className="h-7 w-7 border-[1.5px] border-[#0F172A]">
-                                    <AvatarImage src={profileForMsg?.avatar_url || undefined} />
+                                    <AvatarImage src={profileForMsg?.avatar_url || undefined} className="object-cover" />
                                     <AvatarFallback
                                       className="text-[10px] font-bold"
                                       style={{ background: C.cyan, color: C.ink }}
@@ -560,7 +560,7 @@ export const Chat = () => {
             <div className="border-t-[2.5px] border-[#0F172A] bg-white px-6 py-4">
               <div className="flex items-end gap-3 rounded-2xl border-[2.5px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] bg-white px-4 py-3 focus-within:shadow-[3px_3px_0_0_#0F172A] transition-shadow">
                 <Avatar className="mb-0.5 h-7 w-7 flex-shrink-0 self-end border-[1.5px] border-[#0F172A]">
-                  <AvatarImage src={currentProfile?.avatar_url || undefined} />
+                  <AvatarImage src={currentProfile?.avatar_url || undefined} className="object-cover" />
                   <AvatarFallback
                     className="text-xs font-bold"
                     style={{ background: C.cyan, color: C.ink }}

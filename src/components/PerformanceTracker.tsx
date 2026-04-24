@@ -1,19 +1,27 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Award, BarChart2, TrendingDown, TrendingUp, Minus } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Award, BarChart2, TrendingDown, TrendingUp, Minus, Sparkles } from "lucide-react";
 
 export interface SubjectAttempt {
-  score: number;          // 0–100
-  completed_at: string;   // ISO timestamp
+  score: number;
+  completed_at: string;
   deck_name: string;
 }
 
 interface PerformanceTrackerProps {
   category: string;
-  currentScore: number;   // 0–100
-  history: SubjectAttempt[]; // past attempts for this subject (newest first), NOT including current
+  currentScore: number;
+  history: SubjectAttempt[];
 }
+
+const C = {
+  cyan: "#3BD6F5", blue: "#2F7CFF", indigo: "#2E2BE5",
+  ink: "#0F172A", skySoft: "#DDF3FF", indigoSoft: "#D6D4FF",
+  pop: "#FF7A59", sun: "#FFD65C", mintSoft: "#D1FAE5",
+};
+
+const CARD    = "border-[3px] border-[#0F172A] rounded-[24px] shadow-[4px_4px_0_0_#0F172A] bg-white overflow-hidden";
+const DISPLAY = "font-['Baloo_2'] tracking-tight";
+const TAG     = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-[2.5px] border-[#0F172A] font-extrabold text-xs";
 
 function fmt(dt: string) {
   const d = new Date(dt);
@@ -21,8 +29,7 @@ function fmt(dt: string) {
 }
 
 export default function PerformanceTracker({ category, currentScore, history }: PerformanceTrackerProps) {
-  // Build chronological list: oldest → newest → current
-  const past = [...history].reverse(); // history is newest-first, reverse to chronological
+  const past = [...history].reverse();
   const allAttempts: SubjectAttempt[] = [
     ...past,
     { score: currentScore, completed_at: new Date().toISOString(), deck_name: "This attempt" },
@@ -30,107 +37,88 @@ export default function PerformanceTracker({ category, currentScore, history }: 
 
   const previousScore = past.length > 0 ? past[past.length - 1].score : null;
   const diff = previousScore !== null ? +(currentScore - previousScore).toFixed(1) : null;
-
   const best = Math.max(...allAttempts.map((a) => a.score));
-  const avg = +(allAttempts.reduce((s, a) => s + a.score, 0) / allAttempts.length).toFixed(1);
+  const avg  = +(allAttempts.reduce((s, a) => s + a.score, 0) / allAttempts.length).toFixed(1);
+  const isFirst = previousScore === null;
 
-  // Chart data (up to last 6 attempts + current)
   const chartData = allAttempts.slice(-7).map((a, i, arr) => ({
     label: i === arr.length - 1 ? "Now" : fmt(a.completed_at),
     score: +a.score.toFixed(1),
     isCurrent: i === arr.length - 1,
   }));
 
-  const isFirst = previousScore === null;
-
-  let trendBadge: { label: string; icon: React.ElementType; className: string } | null = null;
+  let trendTag: { label: string; icon: React.ElementType; bg: string; color: string } | null = null;
   if (!isFirst && diff !== null) {
-    if (diff > 0) {
-      trendBadge = {
-        label: `+${diff}% from last`,
-        icon: TrendingUp,
-        className: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300 border-green-300 dark:border-green-500/40",
-      };
-    } else if (diff < 0) {
-      trendBadge = {
-        label: `${diff}% from last`,
-        icon: TrendingDown,
-        className: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300 border-red-300 dark:border-red-500/40",
-      };
-    } else {
-      trendBadge = {
-        label: "Same as last",
-        icon: Minus,
-        className: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border-blue-300 dark:border-blue-500/40",
-      };
-    }
+    if (diff > 0)
+      trendTag = { label: `+${diff}% from last`, icon: TrendingUp,   bg: C.mintSoft,   color: "#15803d" };
+    else if (diff < 0)
+      trendTag = { label: `${diff}% from last`,  icon: TrendingDown, bg: "#FFE4E6",    color: C.pop };
+    else
+      trendTag = { label: "Same as last",         icon: Minus,        bg: C.skySoft,    color: C.blue };
   }
 
   return (
-    <Card className="shadow-elegant border-primary/20">
-      <CardHeader className="pb-4">
+    <div className={CARD}>
+      {/* Header bar */}
+      <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${C.blue}, ${C.cyan})` }} />
+
+      <div className="p-5 space-y-4">
+        {/* Title row */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <BarChart2 className="w-5 h-5 text-primary" />
+          <div className="w-10 h-10 rounded-[12px] border-[2.5px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.skySoft }}>
+            <BarChart2 className="w-5 h-5" style={{ color: C.blue }} />
           </div>
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg">Performance Tracker</CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">{category}</p>
+            <p className={`${DISPLAY} font-extrabold text-lg leading-tight`}>Performance Tracker</p>
+            <p className="text-xs font-semibold text-slate-400 truncate">{category}</p>
           </div>
-          {trendBadge && (
-            <Badge variant="outline" className={`flex items-center gap-1.5 shrink-0 ${trendBadge.className}`}>
-              <trendBadge.icon className="w-3.5 h-3.5" />
-              {trendBadge.label}
-            </Badge>
-          )}
-          {isFirst && (
-            <Badge variant="outline" className="shrink-0 bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 border-purple-300 dark:border-purple-500/40">
-              First Attempt
-            </Badge>
-          )}
+          {trendTag ? (
+            <span className={`${TAG} shrink-0`} style={{ background: trendTag.bg, color: trendTag.color }}>
+              <trendTag.icon className="w-3.5 h-3.5" />
+              {trendTag.label}
+            </span>
+          ) : isFirst ? (
+            <span className={`${TAG} shrink-0`} style={{ background: C.indigoSoft, color: C.indigo }}>
+              <Sparkles className="w-3.5 h-3.5" /> First Attempt
+            </span>
+          ) : null}
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-5">
-        {/* Improvement message */}
+        {/* Trend message */}
         {diff !== null && diff !== 0 && (
-          <div className={`rounded-xl border p-4 flex items-center gap-3 ${diff > 0 ? "bg-green-50 border-green-200 dark:bg-green-500/10 dark:border-green-500/30" : "bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/30"}`}>
-            {diff > 0 ? (
-              <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
-            ) : (
-              <TrendingDown className="w-5 h-5 text-red-500 shrink-0" />
-            )}
-            <p className={`text-sm font-semibold ${diff > 0 ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+          <div className="rounded-[16px] border-[2px] border-[#0F172A]/10 p-4 flex items-center gap-3"
+            style={{ background: diff > 0 ? C.mintSoft : "#FFE4E6" }}>
+            {diff > 0
+              ? <TrendingUp  className="w-5 h-5 text-emerald-600 shrink-0" />
+              : <TrendingDown className="w-5 h-5 shrink-0" style={{ color: C.pop }} />}
+            <p className={`text-sm font-bold ${diff > 0 ? "text-emerald-700" : ""}`} style={diff < 0 ? { color: C.pop } : {}}>
               {diff > 0
-                ? `You have improved ${diff}% from your last attempt!`
-                : `You have dropped ${Math.abs(diff)}% from your last attempt.`}
+                ? `You improved ${diff}% from your last attempt! 🎉`
+                : `You dropped ${Math.abs(diff)}% from your last attempt.`}
             </p>
           </div>
         )}
 
-        {/* Stat row */}
+        {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border p-3 text-center">
-            <p className="text-xs text-muted-foreground mb-1">This Attempt</p>
-            <p className="text-xl font-bold text-primary">{currentScore.toFixed(1)}%</p>
-          </div>
-          <div className="rounded-xl border p-3 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Best Score</p>
-            <p className="text-xl font-bold text-green-600 dark:text-green-400 flex items-center justify-center gap-1">
-              <Award className="w-4 h-4" />
-              {best.toFixed(1)}%
-            </p>
-          </div>
-          <div className="rounded-xl border p-3 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Average</p>
-            <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{avg}%</p>
-          </div>
+          {[
+            { label: "This Attempt", value: `${currentScore.toFixed(1)}%`, bg: C.indigoSoft, color: C.indigo, icon: null },
+            { label: "Best Score",   value: `${best.toFixed(1)}%`,         bg: C.mintSoft,   color: "#15803d", icon: <Award className="w-3.5 h-3.5" /> },
+            { label: "Average",      value: `${avg}%`,                     bg: C.skySoft,    color: C.blue,   icon: null },
+          ].map(({ label, value, bg, color, icon }) => (
+            <div key={label} className="rounded-[16px] border-[2px] border-[#0F172A]/10 p-3 text-center" style={{ background: bg }}>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">{label}</p>
+              <p className={`${DISPLAY} font-extrabold text-lg flex items-center justify-center gap-1`} style={{ color }}>
+                {icon}{value}
+              </p>
+            </div>
+          ))}
         </div>
 
         {/* Chart */}
         {allAttempts.length > 1 && (
           <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
               Score History — {category}
             </p>
             <div className="h-36">
@@ -138,57 +126,55 @@ export default function PerformanceTracker({ category, currentScore, history }: 
                 <BarChart data={chartData} barCategoryGap="30%">
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11, fill: "currentColor" }}
+                    tick={{ fontSize: 11, fill: "#64748b", fontFamily: "Nunito" }}
                     axisLine={false}
                     tickLine={false}
-                    className="text-muted-foreground"
                   />
                   <YAxis
                     domain={[0, 100]}
-                    tick={{ fontSize: 11, fill: "currentColor" }}
+                    tick={{ fontSize: 11, fill: "#64748b", fontFamily: "Nunito" }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => `${v}%`}
-                    className="text-muted-foreground"
                     width={36}
                   />
                   <Tooltip
                     formatter={(val: number) => [`${val}%`, "Score"]}
                     contentStyle={{
-                      borderRadius: "8px",
+                      borderRadius: "14px",
                       fontSize: "12px",
-                      border: "1px solid hsl(var(--border))",
-                      background: "hsl(var(--background))",
-                      color: "hsl(var(--foreground))",
+                      border: `2.5px solid ${C.ink}`,
+                      background: "#fff",
+                      color: C.ink,
+                      fontFamily: "Nunito",
+                      fontWeight: 700,
+                      boxShadow: `3px 3px 0 0 ${C.ink}`,
                     }}
-                    cursor={{ fill: "hsl(var(--muted)/0.4)" }}
+                    cursor={{ fill: "#f1f5f9" }}
                   />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="score" radius={[6, 6, 0, 0]}>
                     {chartData.map((entry, idx) => (
-                      <Cell
-                        key={idx}
-                        fill={entry.isCurrent ? "hsl(var(--primary))" : "hsl(var(--primary)/0.35)"}
-                      />
+                      <Cell key={idx} fill={entry.isCurrent ? C.blue : C.skySoft} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs text-muted-foreground text-center mt-1">
-              Showing last {chartData.length} attempt{chartData.length !== 1 ? "s" : ""} • Highlighted bar = this attempt
+            <p className="text-[10px] font-semibold text-slate-400 text-center mt-1">
+              Showing last {chartData.length} attempt{chartData.length !== 1 ? "s" : ""} · Highlighted bar = this attempt
             </p>
           </div>
         )}
 
         {/* First attempt prompt */}
         {isFirst && (
-          <div className="rounded-xl bg-muted/40 border p-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              Complete more quizzes in <span className="font-semibold text-foreground">{category}</span> to see your progress trend here.
+          <div className="rounded-[16px] border-[2px] border-[#0F172A]/10 p-4 text-center" style={{ background: C.skySoft }}>
+            <p className="text-sm font-semibold text-slate-500">
+              Complete more quizzes in <span className={`${DISPLAY} font-extrabold text-[#0F172A]`}>{category}</span> to see your progress trend here.
             </p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SignInGate } from '@/components/SignInGate';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
@@ -382,15 +383,7 @@ export const Materials = () => {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center">
-        <div className={`${CARD} p-8 text-center`}>
-          <p className="font-semibold text-slate-400">Please sign in to view materials.</p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return <SignInGate message="Please sign in to view materials." />;
 
   return (
     <div className="min-h-screen bg-transparent">

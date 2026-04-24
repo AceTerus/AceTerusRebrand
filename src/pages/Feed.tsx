@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { SignInGate } from "@/components/SignInGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +14,7 @@ import { CommentSection } from "@/components/CommentSection";
 import { PostUpload } from "@/components/PostUpload";
 import { TodayGoalBanner } from "@/components/TodayGoalBanner";
 import { PostImageCarousel } from "@/components/PostImageCarousel";
+import { CommentPreview } from "@/components/CommentPreview";
 
 /* ── brand ────────────────────────────────────────────────────────────────── */
 const C = {
@@ -59,6 +61,7 @@ export const Feed = () => {
   const [lightboxPostId, setLightboxPostId] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -207,13 +210,7 @@ export const Feed = () => {
     setTouchStartX(null);
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <p className="font-semibold text-slate-500">Please sign in to view your feed</p>
-      </div>
-    );
-  }
+  if (!user) return <SignInGate message="Please sign in to view your feed." />;
 
   const currentLightboxPost = lightboxPostId ? posts.find((p) => p.id === lightboxPostId) : null;
   const currentLightboxImage = currentLightboxPost?.images?.[lightboxIndex];
@@ -252,7 +249,7 @@ export const Feed = () => {
                     <div key={profile.id} className="flex items-center justify-between gap-3">
                       <Link to={`/profile/${profile.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
                         <Avatar className="h-9 w-9 flex-shrink-0 border-[2px] border-[#0F172A]">
-                          <AvatarImage src={profile.avatar_url} />
+                          <AvatarImage src={profile.avatar_url} className="object-cover" />
                           <AvatarFallback className={`${DISPLAY} font-extrabold text-xs`} style={{ background: C.cyan }}>
                             {profile.username?.[0]?.toUpperCase() || "U"}
                           </AvatarFallback>
@@ -286,7 +283,7 @@ export const Feed = () => {
                   <div key={u.id} className="flex items-center justify-between gap-3">
                     <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar className="h-10 w-10 flex-shrink-0 border-[2px] border-[#0F172A]">
-                        <AvatarImage src={u.avatar_url} />
+                        <AvatarImage src={u.avatar_url} className="object-cover" />
                         <AvatarFallback className={`${DISPLAY} font-extrabold text-xs`} style={{ background: C.cyan }}>
                           {u.username?.[0]?.toUpperCase() || "U"}
                         </AvatarFallback>
@@ -362,7 +359,7 @@ export const Feed = () => {
                     <div className="flex items-center gap-3 px-4 py-3">
                       <Link to={`/profile/${post.user_id}`} className="flex-shrink-0">
                         <Avatar className="h-10 w-10 border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A]">
-                          <AvatarImage src={post.profiles?.avatar_url} />
+                          <AvatarImage src={post.profiles?.avatar_url} className="object-cover" />
                           <AvatarFallback
                             className={`${DISPLAY} font-extrabold text-sm`}
                             style={{ background: C.cyan, color: C.ink }}
@@ -402,8 +399,11 @@ export const Feed = () => {
                         }
                       />
                       <CommentSection
+                        mode="trigger"
                         postId={post.id}
                         commentsCount={post.comments_count}
+                        open={!!openComments[post.id]}
+                        onOpenChange={(v) => setOpenComments((prev) => ({ ...prev, [post.id]: v }))}
                         onCommentChange={(newCount) =>
                           setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: newCount } : p))
                         }
@@ -422,7 +422,7 @@ export const Feed = () => {
 
                     {/* Tags */}
                     {post.tags && post.tags.length > 0 && (
-                      <div className="px-4 pb-4 flex flex-wrap gap-x-2 gap-y-1">
+                      <div className="px-4 pb-2 flex flex-wrap gap-x-2 gap-y-1">
                         {post.tags.map((tag, i) => (
                           <span
                             key={i}
@@ -433,6 +433,26 @@ export const Feed = () => {
                           </span>
                         ))}
                       </div>
+                    )}
+
+                    {/* Comment preview (collapsed) or full panel (expanded) — both below caption */}
+                    {openComments[post.id] ? (
+                      <CommentSection
+                        mode="panel"
+                        postId={post.id}
+                        commentsCount={post.comments_count}
+                        open={true}
+                        onOpenChange={(v) => setOpenComments((prev) => ({ ...prev, [post.id]: v }))}
+                        onCommentChange={(newCount) =>
+                          setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, comments_count: newCount } : p))
+                        }
+                      />
+                    ) : (
+                      <CommentPreview
+                        postId={post.id}
+                        commentsCount={post.comments_count}
+                        onViewAll={() => setOpenComments((prev) => ({ ...prev, [post.id]: true }))}
+                      />
                     )}
                   </article>
                 );
@@ -457,7 +477,7 @@ export const Feed = () => {
                   <div key={u.id} className="flex items-center justify-between gap-3">
                     <Link to={`/profile/${u.user_id}`} className="flex items-center gap-3 flex-1 min-w-0">
                       <Avatar className="h-9 w-9 flex-shrink-0 border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A]">
-                        <AvatarImage src={u.avatar_url} />
+                        <AvatarImage src={u.avatar_url} className="object-cover" />
                         <AvatarFallback
                           className={`${DISPLAY} font-extrabold text-xs`}
                           style={{ background: C.cyan, color: C.ink }}
