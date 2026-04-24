@@ -292,10 +292,12 @@ export const Profile = () => {
     if (cropTarget === 'avatar') {
       setAvatarBlob(blob); setAvatarPreview(previewUrl);
       setCropSrc(null); setCropTarget(null);
+      setIsEditDialogOpen(true);
       toast({ title: 'Photo ready', description: 'Click Save Changes to apply it to your profile.' });
     } else if (cropTarget === 'cover-edit') {
       setCoverBlob(blob); setCoverPreview(previewUrl);
       setCropSrc(null); setCropTarget(null);
+      setIsEditDialogOpen(true);
       toast({ title: 'Cover ready', description: 'Click Save Changes to apply it to your profile.' });
     } else if (cropTarget === 'cover-live' && user) {
       const filePath = `${user.id}/cover_${Date.now()}.jpg`;
@@ -690,6 +692,7 @@ export const Profile = () => {
                               <span className="text-sm font-semibold text-slate-500">{avatarPreview ? 'Change photo' : 'Choose photo'}</span>
                               <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                 const f = e.target.files?.[0]; if (!f) return;
+                                setIsEditDialogOpen(false);
                                 setCropSrc(URL.createObjectURL(f)); setCropTarget('avatar'); e.target.value = '';
                               }} />
                             </label>
@@ -705,6 +708,7 @@ export const Profile = () => {
                               <span className="text-sm font-semibold text-slate-500">{coverPreview ? 'Change cover' : 'Choose cover'}</span>
                               <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                 const f = e.target.files?.[0]; if (!f) return;
+                                setIsEditDialogOpen(false);
                                 setCropSrc(URL.createObjectURL(f)); setCropTarget('cover-edit'); e.target.value = '';
                               }} />
                             </label>
@@ -1218,7 +1222,7 @@ export const Profile = () => {
           aspect={cropTarget === 'avatar' ? 1 : cropTarget.startsWith('cover') ? 3 : undefined}
           title={cropTarget === 'avatar' ? 'Crop Profile Photo' : 'Crop Cover Photo'}
           onConfirm={handleCropConfirm}
-          onCancel={() => { setCropSrc(null); setCropTarget(null); }}
+          onCancel={() => { const wasEditCrop = cropTarget === 'avatar' || cropTarget === 'cover-edit'; setCropSrc(null); setCropTarget(null); if (wasEditCrop) setIsEditDialogOpen(true); }}
         />
       )}
     </div>
