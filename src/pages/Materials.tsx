@@ -249,6 +249,10 @@ export const Materials = () => {
   const [previewUpload, setPreviewUpload] = useState<Upload | null>(null);
 
   useEffect(() => {
+    document.title = "Study Materials – AceTerus";
+    return () => { document.title = "AceTerus – AI Tutor & Quiz Platform for Malaysian Students"; };
+  }, []);
+  useEffect(() => {
     fetchUploads();
   }, [user, showOnlyMine]);
 

@@ -64,6 +64,10 @@ const Quiz = () => {
   const { user, isLoading: authLoading, isAdmin, aceCoins, setAceCoins } = useAuth();
   const { streak, updateStreak } = useStreak();
   const { pushMessage } = useMascot();
+  useEffect(() => {
+    document.title = "Quizzes – AceTerus";
+    return () => { document.title = "AceTerus – AI Tutor & Quiz Platform for Malaysian Students"; };
+  }, []);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const previewDeckId = searchParams.get("preview");

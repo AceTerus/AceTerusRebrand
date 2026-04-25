@@ -53,6 +53,10 @@ const getDateLabel = (dateStr: string) => {
 export const Chat = () => {
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
+  useEffect(() => {
+    document.title = "Messages – AceTerus";
+    return () => { document.title = "AceTerus – AI Tutor & Quiz Platform for Malaysian Students"; };
+  }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   const userId = user?.id;
   const { unreadCounts, clearUnread } = useChatNotifications();

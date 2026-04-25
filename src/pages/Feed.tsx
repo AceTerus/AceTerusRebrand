@@ -52,6 +52,10 @@ interface SearchProfile {
 export const Feed = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  useEffect(() => {
+    document.title = "Feed – AceTerus";
+    return () => { document.title = "AceTerus – AI Tutor & Quiz Platform for Malaysian Students"; };
+  }, []);
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");

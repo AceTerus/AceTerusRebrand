@@ -178,6 +178,9 @@ function useSmoothAnchor() {
 const Index = () => {
   const { user, isLoading } = useAuth();
   useSmoothAnchor();
+  React.useEffect(() => {
+    document.title = "AceTerus – Free AI Tutor & SPM Quiz Platform for Malaysian Students";
+  }, []);
 
   if (isLoading) return null;
   if (user) return <Navigate to="/feed" replace />;
