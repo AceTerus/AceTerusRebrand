@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Camera, Flame, Trash2, Users, Search, Lock,
   Settings, CheckCircle, XCircle, SkipForward, BarChart2,
-  Zap, Target, PenLine, GraduationCap, MapPin,
+  Zap, Target, PenLine, GraduationCap, MapPin, Plus,
   BookOpen, BookMarked, Compass, Award, Building2, Microscope,
 } from 'lucide-react';
 import { NotificationsBell } from '@/components/NotificationsBell';
@@ -86,6 +86,10 @@ const EDUCATION_LEVELS: LevelConfig[] = [
   { value: 'degree',    label: 'Degree',     sub: 'Year 1 – 5',  Icon: Building2,     idleBg: '#E0F2FE', idleColor: '#0369a1', activeBg: '#0369a1', activeShadow: '#075985' },
   { value: 'postgrad',  label: 'Postgrad',   sub: "Master's / PhD", Icon: Microscope, idleBg: '#EDE9FE', idleColor: '#6D28D9', activeBg: '#6D28D9', activeShadow: '#4C1D95' },
 ];
+
+const LEVEL_ORDER: Record<string, number> = {
+  primary: 1, secondary: 2, preuni: 3, diploma: 4, degree: 5, postgrad: 6,
+};
 
 const YEAR_OPTIONS: Record<EducationLevel, string[]> = {
   primary:   ['Standard 1','Standard 2','Standard 3','Standard 4','Standard 5','Standard 6'],
@@ -168,6 +172,10 @@ interface StudentSchool {
   school_type: string | null;
   school_location: string | null;
   class_name: string | null;
+  start_year: number | null;
+  end_year: number | null;
+  is_current: boolean;
+  schools?: SchoolResult | null;
 }
 
 interface Profile {
@@ -215,9 +223,10 @@ export const Profile = () => {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
-  const [schoolInfo, setSchoolInfo] = useState<StudentSchool | null>(null);
+  const [schoolEntries, setSchoolEntries] = useState<StudentSchool[]>([]);
   const [isSchoolDialogOpen, setIsSchoolDialogOpen] = useState(false);
-  const [schoolForm, setSchoolForm] = useState({ educationLevel: '' as EducationLevel | '', grade: '', curricular: '', class_name: '' });
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [schoolForm, setSchoolForm] = useState({ educationLevel: '' as EducationLevel | '', grade: '', curricular: '', class_name: '', start_year: '', end_year: '', is_current: false });
   const [selectedSchool, setSelectedSchool] = useState<SchoolResult | null>(null);
   const [isSavingSchool, setIsSavingSchool] = useState(false);
 
@@ -237,6 +246,12 @@ export const Profile = () => {
       fetchSchoolInfo();
     }
   }, [profileUserId]);
+
+  useEffect(() => {
+    const name = profile?.username;
+    document.title = name ? `${name} – AceTerus` : "Profile – AceTerus";
+    return () => { document.title = "AceTerus – AI Tutor & Quiz Platform for Malaysian Students"; };
+  }, [profile?.username]);
 
   const fetchProfile = async () => {
     if (!profileUserId) return;
@@ -389,18 +404,48 @@ export const Profile = () => {
     if (!profileUserId) return;
     const { data } = await (supabase.from('student_schools') as any)
       .select('*, schools(id, name, type, level, state, district, city)')
-      .eq('user_id', profileUserId).maybeSingle();
-    if (data) {
-      setSchoolInfo(data as StudentSchool);
-      setSchoolForm({ educationLevel: deriveLevelFromGrade(data.grade ?? ''), grade: data.grade ?? '', curricular: data.curricular ?? '', class_name: data.class_name ?? '' });
-      if (data.schools) setSelectedSchool(data.schools as SchoolResult);
+      .eq('user_id', profileUserId)
+      .order('created_at', { ascending: true });
+    setSchoolEntries((data as StudentSchool[]) ?? []);
+  };
+
+  const openAddEntry = () => {
+    setEditingEntryId(null);
+    setSchoolForm({ educationLevel: '', grade: '', curricular: '', class_name: '', start_year: '', end_year: '', is_current: false });
+    setSelectedSchool(null);
+    setIsSchoolDialogOpen(true);
+  };
+
+  const openEditEntry = (entry: StudentSchool) => {
+    setEditingEntryId(entry.id);
+    setSchoolForm({
+      educationLevel: deriveLevelFromGrade(entry.grade ?? ''),
+      grade: entry.grade ?? '',
+      curricular: entry.curricular ?? '',
+      class_name: entry.class_name ?? '',
+      start_year: entry.start_year ? String(entry.start_year) : '',
+      end_year: entry.end_year ? String(entry.end_year) : '',
+      is_current: entry.is_current ?? false,
+    });
+    setSelectedSchool(entry.schools ?? null);
+    setIsSchoolDialogOpen(true);
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    try {
+      const { error } = await (supabase.from('student_schools') as any).delete().eq('id', id);
+      if (error) throw error;
+      setSchoolEntries(prev => prev.filter(e => e.id !== id));
+      toast({ title: 'Education entry removed.' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || 'Failed to delete', variant: 'destructive' });
     }
   };
 
   const handleSaveSchool = async () => {
     if (!user) return;
     if (!selectedSchool) { toast({ title: 'Please select a school', variant: 'destructive' }); return; }
-    if (!schoolForm.grade) { toast({ title: 'Please select your grade/form', variant: 'destructive' }); return; }
+    if (!schoolForm.grade) { toast({ title: 'Please select your year / grade', variant: 'destructive' }); return; }
     setIsSavingSchool(true);
     try {
       const payload = {
@@ -412,14 +457,28 @@ export const Profile = () => {
         grade: schoolForm.grade,
         curricular: schoolForm.curricular || null,
         class_name: schoolForm.class_name || null,
+        start_year: schoolForm.start_year ? Number(schoolForm.start_year) : null,
+        end_year: schoolForm.is_current ? null : (schoolForm.end_year ? Number(schoolForm.end_year) : null),
+        is_current: schoolForm.is_current,
       };
-      const { error } = await (supabase.from('student_schools') as any).upsert(payload, { onConflict: 'user_id' });
-      if (error) throw error;
-      toast({ title: 'School info saved!' });
+      // If marking as current, clear is_current on all other entries first
+      if (schoolForm.is_current) {
+        const clearQuery = (supabase.from('student_schools') as any).update({ is_current: false }).eq('user_id', user.id);
+        const { error: clearErr } = editingEntryId ? await clearQuery.neq('id', editingEntryId) : await clearQuery;
+        if (clearErr) throw clearErr;
+      }
+      if (editingEntryId) {
+        const { error } = await (supabase.from('student_schools') as any).update(payload).eq('id', editingEntryId);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase.from('student_schools') as any).insert(payload);
+        if (error) throw error;
+      }
+      toast({ title: editingEntryId ? 'Education updated!' : 'Education added!' });
       setIsSchoolDialogOpen(false);
       fetchSchoolInfo();
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message || 'Failed to save school info', variant: 'destructive' });
+      toast({ title: 'Error', description: err?.message || 'Failed to save', variant: 'destructive' });
     } finally { setIsSavingSchool(false); }
   };
 
@@ -457,7 +516,9 @@ export const Profile = () => {
   const schoolDialog = (
     <DialogContent className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A] max-w-md">
       <DialogHeader>
-        <DialogTitle className={`${DISPLAY} font-extrabold text-lg`}>School Information</DialogTitle>
+        <DialogTitle className={`${DISPLAY} font-extrabold text-lg`}>
+          {editingEntryId ? 'Edit Education' : 'Add Education'}
+        </DialogTitle>
       </DialogHeader>
       <div className="space-y-4 py-2">
 
@@ -567,6 +628,57 @@ export const Profile = () => {
             />
           </div>
         )}
+
+        {/* Step 6 — Year range */}
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Years Attended <span className="normal-case font-semibold text-slate-400">(optional)</span></Label>
+
+          {/* Currently enrolled checkbox */}
+          <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+            <div
+              onClick={() => setSchoolForm(f => ({ ...f, is_current: !f.is_current, end_year: '' }))}
+              className="w-5 h-5 rounded-[6px] border-[2px] border-[#0F172A] flex items-center justify-center shrink-0 transition-colors"
+              style={{ background: schoolForm.is_current ? C.blue : '#fff', boxShadow: schoolForm.is_current ? `1px 1px 0 0 #1D4ED8` : '1px 1px 0 0 #0F172A' }}
+            >
+              {schoolForm.is_current && (
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
+                </svg>
+              )}
+            </div>
+            <span className="text-sm font-bold font-['Baloo_2'] text-slate-700">I am currently studying here</span>
+          </label>
+
+          <div className="flex items-center gap-2">
+            <select
+              className={`${INPUT} flex-1`}
+              value={schoolForm.start_year}
+              onChange={(e) => setSchoolForm(f => ({ ...f, start_year: e.target.value }))}
+            >
+              <option value="">From</option>
+              {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <span className="text-sm font-bold text-slate-400 shrink-0">–</span>
+            {schoolForm.is_current ? (
+              <div className={`${INPUT} flex-1 flex items-center text-blue-500 font-extrabold font-['Baloo_2'] pointer-events-none select-none`}>
+                Present
+              </div>
+            ) : (
+              <select
+                className={`${INPUT} flex-1`}
+                value={schoolForm.end_year}
+                onChange={(e) => setSchoolForm(f => ({ ...f, end_year: e.target.value }))}
+              >
+                <option value="">To</option>
+                {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
 
         <button className={`${BTN_PRIMARY} w-full`} style={{ background: C.blue }} onClick={handleSaveSchool} disabled={isSavingSchool || !schoolForm.grade || !selectedSchool}>
           {isSavingSchool ? 'Saving…' : 'Save Info'}
@@ -811,85 +923,150 @@ export const Profile = () => {
           </div>
         </div>
 
-        {/* ── School Information (LinkedIn-style) ── */}
-        {(isOwnProfile || schoolInfo) && (
-          <div className={`${CARD} mb-6 overflow-hidden`}>
-            {/* header bar */}
-            <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${C.blue}, ${C.cyan})` }} />
-            <div className="p-5">
-              <div className="flex items-start gap-4">
-                {/* school icon */}
-                <div className="w-14 h-14 rounded-[16px] border-[2.5px] border-[#0F172A] shadow-[3px_3px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.skySoft }}>
-                  <GraduationCap className="w-7 h-7" style={{ color: C.blue }} />
-                </div>
+        {/* ── Education (LinkedIn-style multi-entry) ── */}
+        {(isOwnProfile || schoolEntries.length > 0) && (() => {
+          const sortedEntries = [...schoolEntries].sort((a, b) => {
+            const la = LEVEL_ORDER[deriveLevelFromGrade(a.grade ?? '')] ?? 99;
+            const lb = LEVEL_ORDER[deriveLevelFromGrade(b.grade ?? '')] ?? 99;
+            return la - lb;
+          });
+          return (
+            <>
+              {/* Single controlled dialog — opened by add/edit buttons below */}
+              <Dialog open={isSchoolDialogOpen} onOpenChange={setIsSchoolDialogOpen}>
+                {schoolDialog}
+              </Dialog>
 
-                <div className="flex-1 min-w-0">
-                  {schoolInfo ? (
-                    <>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className={`${DISPLAY} font-extrabold text-lg leading-tight`}>{schoolInfo.school_name ?? "Unknown School"}</p>
-                          <p className="text-sm font-semibold text-slate-600 mt-0.5">
-                            {(() => {
-                              const isTert = schoolInfo.school_type && ['Universiti Awam','Universiti Swasta','Politeknik','Kolej Komuniti','Kolej Matrikulasi'].includes(schoolInfo.school_type);
-                              return [
-                                schoolInfo.grade,
-                                schoolInfo.curricular ? (isTert ? schoolInfo.curricular : `${schoolInfo.curricular} Stream`) : null,
-                                schoolInfo.class_name ? (isTert ? schoolInfo.class_name : `Class ${schoolInfo.class_name}`) : null,
-                              ].filter(Boolean).join(' · ') || 'No details added';
-                            })()}
-                          </p>
-                        </div>
-                        {isOwnProfile && (
-                          <Dialog open={isSchoolDialogOpen} onOpenChange={setIsSchoolDialogOpen}>
-                            <DialogTrigger asChild>
-                              <button className="w-8 h-8 rounded-full border-[2px] border-[#0F172A] bg-white flex items-center justify-center hover:-translate-y-0.5 hover:shadow-[2px_2px_0_0_#0F172A] transition-all shrink-0 shadow-[1px_1px_0_0_#0F172A]">
-                                <PenLine className="w-3.5 h-3.5 text-slate-500" />
-                              </button>
-                            </DialogTrigger>
-                            {schoolDialog}
-                          </Dialog>
-                        )}
+              <div className={`${CARD} mb-6 overflow-hidden`}>
+                <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${C.blue}, ${C.cyan})` }} />
+                <div className="p-5">
+
+                  {/* Section header */}
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0" style={{ background: C.skySoft }}>
+                        <GraduationCap className="w-4.5 h-4.5" style={{ color: C.blue }} />
                       </div>
-                      <div className="flex items-center flex-wrap gap-2 mt-2.5">
-                        {schoolInfo.school_type && (() => {
-                          const s = SCHOOL_TYPE_STYLE[schoolInfo.school_type!] ?? { bg: '#f1f5f9', color: '#64748b' };
-                          return (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border-[2px] border-[#0F172A] text-[11px] font-extrabold shadow-[1px_1px_0_0_#0F172A]" style={{ background: s.bg, color: s.color }}>
-                              {schoolInfo.school_type}
-                            </span>
-                          );
-                        })()}
-                        {schoolInfo.school_location && (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
-                            <MapPin className="w-3.5 h-3.5 shrink-0" />{schoolInfo.school_location}
-                          </span>
-                        )}
+                      <p className={`${DISPLAY} font-extrabold text-lg`}>Education</p>
+                    </div>
+                    {isOwnProfile && (
+                      <button
+                        onClick={openAddEntry}
+                        className={`${BTN_PRIMARY} text-xs px-3.5 py-2 gap-1`}
+                        style={{ background: C.blue }}
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Empty state */}
+                  {sortedEntries.length === 0 && isOwnProfile && (
+                    <button
+                      onClick={openAddEntry}
+                      className="w-full py-6 rounded-[16px] border-[2px] border-dashed border-slate-300 flex flex-col items-center gap-2 hover:border-blue-400 hover:bg-blue-50/40 transition-colors group"
+                    >
+                      <div className="w-10 h-10 rounded-full border-[2px] border-slate-300 group-hover:border-blue-400 flex items-center justify-center transition-colors">
+                        <Plus className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className={`${DISPLAY} font-extrabold text-base`}>Add your school info</p>
-                        <p className="text-xs font-semibold text-slate-400 mt-0.5">Let others know where you study</p>
-                      </div>
-                      {isOwnProfile && (
-                        <Dialog open={isSchoolDialogOpen} onOpenChange={setIsSchoolDialogOpen}>
-                          <DialogTrigger asChild>
-                            <button className={`${BTN_PRIMARY} text-xs px-4 py-2 shrink-0`} style={{ background: C.blue }}>
-                              + Add
-                            </button>
-                          </DialogTrigger>
-                          {schoolDialog}
-                        </Dialog>
-                      )}
+                      <p className="text-sm font-extrabold text-slate-400 group-hover:text-blue-500 transition-colors font-['Baloo_2']">Add your education history</p>
+                      <p className="text-xs font-semibold text-slate-400">Primary, secondary, pre-u, university — all optional</p>
+                    </button>
+                  )}
+
+                  {/* Timeline entries */}
+                  {sortedEntries.length > 0 && (
+                    <div>
+                      {sortedEntries.map((entry, idx) => {
+                        const level = deriveLevelFromGrade(entry.grade ?? '');
+                        const lvlCfg = level ? EDUCATION_LEVELS.find(l => l.value === level) : null;
+                        const isTert = entry.school_type && ['Universiti Awam','Universiti Swasta','Politeknik','Kolej Komuniti','Kolej Matrikulasi'].includes(entry.school_type);
+                        const typeStyle = entry.school_type ? (SCHOOL_TYPE_STYLE[entry.school_type] ?? { bg: '#f1f5f9', color: '#64748b' }) : null;
+                        const detail = [
+                          entry.grade,
+                          entry.curricular ? (isTert ? entry.curricular : `${entry.curricular} Stream`) : null,
+                          entry.class_name ? (isTert ? entry.class_name : `Class ${entry.class_name}`) : null,
+                        ].filter(Boolean).join(' · ');
+                        const isLast = idx === sortedEntries.length - 1;
+                        const LvlIcon = lvlCfg?.Icon ?? GraduationCap;
+
+                        return (
+                          <div key={entry.id} className="flex gap-4">
+                            {/* Timeline spine */}
+                            <div className="flex flex-col items-center shrink-0" style={{ width: 40 }}>
+                              <div
+                                className="w-10 h-10 rounded-[12px] border-[2px] border-[#0F172A] shadow-[2px_2px_0_0_#0F172A] flex items-center justify-center shrink-0"
+                                style={{ background: lvlCfg?.idleBg ?? C.skySoft }}
+                              >
+                                <LvlIcon className="w-4.5 h-4.5" style={{ color: lvlCfg?.idleColor ?? C.blue }} />
+                              </div>
+                              {!isLast && (
+                                <div className="w-0.5 flex-1 my-1.5 rounded-full bg-slate-200" style={{ minHeight: 20 }} />
+                              )}
+                            </div>
+
+                            {/* Entry content */}
+                            <div className={`flex-1 min-w-0 ${isLast ? 'pb-0' : 'pb-4'}`}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className={`${DISPLAY} font-extrabold text-base leading-tight`}>{entry.school_name ?? 'Unknown School'}</p>
+                                  {detail && <p className="text-sm font-semibold text-slate-600 mt-0.5">{detail}</p>}
+                                  {(entry.start_year || entry.is_current) && (
+                                    <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                                      {entry.start_year ?? '?'} –{' '}
+                                      {entry.is_current
+                                        ? <span className="font-extrabold" style={{ color: C.blue }}>Present</span>
+                                        : (entry.end_year ?? '?')
+                                      }
+                                    </p>
+                                  )}
+                                </div>
+                                {isOwnProfile && (
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      onClick={() => openEditEntry(entry)}
+                                      className="w-7 h-7 rounded-full border-[2px] border-[#0F172A] bg-white flex items-center justify-center hover:-translate-y-0.5 transition-all shadow-[1px_1px_0_0_#0F172A]"
+                                      title="Edit"
+                                    >
+                                      <PenLine className="w-3 h-3 text-slate-500" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEntry(entry.id)}
+                                      className="w-7 h-7 rounded-full border-[2px] border-[#0F172A] bg-white flex items-center justify-center hover:-translate-y-0.5 transition-all shadow-[1px_1px_0_0_#0F172A] hover:bg-red-50"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-3 h-3 text-red-400" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 mt-2">
+                                {typeStyle && entry.school_type && (
+                                  <span
+                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full border-[2px] border-[#0F172A] text-[11px] font-extrabold shadow-[1px_1px_0_0_#0F172A]"
+                                    style={{ background: typeStyle.bg, color: typeStyle.color }}
+                                  >
+                                    {entry.school_type}
+                                  </span>
+                                )}
+                                {entry.school_location && (
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                                    <MapPin className="w-3 h-3 shrink-0" />{entry.school_location}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
+
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </>
+          );
+        })()}
 
         {/* ── Stats ── */}
         <div className="grid grid-cols-4 gap-3 mb-6">

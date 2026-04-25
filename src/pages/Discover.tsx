@@ -31,6 +31,10 @@ export const Discover = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  useEffect(() => {
+    document.title = "Discover Quizzes – AceTerus";
+    return () => { document.title = "AceTerus – AI Tutor & Quiz Platform for Malaysian Students"; };
+  }, []);
   useEffect(() => { fetchProfiles(); }, []);
 
   const fetchProfiles = async () => {
