@@ -129,9 +129,10 @@ export const SchoolPicker = ({ value, onChange, placeholder = "Search for your s
           <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
           <button
             onClick={clear}
-            className="w-7 h-7 rounded-full border-[2px] border-[#0F172A] flex items-center justify-center hover:bg-red-50 transition-colors shrink-0"
+            className="relative w-11 h-11 rounded-full border-[2px] border-[#0F172A] flex items-center justify-center hover:bg-red-50 transition-colors shrink-0 group"
           >
-            <X className="w-3.5 h-3.5 text-slate-400" />
+            <span className="absolute inset-0 rounded-full border-2 border-red-400 opacity-0 group-hover:opacity-100 animate-ping pointer-events-none" />
+            <X className="w-5 h-5 text-slate-500 group-hover:text-red-500 transition-colors" />
           </button>
         </div>
       ) : (
