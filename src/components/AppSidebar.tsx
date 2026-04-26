@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, Search, LogOut, Compass, FileText, MessageCircle, ShieldCheck, ScanLine, ChevronLeft, ChevronRight, User, CalendarDays } from "lucide-react";
+import { BookOpen, Search, LogOut, Compass, FileText, MessageCircle, ScanLine, ChevronLeft, ChevronRight, User, CalendarDays } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -57,7 +57,6 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
     { href: "/quiz",       label: "Quiz",       icon: BookOpen },
     { href: "/materials",  label: "Materials",  icon: FileText },
     { href: "/ar-scanner", label: "AR Scanner", icon: ScanLine },
-    ...(isAdmin ? [{ href: "/admin", label: "Admin", icon: ShieldCheck }] : []),
   ];
 
   const avatarSrc = profileAvatar || user?.user_metadata?.avatar_url;
@@ -117,7 +116,7 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
       </nav>
 
       {/* Events & Deals cross-link */}
-      <div className={`px-3 pb-2 ${collapsed ? "flex justify-center" : ""}`}>
+      <div className="px-3 pb-2">
         <a
           href="https://events.aceterus.com"
           target="_blank"

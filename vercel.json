@@ -10,6 +10,12 @@
     },
     {
       "src": "/(.*)",
+      "dest": "https://aceterus.com/admin",
+      "status": 302,
+      "has": [{ "type": "host", "value": "admin.aceterus.com" }]
+    },
+    {
+      "src": "/(.*)",
       "dest": "/events.html",
       "has": [{ "type": "host", "value": "events.aceterus.com" }]
     },
