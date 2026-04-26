@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     const syncProfile = async (userId: string | undefined) => {
       if (!userId) { setIsAdmin(false); setAceCoins(0); return; }
-      
+
       const { data, error } = await supabase
         .from("profiles")
         .select("is_admin, ace_coins, username")
@@ -61,10 +61,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       setIsAdmin((data as any)?.is_admin ?? false);
       setIsNewUser(!(data as any)?.username);
-      
+
       let coins = (data as any)?.ace_coins ?? 0;
       if (coins < 1000) {
-        // Auto-grant 1000 ACE Coins for new players or those stuck at 0 
+        // Auto-grant 1000 ACE Coins for new players or those stuck at 0
         try {
           await (supabase as any).from('profiles').update({ ace_coins: 1000 }).eq('user_id', userId);
           coins = 1000;
@@ -85,13 +85,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const init = async () => {
+      // Explicitly restore session from URL hash (cross-subdomain SSO from aceterus.com)
+      const hashStr = window.location.hash.slice(1);
+      if (hashStr) {
+        const params = new URLSearchParams(hashStr);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          return; // onAuthStateChange will fire and handle the rest
+        }
+      }
+
+      // Check for existing session
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
       syncProfile(session?.user?.id);
-    });
+    };
+
+    init();
 
     return () => subscription.unsubscribe();
   }, []);
