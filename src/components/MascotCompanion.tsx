@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useMascot } from '@/context/MascotContext';
 import { useStreak } from '@/hooks/useStreak';
-import mascotGif from '@/assets/mascot1.gif';
+const mascotGif = '/mascot1.gif';
 
 /**
  * Ace — the AceTerus star mascot companion.

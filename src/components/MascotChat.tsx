@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, Send } from 'lucide-react';
 import { useMascot } from '@/context/MascotContext';
 import { supabase } from '@/integrations/supabase/client';
-import mascotGif from '@/assets/mascot1.gif';
+const mascotGif = '/mascot1.gif';
 
 interface ChatMessage {
   role: 'user' | 'model';
