@@ -1,17 +1,17 @@
 {
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "/events.html",
-      "has": [{ "type": "host", "value": "events.aceterus.com" }]
-    },
-    {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
     },
     {
-      "src": "/(.*\\.(png|jpg|svg|ico|gif|webp|js|css|woff2?))",
+      "src": "/(.*\\.(png|jpg|svg|ico|gif|webp|js|css|woff2?)$)",
       "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/events.html",
+      "has": [{ "type": "host", "value": "events.aceterus.com" }]
     },
     {
       "src": "/(.*)",
