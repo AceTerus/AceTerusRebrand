@@ -445,7 +445,7 @@ export const Profile = () => {
   const handleSaveSchool = async () => {
     if (!user) return;
     if (!selectedSchool) { toast({ title: 'Please select a school', variant: 'destructive' }); return; }
-    if (!schoolForm.grade) { toast({ title: 'Please select your year / grade', variant: 'destructive' }); return; }
+    if (schoolForm.is_current && !schoolForm.grade) { toast({ title: 'Please select your year / grade', variant: 'destructive' }); return; }
     setIsSavingSchool(true);
     try {
       const payload = {
@@ -454,7 +454,7 @@ export const Profile = () => {
         school_name: selectedSchool.name,
         school_type: selectedSchool.type,
         school_location: selectedSchool.city ? `${selectedSchool.city}, ${selectedSchool.state}` : selectedSchool.state,
-        grade: schoolForm.grade,
+        grade: schoolForm.grade || null,
         curricular: schoolForm.curricular || null,
         class_name: schoolForm.class_name || null,
         start_year: schoolForm.start_year ? Number(schoolForm.start_year) : null,
@@ -493,11 +493,15 @@ export const Profile = () => {
   if (!user) return <SignInGate message="Please sign in to view your profile." />;
 
   // ── school dialog derived values ──
-  const isTertiary    = schoolDBLevel(schoolForm.grade) === 'tertiary';
+  const activeEduLevel = schoolForm.educationLevel as EducationLevel | '';
+  const curLevelFromEdu = activeEduLevel === 'primary' ? 'primary'
+    : activeEduLevel === 'secondary' || activeEduLevel === 'preuni' ? 'secondary'
+    : activeEduLevel ? 'tertiary'
+    : undefined;
+  const curLevel      = schoolForm.grade ? schoolDBLevel(schoolForm.grade) : curLevelFromEdu;
+  const isTertiary    = curLevel === 'tertiary';
   const curStreams     = streamOptions(schoolForm.grade);
   const curTypes      = schoolTypeFilter(schoolForm.grade);
-  const curLevel      = schoolDBLevel(schoolForm.grade);
-  const activeEduLevel = schoolForm.educationLevel as EducationLevel | '';
 
   const handleLevelChange = (level: EducationLevel) => {
     const oldDBLevel = schoolDBLevel(schoolForm.grade);
@@ -514,13 +518,13 @@ export const Profile = () => {
   const activeLevelCfg = activeEduLevel ? EDUCATION_LEVELS.find(l => l.value === activeEduLevel) : null;
 
   const schoolDialog = (
-    <DialogContent className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A] max-w-md">
+    <DialogContent className="border-[2.5px] border-[#0F172A] rounded-[20px] shadow-[5px_5px_0_0_#0F172A] max-w-md max-h-[85vh] flex flex-col">
       <DialogHeader>
         <DialogTitle className={`${DISPLAY} font-extrabold text-lg`}>
           {editingEntryId ? 'Edit Education' : 'Add Education'}
         </DialogTitle>
       </DialogHeader>
-      <div className="space-y-4 py-2">
+      <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
 
         {/* Step 1 — Education level cards */}
         <div className="space-y-2">
@@ -548,8 +552,26 @@ export const Profile = () => {
           </div>
         </div>
 
-        {/* Step 2 — Year pills (colored to match selected level) */}
-        {activeEduLevel && activeLevelCfg && (
+        {/* Step 2 — Currently enrolled */}
+        {activeEduLevel && (
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <div
+              onClick={() => setSchoolForm(f => ({ ...f, is_current: !f.is_current, grade: '', curricular: '', start_year: '', end_year: '' }))}
+              className="w-5 h-5 rounded-[6px] border-[2px] border-[#0F172A] flex items-center justify-center shrink-0 transition-colors"
+              style={{ background: schoolForm.is_current ? C.blue : '#fff', boxShadow: schoolForm.is_current ? `1px 1px 0 0 #1D4ED8` : '1px 1px 0 0 #0F172A' }}
+            >
+              {schoolForm.is_current && (
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
+                </svg>
+              )}
+            </div>
+            <span className="text-sm font-bold font-['Baloo_2'] text-slate-700">I am currently studying here</span>
+          </label>
+        )}
+
+        {/* Step 3 — Grade/Form pills (current only) */}
+        {schoolForm.is_current && activeEduLevel && activeLevelCfg && (
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
               {activeEduLevel === 'primary' ? 'Standard' : activeEduLevel === 'secondary' ? 'Form' : 'Year / Programme'}
@@ -576,8 +598,8 @@ export const Profile = () => {
           </div>
         )}
 
-        {/* Step 3 — School picker (filtered once grade chosen) */}
-        {schoolForm.grade && (
+        {/* Step 4 — School picker */}
+        {activeEduLevel && (schoolForm.is_current ? !!schoolForm.grade : true) && (
           <div className="space-y-1.5">
             <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
               {isTertiary ? 'University / College' : 'School'}
@@ -601,8 +623,8 @@ export const Profile = () => {
           </div>
         )}
 
-        {/* Step 4 — Stream / Field (hidden for lower secondary & primary) */}
-        {schoolForm.grade && curStreams.length > 0 && (
+        {/* Step 5a — Stream / Field (current only, hidden for lower secondary & primary) */}
+        {schoolForm.is_current && schoolForm.grade && curStreams.length > 0 && (
           <div className="space-y-1.5">
             <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
               {isTertiary ? 'Field of Study' : 'Stream'}
@@ -614,73 +636,61 @@ export const Profile = () => {
           </div>
         )}
 
-        {/* Step 5 — Class / Programme name */}
-        {schoolForm.grade && (
+        {/* Step 5b — Programme / Major (tertiary only) */}
+        {isTertiary && selectedSchool && (
           <div className="space-y-1.5">
-            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-              {isTertiary ? 'Programme / Major' : 'Class Name'}
-            </Label>
+            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Programme / Major <span className="normal-case font-semibold text-slate-400">(optional)</span></Label>
             <input
               className={INPUT}
               value={schoolForm.class_name}
               onChange={(e) => setSchoolForm(f => ({ ...f, class_name: e.target.value }))}
-              placeholder={isTertiary ? 'e.g. Computer Science' : 'e.g. 5 Amanah'}
+              placeholder="e.g. Computer Science"
             />
           </div>
         )}
 
         {/* Step 6 — Year range */}
-        <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Years Attended <span className="normal-case font-semibold text-slate-400">(optional)</span></Label>
-
-          {/* Currently enrolled checkbox */}
-          <label className="flex items-center gap-2.5 cursor-pointer group select-none">
-            <div
-              onClick={() => setSchoolForm(f => ({ ...f, is_current: !f.is_current, end_year: '' }))}
-              className="w-5 h-5 rounded-[6px] border-[2px] border-[#0F172A] flex items-center justify-center shrink-0 transition-colors"
-              style={{ background: schoolForm.is_current ? C.blue : '#fff', boxShadow: schoolForm.is_current ? `1px 1px 0 0 #1D4ED8` : '1px 1px 0 0 #0F172A' }}
-            >
-              {schoolForm.is_current && (
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
-                </svg>
-              )}
-            </div>
-            <span className="text-sm font-bold font-['Baloo_2'] text-slate-700">I am currently studying here</span>
-          </label>
-
-          <div className="flex items-center gap-2">
-            <select
-              className={`${INPUT} flex-1`}
-              value={schoolForm.start_year}
-              onChange={(e) => setSchoolForm(f => ({ ...f, start_year: e.target.value }))}
-            >
-              <option value="">From</option>
-              {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            <span className="text-sm font-bold text-slate-400 shrink-0">–</span>
-            {schoolForm.is_current ? (
-              <div className={`${INPUT} flex-1 flex items-center text-blue-500 font-extrabold font-['Baloo_2'] pointer-events-none select-none`}>
-                Present
-              </div>
-            ) : (
+        {activeEduLevel && (schoolForm.is_current ? !!schoolForm.grade : true) && (
+          <div className="space-y-2">
+            <Label className="text-xs font-bold uppercase tracking-wide text-slate-500">Years Attended <span className="normal-case font-semibold text-slate-400">(optional)</span></Label>
+            <div className="flex items-center gap-2">
               <select
                 className={`${INPUT} flex-1`}
-                value={schoolForm.end_year}
-                onChange={(e) => setSchoolForm(f => ({ ...f, end_year: e.target.value }))}
+                value={schoolForm.start_year}
+                onChange={(e) => setSchoolForm(f => ({ ...f, start_year: e.target.value }))}
               >
-                <option value="">To</option>
+                <option value="">From</option>
                 {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
-            )}
+              <span className="text-sm font-bold text-slate-400 shrink-0">–</span>
+              {schoolForm.is_current ? (
+                <div className={`${INPUT} flex-1 flex items-center text-blue-500 font-extrabold font-['Baloo_2'] pointer-events-none select-none`}>
+                  Present
+                </div>
+              ) : (
+                <select
+                  className={`${INPUT} flex-1`}
+                  value={schoolForm.end_year}
+                  onChange={(e) => setSchoolForm(f => ({ ...f, end_year: e.target.value }))}
+                >
+                  <option value="">To</option>
+                  {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <button className={`${BTN_PRIMARY} w-full`} style={{ background: C.blue }} onClick={handleSaveSchool} disabled={isSavingSchool || !schoolForm.grade || !selectedSchool}>
+        <button
+          className={`${BTN_PRIMARY} w-full`}
+          style={{ background: C.blue }}
+          onClick={handleSaveSchool}
+          disabled={isSavingSchool || !activeEduLevel || !selectedSchool || (schoolForm.is_current && !schoolForm.grade)}
+        >
           {isSavingSchool ? 'Saving…' : 'Save Info'}
         </button>
       </div>
@@ -925,10 +935,20 @@ export const Profile = () => {
 
         {/* ── Education (LinkedIn-style multi-entry) ── */}
         {(isOwnProfile || schoolEntries.length > 0) && (() => {
+          const schoolDBLevelOrder = (e: StudentSchool) => {
+            const fromGrade = LEVEL_ORDER[deriveLevelFromGrade(e.grade ?? '')];
+            if (fromGrade !== undefined) return fromGrade;
+            const dbLevel = (e as any).schools?.level;
+            if (dbLevel === 'primary') return 1;
+            if (dbLevel === 'secondary') return 2;
+            if (dbLevel === 'tertiary') return 4;
+            return 99;
+          };
           const sortedEntries = [...schoolEntries].sort((a, b) => {
-            const la = LEVEL_ORDER[deriveLevelFromGrade(a.grade ?? '')] ?? 99;
-            const lb = LEVEL_ORDER[deriveLevelFromGrade(b.grade ?? '')] ?? 99;
-            return la - lb;
+            const la = schoolDBLevelOrder(a);
+            const lb = schoolDBLevelOrder(b);
+            if (lb !== la) return lb - la;
+            return (b.start_year ?? 0) - (a.start_year ?? 0);
           });
           return (
             <>
