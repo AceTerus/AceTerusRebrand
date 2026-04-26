@@ -116,7 +116,16 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
 
         {/* Events & Deals cross-link */}
         <button
-          onClick={() => window.open("https://events.aceterus.com", "_blank")}
+          onClick={async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            const base = "https://events.aceterus.com";
+            if (session) {
+              const hash = `#access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer&type=magiclink`;
+              window.open(`${base}/${hash}`, "_blank");
+            } else {
+              window.open(base, "_blank");
+            }
+          }}
           title={collapsed ? "Events & Deals" : undefined}
           className={`relative flex items-center rounded-xl transition-all duration-150 group cursor-pointer text-foreground/70 hover:bg-muted/60 hover:text-foreground hover:-translate-y-0.5 ${collapsed ? "justify-center px-0 py-4" : "px-5 py-4 space-x-4"}`}
         >
