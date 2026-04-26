@@ -24,6 +24,22 @@ export const useAuth = () => {
   return context;
 };
 
+// Cross-subdomain sign-out cookie helpers (domain=.aceterus.com is readable by all subdomains)
+const SIGNOUT_COOKIE = 'ace_signout';
+const COOKIE_DOMAIN = '.aceterus.com';
+
+function setSignOutCookie() {
+  document.cookie = `${SIGNOUT_COOKIE}=1; domain=${COOKIE_DOMAIN}; path=/; max-age=300; SameSite=Lax`;
+}
+
+function clearSignOutCookie() {
+  document.cookie = `${SIGNOUT_COOKIE}=; domain=${COOKIE_DOMAIN}; path=/; max-age=0; SameSite=Lax`;
+}
+
+function hasSignOutCookie() {
+  return document.cookie.split(';').some(c => c.trim().startsWith(`${SIGNOUT_COOKIE}=1`));
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -77,7 +93,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
@@ -85,8 +101,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     );
 
+    const localSignOut = async () => {
+      clearSignOutCookie();
+      await supabase.auth.signOut();
+      setIsAdmin(false);
+    };
+
+    // Check the sign-out cookie and act on it
+    const checkSignOutCookie = () => {
+      if (hasSignOutCookie()) localSignOut();
+    };
+
+    // Check on tab focus (catches sign-out from another subdomain tab)
+    window.addEventListener('focus', checkSignOutCookie);
+    // Also poll every 5 seconds to catch sign-outs in background tabs
+    const pollInterval = setInterval(checkSignOutCookie, 5000);
+
     const init = async () => {
-      // Explicitly restore session from URL hash (cross-subdomain SSO from aceterus.com)
+      // Honour a pending global sign-out first
+      if (hasSignOutCookie()) {
+        await localSignOut();
+        return;
+      }
+
+      // Explicitly restore session from URL hash (cross-subdomain SSO)
       const hashStr = window.location.hash.slice(1);
       if (hashStr) {
         const params = new URLSearchParams(hashStr);
@@ -109,10 +147,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     init();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('focus', checkSignOutCookie);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const signOut = async () => {
+    setSignOutCookie(); // signal all other subdomains
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('Error signing out:', error);

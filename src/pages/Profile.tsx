@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { SignInGate } from '@/components/SignInGate';
 import { createPortal } from 'react-dom';
 import { ImageCropper } from '@/components/ImageCropper';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useStreak } from '@/hooks/useStreak';
