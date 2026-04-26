@@ -572,7 +572,11 @@ const AdminQuiz = () => {
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          {!window.location.hostname.startsWith("admin.") && (
+          {window.location.hostname.startsWith("admin.") ? (
+            <a href="https://aceterus.com" className="inline-flex items-center gap-2 mb-3 px-3 py-1.5 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+              <ChevronLeft className="w-4 h-4" /> Back to AceTerus Web
+            </a>
+          ) : (
             <Button variant="outline" size="sm" onClick={() => navigate("/profile")} className="gap-2 mb-3">
               <ChevronLeft className="w-4 h-4" /> Back to Profile
             </Button>

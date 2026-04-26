@@ -113,31 +113,19 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
             </button>
           );
         })}
-      </nav>
 
-      {/* Events & Deals cross-link */}
-      <div className="px-3 pb-2">
-        <a
-          href="https://events.aceterus.com"
-          target="_blank"
-          rel="noopener noreferrer"
+        {/* Events & Deals cross-link */}
+        <button
+          onClick={() => window.open("https://events.aceterus.com", "_blank")}
           title={collapsed ? "Events & Deals" : undefined}
-          className={`
-            relative flex items-center rounded-xl transition-all duration-150 group cursor-pointer w-full
-            ${collapsed ? "justify-center px-0 py-4" : "px-5 py-4 space-x-4"}
-            text-foreground/70 hover:bg-muted/60 hover:text-foreground hover:-translate-y-0.5
-          `}
+          className={`relative flex items-center rounded-xl transition-all duration-150 group cursor-pointer text-foreground/70 hover:bg-muted/60 hover:text-foreground hover:-translate-y-0.5 ${collapsed ? "justify-center px-0 py-4" : "px-5 py-4 space-x-4"}`}
         >
           <div className="relative flex-shrink-0">
             <CalendarDays className="w-6 h-6 stroke-[1.8]" />
           </div>
-          {!collapsed && (
-            <div className="flex-1 flex items-center justify-between">
-              <span className="text-[17px]">Events &amp; Deals</span>
-            </div>
-          )}
-        </a>
-      </div>
+          {!collapsed && <span className="text-[17px] flex-1">Events &amp; Deals</span>}
+        </button>
+      </nav>
 
       {/* Collapse toggle */}
       <div className={`px-3 pb-2 ${collapsed ? "flex justify-center" : ""}`}>
