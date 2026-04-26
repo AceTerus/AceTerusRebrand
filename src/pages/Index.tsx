@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
   ArrowRight, Rocket, Eye, Zap, Sparkles, Star, Flame, CheckCircle2, Trophy,
@@ -177,6 +177,7 @@ function useSmoothAnchor() {
 /* ── page component ─────────────────────────────────────────────────────── */
 const Index = () => {
   const { user, isLoading } = useAuth();
+  const [videoError, setVideoError] = useState(false);
   useSmoothAnchor();
   React.useEffect(() => {
     document.title = "AceTerus – Free AI Tutor & SPM Quiz Platform for Malaysian Students";
@@ -279,14 +280,19 @@ const Index = () => {
       {/* ── HERO (nav lives inside so it floats over the video) ──────────── */}
       <section className="relative px-5 pt-6 pb-24">
         {/* background video */}
-        <video
-          className="absolute inset-0 w-full h-full object-cover"
-          src="/videos/promotional.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-        />
+        {!videoError ? (
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            src="/videos/promotional.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            onError={() => setVideoError(true)}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-[#3BD6F5] via-[#2F7CFF] to-[#2E2BE5]" />
+        )}
         {/* video overlay — keeps text readable over the video */}
         <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]" />
 
