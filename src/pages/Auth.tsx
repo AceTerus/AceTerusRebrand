@@ -14,6 +14,10 @@ const C = {
 const DISPLAY = "font-['Baloo_2'] tracking-tight";
 
 const Auth = () => {
+  useEffect(() => {
+    document.title = "Sign In – AceTerus";
+    return () => { document.title = "AceTerus – AI Tutor & Quiz Platform for Malaysian Students"; };
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
