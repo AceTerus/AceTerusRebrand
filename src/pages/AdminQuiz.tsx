@@ -572,9 +572,11 @@ const AdminQuiz = () => {
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Button variant="outline" size="sm" onClick={() => navigate("/profile")} className="gap-2 mb-3">
-            <ChevronLeft className="w-4 h-4" /> Back to Profile
-          </Button>
+          {!window.location.hostname.startsWith("admin.") && (
+            <Button variant="outline" size="sm" onClick={() => navigate("/profile")} className="gap-2 mb-3">
+              <ChevronLeft className="w-4 h-4" /> Back to Profile
+            </Button>
+          )}
           <h1 className="text-3xl font-bold">Admin Tools</h1>
           {section === "quiz" && breadcrumb}
         </div>

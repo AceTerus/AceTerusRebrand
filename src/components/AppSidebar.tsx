@@ -134,7 +134,6 @@ export const AppSidebar = ({ collapsed, onCollapseToggle }: AppSidebarProps) => 
           {!collapsed && (
             <div className="flex-1 flex items-center justify-between">
               <span className="text-[17px]">Events &amp; Deals</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#2F7CFF]/10 text-[#2F7CFF] uppercase tracking-wide">New</span>
             </div>
           )}
         </a>
