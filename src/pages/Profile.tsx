@@ -844,9 +844,22 @@ export const Profile = () => {
 
                     {/* Admin Tools */}
                     {isAdmin && (
-                      <Link to="/admin" className={`${BTN_OUTLINE} w-full max-w-xs flex items-center justify-center gap-2`} style={{ borderColor: '#2E2BE5', color: '#2E2BE5' }}>
+                      <button
+                        onClick={async () => {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          const base = "https://admin.aceterus.com";
+                          if (session) {
+                            const hash = `#access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer&type=magiclink`;
+                            window.open(`${base}/${hash}`, "_blank");
+                          } else {
+                            window.open(base, "_blank");
+                          }
+                        }}
+                        className={`${BTN_OUTLINE} w-full max-w-xs flex items-center justify-center gap-2`}
+                        style={{ borderColor: '#2E2BE5', color: '#2E2BE5' }}
+                      >
                         <ShieldCheck className="w-4 h-4" /> Admin Tools
-                      </Link>
+                      </button>
                     )}
 
                     {/* Quiz History */}
