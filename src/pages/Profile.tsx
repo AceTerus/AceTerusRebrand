@@ -132,9 +132,9 @@ function schoolTypeFilter(grade: string): string[] | undefined {
   if (grade.startsWith('Standard'))
     return ['SK','SJK(C)','SJK(T)','Sekolah Swasta','Sekolah Antarabangsa'];
   if (grade === 'Form 6 (Lower)' || grade === 'Form 6 (Upper)')
-    return ['SMK','SBP','MRSM','Sekolah Swasta'];
+    return ['SMK','SBP','MRSM','Sekolah Swasta','Lain-lain'];
   if (grade.startsWith('Form'))
-    return ['SMK','SMJK','SBP','MRSM','SAM','SABK','Sekolah Swasta','Sekolah Antarabangsa'];
+    return ['SMK','SMJK','SBP','MRSM','SAM','SABK','Sekolah Swasta','Sekolah Antarabangsa','Lain-lain'];
   if (grade === 'Foundation' || grade === 'Matrikulasi')
     return ['Universiti Awam','Universiti Swasta','Kolej Matrikulasi'];
   return ['Universiti Awam','Universiti Swasta','Politeknik','Kolej Komuniti','Kolej Swasta'];

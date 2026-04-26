@@ -46,18 +46,34 @@ ALTER TABLE public.boss_raid_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.boss_raid_attempts ENABLE ROW LEVEL SECURITY;
 
 -- Policies
-CREATE POLICY "Everyone can read boss raids" ON public.boss_raids FOR SELECT USING (true);
-CREATE POLICY "Users can create their own boss raids" ON public.boss_raids FOR INSERT WITH CHECK (auth.uid() = creator_id);
-CREATE POLICY "Users can update their own boss raids" ON public.boss_raids FOR UPDATE USING (auth.uid() = creator_id);
-
-CREATE POLICY "Everyone can read boss raid questions" ON public.boss_raid_questions FOR SELECT USING (true);
-CREATE POLICY "Creator can insert questions" ON public.boss_raid_questions FOR INSERT WITH CHECK (
-  EXISTS(SELECT 1 FROM public.boss_raids WHERE id = raid_id AND creator_id = auth.uid())
-);
-
-CREATE POLICY "Everyone can read attempts" ON public.boss_raid_attempts FOR SELECT USING (true);
-CREATE POLICY "Users can insert own attempts" ON public.boss_raid_attempts FOR INSERT WITH CHECK (auth.uid() = challenger_id);
-CREATE POLICY "Users can update own attempts" ON public.boss_raid_attempts FOR UPDATE USING (auth.uid() = challenger_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raids' AND policyname = 'Everyone can read boss raids') THEN
+    CREATE POLICY "Everyone can read boss raids" ON public.boss_raids FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raids' AND policyname = 'Users can create their own boss raids') THEN
+    CREATE POLICY "Users can create their own boss raids" ON public.boss_raids FOR INSERT WITH CHECK (auth.uid() = creator_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raids' AND policyname = 'Users can update their own boss raids') THEN
+    CREATE POLICY "Users can update their own boss raids" ON public.boss_raids FOR UPDATE USING (auth.uid() = creator_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raid_questions' AND policyname = 'Everyone can read boss raid questions') THEN
+    CREATE POLICY "Everyone can read boss raid questions" ON public.boss_raid_questions FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raid_questions' AND policyname = 'Creator can insert questions') THEN
+    CREATE POLICY "Creator can insert questions" ON public.boss_raid_questions FOR INSERT WITH CHECK (
+      EXISTS(SELECT 1 FROM public.boss_raids WHERE id = raid_id AND creator_id = auth.uid())
+    );
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raid_attempts' AND policyname = 'Everyone can read attempts') THEN
+    CREATE POLICY "Everyone can read attempts" ON public.boss_raid_attempts FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raid_attempts' AND policyname = 'Users can insert own attempts') THEN
+    CREATE POLICY "Users can insert own attempts" ON public.boss_raid_attempts FOR INSERT WITH CHECK (auth.uid() = challenger_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'boss_raid_attempts' AND policyname = 'Users can update own attempts') THEN
+    CREATE POLICY "Users can update own attempts" ON public.boss_raid_attempts FOR UPDATE USING (auth.uid() = challenger_id);
+  END IF;
+END $$;
 
 -- Helper function to fetch user's coin balance from profiles
 CREATE OR REPLACE FUNCTION get_user_ace_coins(target_user_id UUID)
